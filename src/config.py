@@ -1139,6 +1139,13 @@ class Config:
     # Merge stock + market report into one notification (Issue #190)
     merge_email_notification: bool = False
 
+    # 分层分析：Lite 全量初筛 → 高阶模型深度复核该加仓/减仓的票
+    tiered_analysis_enabled: bool = False
+    tier1_model: str = ""  # 初筛模型；空则沿用 LITELLM_MODEL
+    tier2_model: str = ""  # 复核模型；空则沿用 LITELLM_MODEL
+    tier2_top_n: int = 3  # 加仓/减仓两侧各取几只
+    tier2_include_cut: bool = True  # 是否深挖减仓/预警侧
+
     # 消息长度限制（字节）- 超长自动分批发送
     feishu_max_bytes: int = 20000  # 飞书限制约 20KB，默认 20000 字节
     feishu_send_as_file: bool = False  # 飞书是否以文件形式发送报告（默认文字消息）
@@ -2077,6 +2084,11 @@ class Config:
             report_history_compare_n=parse_env_int(os.getenv('REPORT_HISTORY_COMPARE_N'), 0, field_name='REPORT_HISTORY_COMPARE_N', minimum=0),
             analysis_delay=parse_env_float(os.getenv('ANALYSIS_DELAY'), 0.0, field_name='ANALYSIS_DELAY', minimum=0.0),
             merge_email_notification=os.getenv('MERGE_EMAIL_NOTIFICATION', 'false').lower() == 'true',
+            tiered_analysis_enabled=os.getenv('TIERED_ANALYSIS_ENABLED', 'false').lower() == 'true',
+            tier1_model=os.getenv('TIER1_MODEL', '').strip(),
+            tier2_model=os.getenv('TIER2_MODEL', '').strip(),
+            tier2_top_n=parse_env_int(os.getenv('TIER2_TOP_N'), 3, field_name='TIER2_TOP_N', minimum=1),
+            tier2_include_cut=os.getenv('TIER2_INCLUDE_CUT', 'true').lower() == 'true',
             feishu_max_bytes=parse_env_int(os.getenv('FEISHU_MAX_BYTES'), 20000, field_name='FEISHU_MAX_BYTES', minimum=1),
             feishu_send_as_file=os.getenv('FEISHU_SEND_AS_FILE', '').lower() in ('true', '1', 'yes'),
             wechat_max_bytes=wechat_max_bytes,

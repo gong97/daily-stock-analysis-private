@@ -789,8 +789,15 @@ def run_full_analysis(
             config.single_stock_notify = True
 
         # Issue #190: 个股与大盘复盘合并推送
+        # 分层分析自身就要出一封合并邮件，必须让大盘复盘走「只存不推」，
+        # 否则大盘会先单独发一封，用户当天收到两封。
+        tiered_merge = (
+            getattr(config, 'tiered_analysis_enabled', False)
+            and not getattr(args, 'dry_run', False)
+            and not config.single_stock_notify
+        )
         merge_notification = (
-            getattr(config, 'merge_email_notification', False)
+            (getattr(config, 'merge_email_notification', False) or tiered_merge)
             and config.market_review_enabled
             and not getattr(args, 'no_market_review', False)
             and not config.single_stock_notify
@@ -861,6 +868,26 @@ def run_full_analysis(
                 require_current_query_match=True,
             )
 
+        # 分层分析：Lite 全量初筛 → 高阶模型深挖该加仓/减仓的票（合并推送场景专用）
+        tiered_enabled = (
+            getattr(config, 'tiered_analysis_enabled', False)
+            and not args.dry_run
+            and not config.single_stock_notify
+        )
+        tiered_outcome = None
+        logger.info(
+            "[tiered] enabled=%s (config=%s dry_run=%s single_notify=%s) "
+            "tier1=%r tier2=%r top_n=%s skip_futu=%s",
+            tiered_enabled,
+            getattr(config, 'tiered_analysis_enabled', False),
+            args.dry_run,
+            config.single_stock_notify,
+            getattr(config, 'tier1_model', ''),
+            getattr(config, 'tier2_model', ''),
+            getattr(config, 'tier2_top_n', None),
+            skip_futu_stock_analysis,
+        )
+
         # 1. 运行个股分析
         if skip_futu_stock_analysis:
             if portfolio_is_empty:
@@ -868,6 +895,17 @@ def run_full_analysis(
             else:
                 logger.info("Futu 持仓经交易日过滤后无可分析股票，跳过个股分析。")
             results = []
+        elif tiered_enabled:
+            from src.core.tiered_analysis import run_tiered_analysis
+
+            logger.info("模式: 分层分析（初筛 → 深度复核）")
+            tiered_outcome = run_tiered_analysis(
+                config,
+                pipeline,
+                stock_codes=stock_codes,
+                current_time=analysis_reference_time,
+            )
+            results = tiered_outcome.lite_results
         else:
             results = pipeline.run(
                 stock_codes=stock_codes,
@@ -990,8 +1028,33 @@ def run_full_analysis(
             elif can_reuse_market_context:
                 market_report = market_context_full_report or market_context_summary
 
+        # 分层分析推送：大盘 + 深度复核 + 全量初筛，合并成一封
+        if tiered_outcome is not None and not args.no_notify:
+            from src.core.tiered_report import render_tiered_email
+
+            combined_content = render_tiered_email(
+                tiered_outcome,
+                notifier=pipeline.notifier,
+                market_report=market_report,
+                lite_report_type=getattr(config, 'report_type', 'simple'),
+                language=getattr(config, 'report_language', 'zh') or 'zh',
+                tier1_model=getattr(config, 'tier1_model', ''),
+                tier2_model=getattr(config, 'tier2_model', ''),
+            )
+            if pipeline.notifier.is_available():
+                if pipeline.notifier.send(
+                    combined_content, email_send_to_all=True, route_type="report"
+                ):
+                    logger.info(
+                        "已推送分层分析报告（初筛 %d 只 / 深挖 %d 只）",
+                        len(tiered_outcome.lite_results),
+                        len(tiered_outcome.candidates),
+                    )
+                else:
+                    logger.warning("分层分析报告推送失败")
+
         # Issue #190: 合并推送（个股+大盘复盘）
-        if merge_notification and (results or market_report) and not args.no_notify:
+        elif merge_notification and (results or market_report) and not args.no_notify:
             parts = []
             if market_report:
                 parts.append(f"# 📈 大盘复盘\n\n{market_report}")
