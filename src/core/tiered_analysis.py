@@ -34,6 +34,20 @@ CUT_ACTIONS = ("reduce", "sell", "alert")
 
 
 @dataclass
+class WatchlistEntry:
+    """被资金面护栏降级、但 LLM 原始判断偏多的票。
+
+    只提示，不做深度复核：买点未到时深挖没有行动价值，省下这部分 token。
+    """
+
+    code: str
+    name: str
+    raw_score: int
+    adjusted_score: int
+    guardrail_reason: str
+
+
+@dataclass
 class TieredCandidate:
     """一只进入深度复核的候选股，同时保留初筛与复核两侧结果。"""
 
@@ -74,6 +88,7 @@ class TieredCandidate:
 class TieredAnalysisOutcome:
     lite_results: List[Any] = field(default_factory=list)
     candidates: List[TieredCandidate] = field(default_factory=list)
+    watchlist: List[WatchlistEntry] = field(default_factory=list)
 
     @property
     def add_candidates(self) -> List[TieredCandidate]:
@@ -174,6 +189,66 @@ def select_candidates(
     return candidates
 
 
+def _calibration_of(result: Any) -> dict:
+    dashboard = getattr(result, "dashboard", None)
+    if not isinstance(dashboard, dict):
+        return {}
+    calibration = dashboard.get("decision_score_calibration")
+    return calibration if isinstance(calibration, dict) else {}
+
+
+def select_watchlist(
+    lite_results: Sequence[Any],
+    *,
+    candidates: Sequence[TieredCandidate] = (),
+    min_raw_score: int = 70,
+) -> List[WatchlistEntry]:
+    """挑出「LLM 看多但被护栏拦下」的票。
+
+    资金面护栏（analyzer._bound_hold_watch_sentiment_score）会把评分压进
+    45-59，于是 78 分的看多票和 51 分的震荡票在 action 上无法区分。这里靠
+    dashboard 里保留的 raw_score 把前者捞回来——它们买点未到，不该进深度
+    复核，但值得单独列出来盯着。
+    """
+    already_deep = {c.code for c in candidates}
+    entries: List[WatchlistEntry] = []
+
+    for result in lite_results:
+        if not getattr(result, "success", False):
+            continue
+        code = getattr(result, "code", "")
+        if not code or code in already_deep:
+            continue
+
+        calibration = _calibration_of(result)
+        raw = calibration.get("raw_score")
+        adjusted = calibration.get("adjusted_score")
+        # 没有 calibration 说明没被护栏碰过，raw 就是最终分，不属于「被拦下」
+        if not isinstance(raw, int) or not isinstance(adjusted, int):
+            continue
+        if raw <= adjusted or raw < min_raw_score:
+            continue
+
+        entries.append(
+            WatchlistEntry(
+                code=code,
+                name=getattr(result, "name", "") or code,
+                raw_score=raw,
+                adjusted_score=adjusted,
+                guardrail_reason=str(calibration.get("guardrail_reason") or "").strip(),
+            )
+        )
+
+    entries.sort(key=lambda e: e.raw_score, reverse=True)
+    if entries:
+        logger.info(
+            "[tiered] 观察名单 %d 只（LLM 看多但被护栏降级，原始分 >= %d）",
+            len(entries),
+            min_raw_score,
+        )
+    return entries
+
+
 def run_tiered_analysis(
     config: Any,
     pipeline: Any,
@@ -190,6 +265,7 @@ def run_tiered_analysis(
     tier2_model = getattr(config, "tier2_model", "") or ""
     top_n = int(getattr(config, "tier2_top_n", 3) or 3)
     include_cut = bool(getattr(config, "tier2_include_cut", True))
+    watchlist_min_raw_score = int(getattr(config, "tier_watchlist_min_raw_score", 70) or 70)
 
     # ---- Stage 1: 全量初筛 ----
     with model_scope(config, tier1_model), report_type_scope(config, ReportType.BRIEF):
@@ -207,6 +283,11 @@ def run_tiered_analysis(
         outcome.lite_results, top_n=top_n, include_cut=include_cut
     )
     outcome.candidates = candidates
+    outcome.watchlist = select_watchlist(
+        outcome.lite_results,
+        candidates=candidates,
+        min_raw_score=watchlist_min_raw_score,
+    )
     if not candidates:
         logger.info("[tiered] 今日无明确加仓/减仓信号，跳过深度复核")
         return outcome

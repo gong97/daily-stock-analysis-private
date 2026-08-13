@@ -1145,6 +1145,7 @@ class Config:
     tier2_model: str = ""  # 复核模型；空则沿用 LITELLM_MODEL
     tier2_top_n: int = 3  # 加仓/减仓两侧各取几只
     tier2_include_cut: bool = True  # 是否深挖减仓/预警侧
+    tier_watchlist_min_raw_score: int = 70  # 观察名单门槛：护栏降级前的原始分
 
     # 消息长度限制（字节）- 超长自动分批发送
     feishu_max_bytes: int = 20000  # 飞书限制约 20KB，默认 20000 字节
@@ -2089,6 +2090,7 @@ class Config:
             tier2_model=os.getenv('TIER2_MODEL', '').strip(),
             tier2_top_n=parse_env_int(os.getenv('TIER2_TOP_N'), 3, field_name='TIER2_TOP_N', minimum=1),
             tier2_include_cut=os.getenv('TIER2_INCLUDE_CUT', 'true').lower() == 'true',
+            tier_watchlist_min_raw_score=parse_env_int(os.getenv('TIER_WATCHLIST_MIN_RAW_SCORE'), 70, field_name='TIER_WATCHLIST_MIN_RAW_SCORE', minimum=0),
             feishu_max_bytes=parse_env_int(os.getenv('FEISHU_MAX_BYTES'), 20000, field_name='FEISHU_MAX_BYTES', minimum=1),
             feishu_send_as_file=os.getenv('FEISHU_SEND_AS_FILE', '').lower() in ('true', '1', 'yes'),
             wechat_max_bytes=wechat_max_bytes,

@@ -96,6 +96,31 @@ def render_deep_section(
     return "\n\n".join(blocks)
 
 
+def render_watchlist_section(
+    outcome: TieredAnalysisOutcome,
+    *,
+    language: str = "zh",
+) -> str:
+    """观察名单：LLM 看多但被资金面护栏拦下的票。"""
+    if not outcome.watchlist:
+        return ""
+
+    lines = [
+        "## 👀 观察名单（看多但买点未到）",
+        "",
+        "LLM 判断偏多，但资金面/位置护栏未确认，按严进原则暂不给出加仓信号。",
+        "",
+        "| 股票 | 原始分 | 调整后 | 护栏原因 |",
+        "| --- | --- | --- | --- |",
+    ]
+    for e in outcome.watchlist:
+        reason = e.guardrail_reason or "—"
+        lines.append(
+            f"| {e.name}({e.code}) | **{e.raw_score}** | {e.adjusted_score} | {reason} |"
+        )
+    return "\n".join(lines)
+
+
 def render_tiered_email(
     outcome: TieredAnalysisOutcome,
     *,
@@ -120,6 +145,11 @@ def render_tiered_email(
     if tier2_model:
         header += f"（{tier2_model}）"
     parts.append(f"{header}\n\n{deep_section}")
+
+    # 观察名单排在深挖之后、全量初筛之前：它比初筛表重要，但不构成当日行动。
+    watchlist_section = render_watchlist_section(outcome, language=language)
+    if watchlist_section:
+        parts.append(watchlist_section)
 
     if outcome.lite_results:
         lite_body = notifier.generate_aggregate_report(

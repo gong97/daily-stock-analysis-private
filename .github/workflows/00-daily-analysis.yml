@@ -412,6 +412,7 @@ jobs:
           TIER2_MODEL: ${{ vars.TIER2_MODEL }}
           TIER2_TOP_N: ${{ vars.TIER2_TOP_N || '3' }}
           TIER2_INCLUDE_CUT: ${{ vars.TIER2_INCLUDE_CUT || 'true' }}
+          TIER_WATCHLIST_MIN_RAW_SCORE: ${{ vars.TIER_WATCHLIST_MIN_RAW_SCORE || '70' }}
 
           REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
