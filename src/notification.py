@@ -17,6 +17,7 @@ A股自选股智能分析系统 - 通知层
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -89,6 +90,9 @@ from src.notification_sender import (
 )
 
 logger = logging.getLogger(__name__)
+
+# 日报内跳转锚点：摘要 <-> 个股详情（Issue #112 扩展）
+SUMMARY_ANCHOR_ID = "analysis-summary"
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -370,6 +374,12 @@ class NotificationService(
         return self._escape_md(
             get_localized_stock_name(result.name, result.code, report_language)
         )
+
+    @staticmethod
+    def _stock_anchor_id(code: str) -> str:
+        """个股详情锚点 ID（摘要点击跳转用，Issue #112 扩展）"""
+        safe_code = re.sub(r'[^0-9A-Za-z_.-]', '-', str(code or '')).strip('-')
+        return f"stock-{safe_code}" if safe_code else ""
 
     def _get_history_compare_context(self, results: List[AnalysisResult]) -> Dict[str, Any]:
         """Fetch and cache history comparison data for markdown rendering."""
@@ -1257,6 +1267,7 @@ class NotificationService(
         ma_label = _nlabel("Moving Averages", "均线", "이동평균")
         volume_analysis_label = _nlabel("Volume", "量能", "거래량")
         news_heading = _nlabel("News Flow", "消息面", "뉴스 흐름")
+        back_to_summary_label = _nlabel("Back to Summary", "返回摘要", "요약으로 돌아가기")
         if getattr(config, 'report_renderer_enabled', False) and results:
             from src.services.report_renderer import render
             out = render(
@@ -1291,14 +1302,22 @@ class NotificationService(
         # === 新增：分析结果摘要 (Issue #112) ===
         if results:
             report_lines.extend([
+                # 个股详情底部“返回摘要”链接的跳转目标
+                f'<a id="{SUMMARY_ANCHOR_ID}"></a>',
+                "",
                 f"## 📊 {labels['summary_heading']}",
                 "",
             ])
             for r in sorted_results:
                 signal_text, signal_emoji, _ = self._get_signal_level(r)
                 display_name = self._get_display_name(r, report_language)
+                # summary_only 时没有个股详情章节，不生成锚点链接
+                anchor_id = "" if self._report_summary_only else self._stock_anchor_id(r.code)
+                title = f"**{display_name}({r.code})**"
+                if anchor_id:
+                    title = f"[{title}](#{anchor_id})"
                 report_lines.append(
-                    f"{signal_emoji} **{display_name}({r.code})**: "
+                    f"{signal_emoji} {title}: "
                     f"{signal_text} | "
                     f"{labels['score_label']} {r.sentiment_score} | "
                     f"{localize_trend_prediction(r.trend_prediction, report_language)}"
@@ -1318,6 +1337,10 @@ class NotificationService(
                 # 股票名称（优先使用 dashboard 或 result 中的名称，转义 *ST 等特殊字符）
                 stock_name = self._get_display_name(result, report_language)
 
+                anchor_id = self._stock_anchor_id(result.code)
+                if anchor_id:
+                    # 摘要中的链接跳转目标（HTML 邮件生效，纯文本中不可见）
+                    report_lines.extend([f'<a id="{anchor_id}"></a>', ""])
                 report_lines.extend([
                     f"## {signal_emoji} {stock_name} ({result.code})",
                     "",
@@ -1567,6 +1590,8 @@ class NotificationService(
                         ])
 
                 report_lines.extend([
+                    f"[↑ {back_to_summary_label}](#{SUMMARY_ANCHOR_ID})",
+                    "",
                     "---",
                     "",
                 ])
