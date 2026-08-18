@@ -2254,6 +2254,10 @@ class SearchService:
     FUTURE_TOLERANCE_DAYS = 1
     ANALYTICAL_INTEL_LOOKBACK_DAYS = 180
     ANALYTICAL_INTEL_DIMENSIONS = {"market_analysis", "earnings"}
+    # 公告类事件（停牌/控制权变更等）的时效价值长于快讯，
+    # 不应被 NEWS_MAX_AGE_DAYS 的短窗口（默认3天）裁掉。
+    ANNOUNCEMENT_INTEL_LOOKBACK_DAYS = 14
+    ANNOUNCEMENT_INTEL_DIMENSIONS = {"announcements"}
     _CHINESE_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
     _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}(\.[A-Za-z])?$")
     _DIRECT_NEWS_CATEGORY = "direct_company_news"
@@ -4450,7 +4454,7 @@ class SearchService:
                     'name': 'risk_check',
                     'query': (
                         f"{stock_name} 指数走势 跟踪误差 净值 表现"
-                        if is_index_etf else f"{stock_name} 减持 处罚 违规 诉讼 利空 风险"
+                        if is_index_etf else f"{stock_name} 停牌 复牌 控制权变更 股权转让 要约收购 减持 处罚 违规 诉讼 利空 风险"
                     ),
                     'desc': '风险排查',
                     'tavily_topic': None if is_index_etf else 'news',
@@ -4521,11 +4525,12 @@ class SearchService:
             provider = available_providers[provider_index % len(available_providers)]
             provider_index += 1
             
-            request_days = (
-                self.ANALYTICAL_INTEL_LOOKBACK_DAYS
-                if dim['name'] in self.ANALYTICAL_INTEL_DIMENSIONS
-                else search_days
-            )
+            if dim['name'] in self.ANALYTICAL_INTEL_DIMENSIONS:
+                request_days = self.ANALYTICAL_INTEL_LOOKBACK_DAYS
+            elif dim['name'] in self.ANNOUNCEMENT_INTEL_DIMENSIONS:
+                request_days = max(search_days, self.ANNOUNCEMENT_INTEL_LOOKBACK_DAYS)
+            else:
+                request_days = search_days
 
             logger.info(
                 "[情报搜索] %s: 使用 %s，请求窗口: 近%s天",
@@ -4548,9 +4553,11 @@ class SearchService:
                     days=request_days,
                 )
             if dim['strict_freshness']:
+                # request_days 已按维度放宽（公告类=14天），严格过滤沿用同一窗口，
+                # 否则公告会被 NEWS_MAX_AGE_DAYS 的短窗口重新裁掉。
                 filtered_response = self._filter_news_response(
                     response,
-                    search_days=search_days,
+                    search_days=request_days,
                     max_results=provider_max_results,
                     log_scope=f"{stock_code}:{provider.name}:{dim['name']}",
                 )

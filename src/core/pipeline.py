@@ -67,6 +67,7 @@ from src.services.daily_market_context import (
 )
 from src.services.social_sentiment_service import SocialSentimentService
 from src.services.intelligence_service import IntelligenceService
+from src.services.announcement_service import build_announcement_context
 from src.services.market_hotspot_service import MarketHotspotService
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
@@ -612,11 +613,11 @@ class StockAnalysisPipeline:
             if self.search_service is not None and self.search_service.is_available:
                 logger.info(f"{stock_name}({code}) 开始多维度情报搜索...")
 
-                # 使用多维度搜索（最多5次搜索）
+                # 使用多维度搜索（覆盖全部6个维度，避免尾部维度被截断）
                 intel_results = self.search_service.search_comprehensive_intel(
                     stock_code=code,
                     stock_name=stock_name,
-                    max_searches=5
+                    max_searches=6
                 )
 
                 # 格式化情报报告
@@ -659,6 +660,21 @@ class StockAnalysisPipeline:
                             news_context = social_context
                 except Exception as e:
                     logger.warning(f"{stock_name}({code}) Social sentiment fetch failed: {e}")
+
+            # Step 4.6: 交易所结构化公告（A股）。停牌/控制权变更等事件靠
+            # 搜索引擎关键词召回不可靠，这里直连巨潮补一份权威事实。
+            if market in (None, "cn") and not is_us_stock_code(code):
+                try:
+                    announcement_context = build_announcement_context(code, stock_name)
+                    if announcement_context:
+                        logger.info(f"{stock_name}({code}) 已补充交易所披露公告")
+                        news_context = (
+                            f"{news_context}\n\n{announcement_context}"
+                            if news_context
+                            else announcement_context
+                        )
+                except Exception as e:
+                    logger.warning(f"{stock_name}({code}) 公告补充失败: {e}")
 
             if persisted_intelligence_context:
                 news_context = (
