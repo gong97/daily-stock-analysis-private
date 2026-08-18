@@ -2258,6 +2258,22 @@ class SearchService:
     # 不应被 NEWS_MAX_AGE_DAYS 的短窗口（默认3天）裁掉。
     ANNOUNCEMENT_INTEL_LOOKBACK_DAYS = 14
     ANNOUNCEMENT_INTEL_DIMENSIONS = {"announcements"}
+    # 认证/额度类失败重试无意义，本次运行内直接熔断该 provider；
+    # 限流、超时、网络抖动属于瞬时故障，只换引擎重试，不熔断。
+    _FATAL_PROVIDER_ERROR_HINTS = (
+        "api key无效",
+        "invalid api key",
+        "未配置 api key",
+        "余额不足",
+        "insufficient balance",
+        "unauthorized",
+        "forbidden",
+        "http 401",
+        "http 403",
+        "未安装",
+    )
+    # 单个维度最多尝试的引擎数，避免一个坏维度耗尽所有 provider 配额。
+    MAX_PROVIDER_ATTEMPTS_PER_DIMENSION = 2
     _CHINESE_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
     _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}(\.[A-Za-z])?$")
     _DIRECT_NEWS_CATEGORY = "direct_company_news"
@@ -2783,6 +2799,20 @@ class SearchService:
                     for k in oldest:
                         self._cache.pop(k, None)
             self._cache[key] = (time.time(), response)
+
+    @classmethod
+    def _is_fatal_provider_error(cls, response: Optional["SearchResponse"]) -> bool:
+        """判断失败是否属于「重试也没用」的类型（认证失效/额度耗尽/依赖缺失）。
+
+        限流和超时刻意排除在外：那是瞬时故障，provider 下一个维度可能就恢复了，
+        熔断它反而会白白损失一个可用引擎。
+        """
+        if response is None:
+            return True
+        message = (response.error_message or "").strip().lower()
+        if not message:
+            return False
+        return any(hint in message for hint in cls._FATAL_PROVIDER_ERROR_HINTS)
 
     def _effective_news_window_days(self) -> int:
         """Resolve effective news window from strategy profile and global max-age."""
@@ -4512,19 +4542,13 @@ class SearchService:
         
         # 轮流使用不同的搜索引擎
         provider_index = 0
-        
+        # 本次运行内已熔断的引擎（认证失效/额度耗尽），不再参与轮询。
+        disabled_providers: set = set()
+
         for dim in search_dimensions:
             if search_count >= max_searches:
                 break
-            
-            # 选择搜索引擎（轮流使用）
-            available_providers = [p for p in self._providers if p.is_available]
-            if not available_providers:
-                break
-            
-            provider = available_providers[provider_index % len(available_providers)]
-            provider_index += 1
-            
+
             if dim['name'] in self.ANALYTICAL_INTEL_DIMENSIONS:
                 request_days = self.ANALYTICAL_INTEL_LOOKBACK_DAYS
             elif dim['name'] in self.ANNOUNCEMENT_INTEL_DIMENSIONS:
@@ -4532,26 +4556,76 @@ class SearchService:
             else:
                 request_days = search_days
 
-            logger.info(
-                "[情报搜索] %s: 使用 %s，请求窗口: 近%s天",
-                dim['desc'],
-                provider.name,
-                request_days,
-            )
+            # 选择搜索引擎（轮流使用，跳过已熔断的）
+            available_providers = [
+                p for p in self._providers
+                if p.is_available and p.name not in disabled_providers
+            ]
+            if not available_providers:
+                logger.warning(
+                    "[情报搜索] %s: 无可用搜索引擎（已熔断: %s），跳过剩余维度",
+                    dim['desc'],
+                    ", ".join(sorted(disabled_providers)) or "无",
+                )
+                break
 
-            if isinstance(provider, TavilySearchProvider) and dim.get('tavily_topic'):
-                response = provider.search(
-                    dim['query'],
-                    max_results=provider_max_results,
-                    days=request_days,
-                    topic=dim['tavily_topic'],
+            # 失败时换引擎重试同一维度，避免坏引擎白白吃掉一个维度配额。
+            response = None
+            provider = None
+            max_attempts = min(
+                self.MAX_PROVIDER_ATTEMPTS_PER_DIMENSION, len(available_providers)
+            )
+            for attempt in range(max_attempts):
+                provider = available_providers[
+                    (provider_index + attempt) % len(available_providers)
+                ]
+
+                logger.info(
+                    "[情报搜索] %s: 使用 %s，请求窗口: 近%s天%s",
+                    dim['desc'],
+                    provider.name,
+                    request_days,
+                    f"（第{attempt + 1}次尝试）" if attempt else "",
                 )
-            else:
-                response = provider.search(
-                    dim['query'],
-                    max_results=provider_max_results,
-                    days=request_days,
-                )
+
+                if isinstance(provider, TavilySearchProvider) and dim.get('tavily_topic'):
+                    response = provider.search(
+                        dim['query'],
+                        max_results=provider_max_results,
+                        days=request_days,
+                        topic=dim['tavily_topic'],
+                    )
+                else:
+                    response = provider.search(
+                        dim['query'],
+                        max_results=provider_max_results,
+                        days=request_days,
+                    )
+
+                if response.success:
+                    break
+
+                if self._is_fatal_provider_error(response):
+                    disabled_providers.add(provider.name)
+                    logger.warning(
+                        "[情报搜索] %s 已熔断（本次运行不再使用）: %s",
+                        provider.name,
+                        response.error_message,
+                    )
+                    available_providers = [
+                        p for p in available_providers
+                        if p.name not in disabled_providers
+                    ]
+                    if not available_providers:
+                        break
+
+            provider_index += 1
+
+            if response is None or provider is None:
+                # 所有引擎都在尝试中被熔断，本维度无结果可处理。
+                logger.warning("[情报搜索] %s: 无可用引擎完成本维度", dim['desc'])
+                continue
+
             if dim['strict_freshness']:
                 # request_days 已按维度放宽（公告类=14天），严格过滤沿用同一窗口，
                 # 否则公告会被 NEWS_MAX_AGE_DAYS 的短窗口重新裁掉。
@@ -4591,9 +4665,9 @@ class SearchService:
                 max_results=target_per_dimension,
             )
             results[dim['name']] = filtered_response
-            search_count += 1
-            
+            # 只有成功的搜索才计入配额；失败维度不应挤占其他维度的预算。
             if response.success:
+                search_count += 1
                 logger.info(
                     "[情报搜索] %s: 原始=%s条, 过滤后=%s条",
                     dim['desc'],
