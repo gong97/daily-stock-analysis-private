@@ -10,6 +10,8 @@ DSA 将选股能力作为主项目的一部分维护。实现参考 [AlphaSift](
 - `src/services/screening_service.py`：DSA 业务编排，直接调用 pipeline，负责配置、数据源上下文、响应归一化、缓存与错误映射。
 - `src/storage.py`：使用 DSA 现有 SQLAlchemy/SQLite 基础设施持久化已完成的选股运行，不另建文件数据库。
 - `api/v1/endpoints/screening.py`：`/api/v1/screening` API。
+- `src/services/screening_watchlist.py`：全市场扫描观察名单的分层、合并、淘汰与报告渲染逻辑。
+- `scripts/market_scan.py` 与 `.github/workflows/10-market-scan.yml`：定时全市场扫描的编排入口与调度。
 - `apps/dsa-web/src/api/screening.ts` 与 `StockScreeningPage.tsx`：Web 调用与展示。
 
 服务层静态调用 `screening.pipeline`、`screening.strategy` 和 `screening.hotspot`。核心逻辑不通过模块名探测、动态适配器或多套路由分发，因此代码结构、错误边界和打包收集目标均由主项目直接定义。
@@ -115,6 +117,96 @@ DSA 中存在两类用途不同的策略文件：
 | `strategies/*.yaml` | 对单只股票如何分析和形成结论 | `src/agent/skills/base.py` | DSA Agent/报告分析 |
 
 即使 `shrink_pullback`、`volume_breakout` 同名，两者也使用不同目录、Schema 和 loader，不会相互覆盖。筛选策略可通过 `analysis_skills` 声明下一阶段建议使用的分析 skill；Web 的“进一步深度分析”会显式携带这些 skill。未声明映射的筛选策略继续使用用户当前选择或默认分析策略，不做含义不可靠的强行映射。
+
+## 全市场扫描与观察名单
+
+`pipeline.screen()` 本身就是一次全市场扫描（拉全市场快照 → L1 硬筛 → Top-N 补日线 →
+因子评分 → L2 排序 → L3 后置分析）。定时把它跑成一份可持续维护的观察名单，由三个部分组成：
+
+| 组件 | 位置 | 职责 |
+| --- | --- | --- |
+| 名单逻辑 | `src/services/screening_watchlist.py` | 策略分层、名单合并/淘汰、STOCK_LIST 导出与报告渲染；纯逻辑，不触网 |
+| 编排入口 | `scripts/market_scan.py` | 按分层批量调用 `pipeline.screen()`，落盘产物、可选落库与推送 |
+| 调度 | `.github/workflows/10-market-scan.yml` | daily / weekly 两条 cron，产物提交回仓库 |
+
+`scripts/market_scan.py` 不是第二套选股 CLI：它不重复实现筛选、评分或结果存储，只做批量编排，
+筛选仍走 `pipeline.screen()`，运行历史仍写既有的 `screening_runs` 表。
+
+### 按 holding_period 分层调频
+
+扫描频率取自策略 YAML 的 `style.holding_period`，不在代码里硬编码策略名：
+
+| holding_period | 频率 | 内置策略 |
+| --- | --- | --- |
+| `short_term` | daily（每交易日 17:30 北京时间） | `capital_heat`、`oversold_reversal`、`volume_breakout` |
+| `swing` | weekly（每周五 18:30 北京时间） | `momentum_quality`、`low_volatility_quality`、`shrink_pullback` |
+| `watchlist` | weekly | `balanced_alpha`、`quality_value`、`dual_low`、`blue_chip_income` |
+
+未识别的 `holding_period` 一律按 weekly 处理，避免新策略被默默拉成每日高频。
+`WATCHLIST_CADENCE_MAP=short_term:daily,swing:weekly,watchlist:weekly` 可覆盖该映射，
+只接受 `daily` / `weekly`，非法项会被跳过并保留默认值。
+
+分层的成本依据来自两类策略的实际差异：`low_volatility_quality`、`shrink_pullback`、
+`volume_breakout` 的硬过滤需要日 K 特征，会逐只拉取最多 `DAILY_ENRICH_MAX_CANDIDATES` 条历史，
+是整个工作流最主要的耗时来源；其余策略只消费一次全市场快照。同一进程内跑完一组策略时，
+快照（`SCREENING_SNAPSHOT_CACHE_TTL_SEC`）和日 K 缓存（`SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS`）
+都会被复用，因此把一组策略放进一个 job 比拆成多个 job 便宜得多。
+
+每次运行的各策略耗时会追加到 `data/watchlist/timing.json`（保留最近 20 次），
+这是后续调频的实测依据：某个策略持续逼近 job 超时，就把它降到 weekly，
+或调小 `DAILY_ENRICH_MAX_CANDIDATES`。
+
+### 名单产物
+
+全部写在 `WATCHLIST_DIR`（默认 `data/watchlist/`，已在 `.gitignore` 中对 `/data/*` 开例外）：
+
+| 文件 | 内容 |
+| --- | --- |
+| `current.json` | 名单真源：每只票的入选策略与分数、首次/最近入选日、命中次数、行业、风险标记 |
+| `current.csv` | 同一份名单的扁平表，便于直接查看 |
+| `STOCK_LIST.txt` | 逗号分隔代码，供日报流程当作 `STOCK_LIST` 使用（`--write-stock-list`） |
+| `timing.json` | 最近 20 次运行的各策略耗时 |
+| `history/<日期>-<频率>.json` | 当次各策略的原始候选与分数，用于回溯"当时为什么选它" |
+| `latest_report.md` | 最近一次的 Markdown 报告（新进 / 移出 / 当前名单 / 策略耗时） |
+| `pinned.txt` | 手工固定的代码（每行一个，`#` 为注释），永不淘汰且排在名单最前 |
+
+名单维护规则：同一次扫描被多个策略同时选中只算一次命中；超过 `WATCHLIST_TTL_DAYS`（默认 30 天）
+没有再被任何策略选中即移出；名单规模上限 `WATCHLIST_MAX_SIZE`（默认 60），
+按「最近得分 + 命中加分 − 陈旧扣分」排序裁剪。`pinned.txt` 中的代码不占名额也不会被裁掉，
+因此自动扫描不会冲掉手工长期跟踪的票。
+
+### 与日报的衔接
+
+工作流把 `data/watchlist/` 提交回仓库。日报工作流在仓库变量 `WATCHLIST_AS_STOCK_LIST=true`
+且 `data/watchlist/STOCK_LIST.txt` 非空时，优先用它作为 `STOCK_LIST`，否则维持原有的
+`STOCK_LIST_CONFIG` → runner 环境变量 → 最小默认值顺序。
+
+如果希望同时更新仓库变量 `STOCK_LIST` 本身，需要设置仓库变量 `WATCHLIST_SYNC_STOCK_LIST=true`
+并配置一个有 Variables 写权限的 PAT（`WATCHLIST_REPO_TOKEN`）——默认 `GITHUB_TOKEN` 无法修改仓库变量。
+未配置时该步骤静默跳过，名单仍以 `STOCK_LIST.txt` 形式留在仓库中。
+
+### 运行方式
+
+```bash
+# 每周组（swing + watchlist）
+python scripts/market_scan.py --cadence weekly --write-stock-list --save-db
+
+# 每交易日组（short_term），并推送报告
+python scripts/market_scan.py --cadence daily --notify
+
+# 指定策略试跑，不写任何产物
+python scripts/market_scan.py --strategies dual_low,quality_value --dry-run --force-run
+```
+
+扫描默认关闭 L2 LLM 重排（`--use-llm` 开启），因此不消耗 LLM 额度，
+对同一份快照结果是确定性的；候选质量的二次判断交给后续的单股深度分析。
+脚本受 `SCREENING_ENABLED` 控制，未开启时直接拒绝执行（退出码 2）。
+非交易日默认跳过（退出码 0），`--force-run` 可强制运行。
+单个策略失败不会中断整轮扫描，只在报告中标记；只有全部策略失败才返回退出码 1 并保持名单不变。
+
+落库沿用 `screening_runs` 表（`--save-db`）。注意 GitHub Actions runner 上的 SQLite 是一次性的，
+只有把 `DATABASE_URL` 指向外部数据库时这份运行历史才有持久价值；
+名单本身的持久化真源是提交回仓库的 `current.json`。
 
 ## DSA 原生能力复用
 

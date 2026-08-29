@@ -1,0 +1,230 @@
+name: 全市场扫描观察名单
+
+# 用内置选股引擎做全市场扫描，把候选沉淀成 data/watchlist/ 下的观察名单。
+# 频率按策略 YAML 的 style.holding_period 分层：
+#   short_term            → daily  （每交易日收盘后）
+#   swing / watchlist     → weekly （每周五收盘后）
+# 详见 docs/screening-engine.md 的「全市场扫描与观察名单」。
+
+on:
+  schedule:
+    # 每周一至周五 UTC 09:30 = 北京时间 17:30（收盘后），跑 daily 组
+    - cron: '30 9 * * 1-5'
+    # 每周五 UTC 10:30 = 北京时间 18:30，跑 weekly 组
+    - cron: '30 10 * * 5'
+
+  workflow_dispatch:
+    inputs:
+      cadence:
+        description: '扫描频率分层'
+        required: true
+        default: 'weekly'
+        type: choice
+        options:
+          - weekly
+          - daily
+          - all
+      strategies:
+        description: '显式指定策略（逗号分隔，留空则按 cadence 分层）'
+        required: false
+        default: ''
+        type: string
+      force_run:
+        description: '强制运行（跳过交易日检查）'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: '试跑（照常扫描，但不写文件/不落库/不推送/不提交）'
+        required: false
+        default: false
+        type: boolean
+
+# 同一时间只跑一轮扫描：daily 与 weekly 在周五会同时触发，串行执行避免名单写冲突。
+concurrency:
+  group: market-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(vars.MARKET_SCAN_TIMEOUT_MINUTES || '60') }}
+
+    steps:
+      - name: 解析本次扫描计划
+        id: plan
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # 按触发本次运行的 cron 表达式区分分层；新增 cron 时必须同步这里。
+            case "${{ github.event.schedule }}" in
+              "30 10 * * 5") CADENCE=weekly ;;
+              *)             CADENCE=daily ;;
+            esac
+            DRY_RUN=false
+            FORCE_RUN=false
+          else
+            CADENCE="${{ github.event.inputs.cadence }}"
+            DRY_RUN="${{ github.event.inputs.dry_run }}"
+            FORCE_RUN="${{ github.event.inputs.force_run }}"
+          fi
+          echo "cadence=${CADENCE:-weekly}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN:-false}" >> "$GITHUB_OUTPUT"
+          echo "force_run=${FORCE_RUN:-false}" >> "$GITHUB_OUTPUT"
+          echo "🎯 分层: ${CADENCE:-weekly} | 试跑: ${DRY_RUN:-false} | 强制: ${FORCE_RUN:-false}"
+
+      - name: 随机延迟（避免固定时间访问数据源）
+        run: sleep $((RANDOM % 60))
+
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 创建必要目录
+        run: mkdir -p data/watchlist logs
+
+      - name: 执行全市场扫描
+        env:
+          # ===== 选股引擎开关 =====
+          SCREENING_ENABLED: 'true'
+
+          # ===== 全市场快照数据源 =====
+          # 留空时引擎按是否配置 TUSHARE_TOKEN 自动注入优先级，通常不需要固定值。
+          SNAPSHOT_SOURCE_PRIORITY: ${{ vars.SNAPSHOT_SOURCE_PRIORITY }}
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          SCREENING_SNAPSHOT_CALL_TIMEOUT_SEC: ${{ vars.SCREENING_SNAPSHOT_CALL_TIMEOUT_SEC || '60' }}
+          SCREENING_DAILY_CALL_TIMEOUT_SEC: ${{ vars.SCREENING_DAILY_CALL_TIMEOUT_SEC || '20' }}
+          SCREENING_SNAPSHOT_CACHE_TTL_SEC: ${{ vars.SCREENING_SNAPSHOT_CACHE_TTL_SEC || '900' }}
+
+          # ===== 日线补齐 =====
+          # low_volatility_quality / shrink_pullback / volume_breakout 的硬过滤需要日 K 特征，
+          # pipeline 会为它们强制补齐；因此这里保持默认关闭，避免另外 7 个只吃快照的策略
+          # 也各自拉最多 DAILY_ENRICH_MAX_CANDIDATES 条历史。逐只拉取是本工作流最主要的耗时来源，
+          # 日 K 缓存跨策略复用。设为 true 可让所有策略的评分都带上日线特征，代价是耗时数倍增长。
+          DAILY_ENRICH_ENABLED: ${{ vars.DAILY_ENRICH_ENABLED || 'false' }}
+          DAILY_ENRICH_MAX_CANDIDATES: ${{ vars.DAILY_ENRICH_MAX_CANDIDATES || '100' }}
+          DAILY_FETCH_MAX_WORKERS: ${{ vars.DAILY_FETCH_MAX_WORKERS || '2' }}
+          SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS: ${{ vars.SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS || '24' }}
+
+          # ===== 行业/概念（可选，开启后 theme_heat 因子更有信息量）=====
+          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'none' }}
+
+          # ===== 观察名单 =====
+          WATCHLIST_DIR: data/watchlist
+          WATCHLIST_CADENCE_MAP: ${{ vars.WATCHLIST_CADENCE_MAP }}
+          WATCHLIST_TTL_DAYS: ${{ vars.WATCHLIST_TTL_DAYS || '30' }}
+          WATCHLIST_MAX_SIZE: ${{ vars.WATCHLIST_MAX_SIZE || '60' }}
+
+          # ===== 通知渠道（仅在 WATCHLIST_NOTIFY=true 时实际发送）=====
+          WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          FEISHU_WEBHOOK_SECRET: ${{ secrets.FEISHU_WEBHOOK_SECRET }}
+          FEISHU_WEBHOOK_KEYWORD: ${{ vars.FEISHU_WEBHOOK_KEYWORD || secrets.FEISHU_WEBHOOK_KEYWORD }}
+          DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EMAIL_SENDER: ${{ vars.EMAIL_SENDER || secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVERS: ${{ vars.EMAIL_RECEIVERS || secrets.EMAIL_RECEIVERS }}
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          GOTIFY_URL: ${{ secrets.GOTIFY_URL }}
+          GOTIFY_TOKEN: ${{ secrets.GOTIFY_TOKEN }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          NOTIFICATION_REPORT_CHANNELS: ${{ vars.NOTIFICATION_REPORT_CHANNELS }}
+
+          # ===== 落库（默认 SQLite，runner 上是一次性的；配置外部库才有持久价值）=====
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+          CADENCE: ${{ steps.plan.outputs.cadence }}
+          DRY_RUN: ${{ steps.plan.outputs.dry_run }}
+          FORCE_RUN: ${{ steps.plan.outputs.force_run }}
+          EXPLICIT_STRATEGIES: ${{ github.event.inputs.strategies }}
+          WATCHLIST_NOTIFY: ${{ vars.WATCHLIST_NOTIFY || 'false' }}
+          PYTHONUNBUFFERED: '1'
+        run: |
+          set -o pipefail
+          ARGS=(--cadence "$CADENCE" --market cn --write-stock-list --save-db)
+
+          if [ -n "${EXPLICIT_STRATEGIES:-}" ]; then
+            ARGS+=(--strategies "$EXPLICIT_STRATEGIES")
+          fi
+          if [ "${FORCE_RUN:-false}" = "true" ]; then
+            ARGS+=(--force-run)
+          fi
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+
+          echo "=========================================="
+          echo "🔍 全市场扫描 · 观察名单"
+          echo "⏰ $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S') (北京时间)"
+          echo "🎯 分层: $CADENCE"
+          echo "🧠 LLM 重排: 关闭（纯因子排序）"
+          echo "🗄️ 数据库: $([ -n "$DATABASE_URL" ] && echo '外部库' || echo '本地 SQLite（本次运行后丢弃）')"
+          echo "=========================================="
+
+          python scripts/market_scan.py "${ARGS[@]}" 2>&1 | tee logs/market_scan.log
+
+      - name: 提交观察名单
+        if: steps.plan.outputs.dry_run != 'true'
+        env:
+          CADENCE: ${{ steps.plan.outputs.cadence }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/watchlist
+          if git diff --staged --quiet; then
+            echo "观察名单无变化，跳过提交"
+            exit 0
+          fi
+          RUN_DATE="$(TZ='Asia/Shanghai' date '+%Y-%m-%d')"
+          git commit -m "chore: refresh ${CADENCE} market scan watchlist (${RUN_DATE})"
+          # 并发的 daily/weekly 运行可能已经推过一次，rebase 后重试一次再放弃。
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: 同步 STOCK_LIST 仓库变量
+        # 需要一个有 Variables 写权限的 PAT；默认 GITHUB_TOKEN 无法修改仓库变量。
+        # 未配置 WATCHLIST_REPO_TOKEN 时静默跳过，名单仍然以 STOCK_LIST.txt 形式落在仓库里。
+        if: steps.plan.outputs.dry_run != 'true' && vars.WATCHLIST_SYNC_STOCK_LIST == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.WATCHLIST_REPO_TOKEN }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "⚠️ 未配置 WATCHLIST_REPO_TOKEN，跳过 STOCK_LIST 仓库变量同步"
+            exit 0
+          fi
+          if [ ! -s data/watchlist/STOCK_LIST.txt ]; then
+            echo "⚠️ STOCK_LIST.txt 为空，跳过同步（避免把自选股清空）"
+            exit 0
+          fi
+          gh variable set STOCK_LIST --body "$(cat data/watchlist/STOCK_LIST.txt)" --repo "${GITHUB_REPOSITORY}"
+          echo "✅ 已同步 STOCK_LIST 仓库变量"
+
+      - name: 上传扫描产物
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: market-scan-${{ steps.plan.outputs.cadence }}-${{ github.run_number }}
+          path: |
+            data/watchlist/
+            logs/
+          retention-days: 30

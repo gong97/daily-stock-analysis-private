@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`STOCK_LIST.txt`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
+- [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact；配置 `WATCHLIST_SYNC_STOCK_LIST=true` 与 `WATCHLIST_REPO_TOKEN` 后可同步更新 `STOCK_LIST` 仓库变量。
+- [改进] 日报工作流在仓库变量 `WATCHLIST_AS_STOCK_LIST=true` 且 `data/watchlist/STOCK_LIST.txt` 非空时优先使用扫描沉淀的观察名单作为 `STOCK_LIST`，否则维持原有的 `STOCK_LIST_CONFIG` → runner 环境变量 → 最小默认值顺序。
+- [文档] `docs/screening-engine.md` 补充「全市场扫描与观察名单」：分层依据、名单产物契约、与日报的衔接方式和运行方式；`.env.example` 同步新增 `WATCHLIST_*` 配置项。
+- [测试] 新增 `tests/test_screening_watchlist.py` 与 `tests/test_market_scan_script.py`，覆盖分层映射、名单合并去重、TTL/容量淘汰、pinned 保护、产物落盘和失败降级路径。
+
 - [新功能] Agent Chat 按会话持久化 Skill 选择，支持刷新和会话切换恢复，并区分省略 `skills`、显式空列表与非空选择；无持久化状态的历史会话继续使用运行时默认且不会被静默转为显式选择，复用分析 `context` 中残留的 legacy `skills` / `strategies` 也不会覆盖顶层三态或会话状态，非空但全部无效的 Skill 请求不会被当成显式空列表并清空既有选择
 - [改进] 后端 CI 在不跳过离线测试的前提下按完整测试文件分成三个独立 runner 并行执行，由单一 `backend-gate` 汇总门禁结果；实测文件耗时和首分片静态检查成本共同参与负载平衡，新测试文件自动纳入，现有 pip 安装和测试参数保持不变，避免 xdist 进程内并发的全局状态竞态。
 - [测试] 后端 CI 默认覆盖所有非 Web 改动，仅对已证明安全的纯 Web 路径跳过，并将整个 Web public 目录及前端渠道模板、设置帮助视为跨层运行合同；补充纯 Web、共享 Web 资产及 Web/非 Web 混合改动的过滤语义回归，明确 `predicate-quantifier: every` 按单文件匹配全部规则、再以任一匹配文件触发门禁。Docker CI 继续按构建输入过滤。离线测试保留稳定的串行执行与慢用例摘要，并移除重复用例和测试内真实等待。

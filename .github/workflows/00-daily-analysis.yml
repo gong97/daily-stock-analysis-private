@@ -400,6 +400,8 @@ jobs:
           # ==========================================
           # 避免直接写入 STOCK_LIST，保留同名 Environment variables 的 runner 环境值。
           STOCK_LIST_CONFIG: ${{ vars.STOCK_LIST || secrets.STOCK_LIST }}
+          # 设为 true 时优先使用全市场扫描沉淀的观察名单（.github/workflows/10-market-scan.yml 产出）
+          WATCHLIST_AS_STOCK_LIST: ${{ vars.WATCHLIST_AS_STOCK_LIST || 'false' }}
           MARKET_REVIEW_REGION: ${{ vars.MARKET_REVIEW_REGION || secrets.MARKET_REVIEW_REGION || 'cn' }}
           MARKET_REVIEW_COLOR_SCHEME: ${{ vars.MARKET_REVIEW_COLOR_SCHEME || secrets.MARKET_REVIEW_COLOR_SCHEME || 'green_up' }}
           
@@ -437,10 +439,15 @@ jobs:
           
         run: |
           # 解析自选股配置：
-          # 1. Repository/Environment secrets 或 Repository variables（STOCK_LIST_CONFIG）
-          # 2. 同名 Environment variables 注入的 runner 环境变量（STOCK_LIST）
-          # 3. 最小默认值
-          if [ -n "${STOCK_LIST_CONFIG:-}" ]; then
+          # 1. 全市场扫描观察名单（WATCHLIST_AS_STOCK_LIST=true 且文件非空时）
+          # 2. Repository/Environment secrets 或 Repository variables（STOCK_LIST_CONFIG）
+          # 3. 同名 Environment variables 注入的 runner 环境变量（STOCK_LIST）
+          # 4. 最小默认值
+          WATCHLIST_STOCK_LIST_PATH="data/watchlist/STOCK_LIST.txt"
+          if [ "${WATCHLIST_AS_STOCK_LIST:-false}" = "true" ] && [ -s "$WATCHLIST_STOCK_LIST_PATH" ]; then
+            export STOCK_LIST="$(tr -d '[:space:]' < "$WATCHLIST_STOCK_LIST_PATH")"
+            echo "📋 自选股来源：全市场扫描观察名单（$WATCHLIST_STOCK_LIST_PATH）"
+          elif [ -n "${STOCK_LIST_CONFIG:-}" ]; then
             export STOCK_LIST="$STOCK_LIST_CONFIG"
           elif [ -z "${STOCK_LIST:-}" ]; then
             export STOCK_LIST="600519"
