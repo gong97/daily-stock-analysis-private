@@ -41,6 +41,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.services.screening_watchlist import (  # noqa: E402
     DEFAULT_MAX_PER_INDUSTRY,
     DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET,
+    DEFAULT_MAX_PER_INDUSTRY_TOTAL,
     DEFAULT_MAX_SIZE,
     DEFAULT_MAX_SIZE_BY_BUCKET,
     DEFAULT_TTL_DAYS,
@@ -145,6 +146,15 @@ def build_parser() -> argparse.ArgumentParser:
             "同一行业在单个桶内最多保留几只；0 表示不限制。"
             "这是跨策略的集中度控制，选股引擎的组合分散只在单个策略内生效。"
             "支持按桶配置，如 'defensive:2,aggressive:4'"
+        ),
+    )
+    parser.add_argument(
+        "--max-per-industry-total",
+        type=int,
+        default=_env_int("WATCHLIST_MAX_PER_INDUSTRY_TOTAL", DEFAULT_MAX_PER_INDUSTRY_TOTAL),
+        help=(
+            "同一行业在整份名单里的总数上限（跨桶结算）；0 表示不限制。"
+            "桶内配额管不住跨桶叠加：9 只银行分散在两个桶、每桶留 2 只，整体仍有 4 只"
         ),
     )
     parser.add_argument("--use-llm", action="store_true", help="开启 L2 LLM 重排（默认关闭）")
@@ -427,6 +437,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ttl_days=ttl_limits,
         max_size=size_limits,
         max_per_industry=industry_limits,
+        max_per_industry_total=args.max_per_industry_total,
     )
     # 本次刚进来又立刻被容量裁掉的，不算"新进"。
     added = [code for code in added if code in entries]
@@ -467,6 +478,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "ttl_days": ttl_limits,
         "max_size": size_limits,
         "max_per_industry": industry_limits,
+        "max_per_industry_total": args.max_per_industry_total,
         "industry_quota_effective": diagnostic.effective,
         "industry_missing_count": diagnostic.missing_industry,
         "updated_at": datetime.now(_CN_TZ).isoformat(timespec="seconds"),

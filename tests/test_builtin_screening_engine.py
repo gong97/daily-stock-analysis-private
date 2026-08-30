@@ -835,3 +835,55 @@ def test_fresh_snapshot_cache_reuses_fallback_from_same_source_chain(tmp_path, m
     assert second.attrs["snapshot_source"] == "last_good_cache"
     assert second.attrs["last_good_snapshot_source"] == "sina"
     assert second.attrs["fallback_used"] is False
+
+
+def test_em_datacenter_requests_industry_and_concept(monkeypatch) -> None:
+    """em_datacenter 必须随快照一并取回行业/概念。
+
+    这两个字段不额外增加请求也不改变返回行数，却是行业配额、策略内
+    portfolio_profile 和 theme_heat 的唯一可靠来源：akshare 的板块接口走
+    push2.eastmoney.com，在 GitHub Actions 上稳定 502 / RemoteDisconnected。
+    """
+    captured: dict = {}
+
+    class _Resp:
+        @staticmethod
+        def json():
+            return {
+                "success": True,
+                "result": {
+                    "count": 2,
+                    "data": [
+                        {"SECURITY_CODE": "000001", "SECURITY_NAME_ABBR": "平安银行",
+                         "NEW_PRICE": 11.0, "INDUSTRY": "银行",
+                         "CONCEPT": ["深圳特区", "跨境支付"]},
+                        {"SECURITY_CODE": "000007", "SECURITY_NAME_ABBR": "全新好",
+                         "NEW_PRICE": 5.0, "INDUSTRY": "汽车",
+                         "CONCEPT": "深圳特区"},
+                    ],
+                },
+            }
+
+    def _fake_get(url, **kwargs):
+        captured["params"] = kwargs.get("params", {})
+        return _Resp()
+
+    monkeypatch.setattr(screening_snapshot, "_eastmoney_get", _fake_get)
+    df = screening_snapshot._fetch_em_datacenter()
+
+    assert "INDUSTRY" in captured["params"]["sty"]
+    assert "CONCEPT" in captured["params"]["sty"]
+    assert list(df["industry"]) == ["银行", "汽车"]
+    # CONCEPT 单个时是 str、多个时是 list，都要归一成 `a|b` 文本，
+    # 否则 list 会原样进 DataFrame 并炸掉下游的字符串处理。
+    assert list(df["concepts"]) == ["深圳特区|跨境支付", "深圳特区"]
+    assert df["concepts"].map(type).eq(str).all()
+
+
+def test_join_label_list_normalizes_concept_shapes() -> None:
+    join = screening_snapshot._join_label_list
+    assert join(["a", "b"]) == "a|b"
+    assert join("a") == "a"
+    assert join(["a", "", "  ", "b"]) == "a|b"
+    assert join(None) == ""
+    assert join(float("nan")) == ""

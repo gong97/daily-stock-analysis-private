@@ -23,6 +23,8 @@ from src.services.screening_watchlist import (
     SUPPORTED_BUCKETS,
     BUCKET_PRIORITY,
     StrategyHit,
+    DEFAULT_MAX_PER_INDUSTRY_TOTAL,
+    apply_global_industry_cap,
     group_by_bucket,
     industry_quota_diagnostic,
     limit_for,
@@ -685,8 +687,10 @@ def test_expire_entries_applies_per_bucket_industry_quota():
         e = _bucketed(f"A{i}", BUCKET_AGGRESSIVE, 90.0 - i, industry="半导体")
         entries[e.code] = e
 
+    # 关掉全局上限，隔离出桶内配额这一步
     kept, _ = expire_entries(
-        entries, run_date=RUN_DATE, ttl_days=0, max_size=0, max_per_industry=None
+        entries, run_date=RUN_DATE, ttl_days=0, max_size=0,
+        max_per_industry=None, max_per_industry_total=0,
     )
     kept_defensive = [c for c in kept if c.startswith("D")]
     kept_aggressive = [c for c in kept if c.startswith("A")]
@@ -906,3 +910,85 @@ def test_report_surfaces_the_diagnostic():
         added=[], removed=[], summaries=[],
     )
     assert "⚠️ 行业配额未生效" in report
+
+# ---------------------------------------------------------------------------
+# 全局行业上限（跨桶）
+# ---------------------------------------------------------------------------
+def test_global_cap_counts_an_industry_across_buckets():
+    """桶内配额管不住跨桶叠加：银行在两个桶各留 2 只，整体仍有 4 只。"""
+    entries = {}
+    for i, b in enumerate([BUCKET_BALANCED, BUCKET_BALANCED, BUCKET_DEFENSIVE, BUCKET_DEFENSIVE]):
+        e = _make(f"B{i}", bucket=b, score=90.0 - i, industry="银行")
+        entries[e.code] = e
+    entries["X"] = _make("X", bucket=BUCKET_BALANCED, score=50.0, industry="化工")
+
+    kept, removed = apply_global_industry_cap(entries, run_date=RUN_DATE, max_total=3)
+    assert len([c for c in kept if c.startswith("B")]) == 3
+    assert "X" in kept                                    # 别的行业不受影响
+    assert [r for _c, r in removed] == ["industry_quota_global"]
+
+
+def test_global_cap_takes_the_best_of_each_bucket_first():
+    """名额不够时按桶优先级轮流取，不做跨桶分数比较。
+
+    进攻桶两只分数都低于防守桶，但仍各自先保住自己最好的那只。
+    """
+    entries = {
+        "A1": _make("A1", bucket=BUCKET_AGGRESSIVE, score=40.0, industry="银行"),
+        "A2": _make("A2", bucket=BUCKET_AGGRESSIVE, score=30.0, industry="银行"),
+        "D1": _make("D1", bucket=BUCKET_DEFENSIVE, score=95.0, industry="银行"),
+        "D2": _make("D2", bucket=BUCKET_DEFENSIVE, score=90.0, industry="银行"),
+    }
+    kept, _ = apply_global_industry_cap(entries, run_date=RUN_DATE, max_total=3)
+    # 第一轮 A1、D1；第二轮再取 A2（BUCKET_PRIORITY 里 aggressive 在前）
+    assert set(kept) == {"A1", "D1", "A2"}
+
+
+def test_global_cap_zero_disables_it():
+    entries = {f"B{i}": _make(f"B{i}", industry="银行") for i in range(5)}
+    kept, removed = apply_global_industry_cap(entries, run_date=RUN_DATE, max_total=0)
+    assert len(kept) == 5
+    assert removed == []
+
+
+def test_global_cap_exempts_pinned_and_blank_industry():
+    entries = {
+        "P": _make("P", industry="银行", pinned=True),
+        "N": _make("N", industry=""),
+    }
+    for i in range(4):
+        entries[f"B{i}"] = _make(f"B{i}", score=90.0 - i, industry="银行")
+    kept, _ = apply_global_industry_cap(entries, run_date=RUN_DATE, max_total=2)
+    assert "P" in kept and "N" in kept
+    assert len([c for c in kept if c.startswith("B")]) == 2
+
+
+def test_expire_entries_applies_the_global_cap_after_per_bucket_quotas():
+    entries = {}
+    for i, b in enumerate([BUCKET_AGGRESSIVE, BUCKET_BALANCED, BUCKET_DEFENSIVE]):
+        for j in range(3):
+            e = _make(f"{b[0].upper()}{j}", bucket=b, score=90.0 - j, industry="银行")
+            entries[e.code] = e
+
+    kept, removed = expire_entries(
+        entries, run_date=RUN_DATE, ttl_days=0, max_size=0,
+        max_per_industry=2, max_per_industry_total=3,
+    )
+    assert len(kept) == 3
+    reasons = {r for _c, r in removed}
+    # 两层都参与了：桶内先各裁 1，全局再把 6 压到 3
+    assert reasons == {"industry_quota", "industry_quota_global"}
+
+
+def test_default_global_cap_is_active():
+    assert DEFAULT_MAX_PER_INDUSTRY_TOTAL > 0
+
+
+def test_report_labels_the_global_cap_reason():
+    report = render_report(
+        run_date=RUN_DATE, cadence="all", entries={"A": _make("A", industry="银行")},
+        added=[], removed=[("B", "industry_quota_global"), ("C", "industry_quota")],
+        summaries=[],
+    )
+    assert "同行业已达全局上限" in report
+    assert "同行业在该桶已满额" in report

@@ -59,6 +59,11 @@ DEFAULT_MAX_SIZE = 60
 # 同一行业在名单中最多保留几只。选股引擎的组合分散只在单个策略内生效，
 # 跨策略的集中度（7 个策略各选 1 只银行）只能在这一层管。0 表示不限制。
 DEFAULT_MAX_PER_INDUSTRY = 2
+# 同一行业在**整份名单**里的总数上限，跨桶结算。0 表示不限制。
+# 桶内配额管不住跨桶叠加：9 只银行分散在均衡桶和防守桶、每桶各留 2 只，
+# 整份名单仍有 4 只。默认 3 而不是 2，是为了让一个行业还能在两个桶里各留一个
+# 代表（"银行既是防守也是均衡"本身有信息量）；要严格每行业 2 只就设成 2。
+DEFAULT_MAX_PER_INDUSTRY_TOTAL = 3
 
 # 各桶的默认限额。三者的差异是有依据的：
 # - TTL：aggressive 是 short_term 信号，两周后基本失效；defensive 可以长期观察。
@@ -726,7 +731,10 @@ def industry_quota_diagnostic(
     """判断行业配额这一层是生效了还是因为缺数据而静默放行。"""
     total = len(entries)
     missing = sum(1 for entry in entries.values() if not normalize_industry(entry.industry))
-    trimmed = sum(1 for _code, reason in removed if reason == "industry_quota")
+    trimmed = sum(
+        1 for _code, reason in removed
+        if reason in ("industry_quota", "industry_quota_global")
+    )
     return IndustryQuotaDiagnostic(
         effective=bool(total) and missing < total,
         total=total,
@@ -794,6 +802,7 @@ def expire_entries(
     ttl_days: Any = None,
     max_size: Any = None,
     max_per_industry: Any = None,
+    max_per_industry_total: Optional[int] = None,
 ) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
     """按 TTL、行业配额和容量上限淘汰名单，**每个 bucket 独立执行**。
 
@@ -853,6 +862,83 @@ def expire_entries(
         )
         kept.update(bucket_kept)
         removed.extend(bucket_removed)
+
+    # 最后一道：全局行业上限。桶内配额只保证"每个清单不被一个行业占满"，
+    # 但 9 只银行分散在两个桶里、每桶各留 2 只，整份名单仍会有 4 只银行。
+    kept, global_removed = apply_global_industry_cap(
+        kept,
+        run_date=run_date,
+        max_total=(
+            DEFAULT_MAX_PER_INDUSTRY_TOTAL
+            if max_per_industry_total is None
+            else int(max_per_industry_total)
+        ),
+    )
+    removed.extend(global_removed)
+
+    return kept, removed
+
+
+def apply_global_industry_cap(
+    entries: Mapping[str, WatchlistEntry],
+    *,
+    run_date: date,
+    max_total: int,
+) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
+    """限制同一行业在**整份名单**里的总数，跨桶结算。
+
+    难点在于名额不够时该淘汰谁：分数是各策略硬筛存活池内的分位排名，跨桶不可比，
+    直接按分数全局排序正是分桶要避免的事。因此改成**按桶优先级轮流取**——
+    每一轮从每个桶里取该行业排名最高的一只，取满为止。这样：
+
+    - 每个含该行业的桶都能先保住自己最好的那只
+    - 全程不做跨桶分数比较
+    - 结果确定，与字典序和运行顺序无关
+
+    `pinned` 与行业为空的条目豁免，理由同 `apply_industry_quota`。
+    """
+    if max_total <= 0:
+        return dict(entries), []
+
+    kept: Dict[str, WatchlistEntry] = {}
+    removed: List[Tuple[str, str]] = []
+    by_industry: Dict[str, Dict[str, List[WatchlistEntry]]] = {}
+
+    for entry in entries.values():
+        industry = normalize_industry(entry.industry)
+        if entry.pinned or not industry:
+            kept[entry.code] = entry
+            continue
+        by_industry.setdefault(industry, {}).setdefault(entry.bucket, []).append(entry)
+
+    for buckets in by_industry.values():
+        ordered = {
+            bucket: sort_entries(rows, run_date=run_date)
+            for bucket, rows in buckets.items()
+        }
+        selected: List[WatchlistEntry] = []
+        depth = 0
+        while len(selected) < max_total:
+            progressed = False
+            for bucket in BUCKET_PRIORITY:
+                rows = ordered.get(bucket) or []
+                if depth >= len(rows):
+                    continue
+                selected.append(rows[depth])
+                progressed = True
+                if len(selected) >= max_total:
+                    break
+            if not progressed:
+                break
+            depth += 1
+
+        selected_codes = {entry.code for entry in selected}
+        for rows in ordered.values():
+            for entry in rows:
+                if entry.code in selected_codes:
+                    kept[entry.code] = entry
+                else:
+                    removed.append((entry.code, "industry_quota_global"))
 
     return kept, removed
 
@@ -966,7 +1052,8 @@ def render_report(
         lines.append("")
         reason_text = {
             "ttl": "超过留存期",
-            "industry_quota": "同行业已满额",
+            "industry_quota": "同行业在该桶已满额",
+            "industry_quota_global": "同行业已达全局上限",
             "capacity": "超出名单容量",
         }
         for code, reason in removed:

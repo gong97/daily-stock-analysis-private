@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 观察名单新增全局行业上限 `WATCHLIST_MAX_PER_INDUSTRY_TOTAL`（默认 3，跨桶结算，0 关闭），在桶内配额之后执行。桶内配额只保证每个清单不被一个行业占满，管不住跨桶叠加：9 只银行分散在均衡桶与防守桶、每桶各留 2 只，整份名单仍有 4 只。名额不够时按桶优先级轮流取（每轮从各桶取该行业排名最高的一只），避免按分数全局排序——分数是各策略硬筛存活池内的分位排名，跨桶不可比。`pinned` 与行业为空的条目豁免。实测把真实行业回填到 19 条名单：关闭时 19→13（银行 4 只），默认 3 时 19→12（银行 3 只），设 2 时 19→10（银行 2 只）。
+
+- [修复] `em_datacenter` 快照的 `sty` 参数补上 `INDUSTRY` / `CONCEPT`，行业与概念随快照一并取回：零额外请求、不改变返回行数，实测 5147 行行业零缺失、103 个分类。此前行业数据只能由 `INDUSTRY_PROVIDER=akshare` 提供，而 akshare 的板块接口走 `push2.eastmoney.com`，在 GitHub Actions 上连续两轮均为 502 / RemoteDisconnected，导致观察名单行业列全空、跨策略行业配额静默放行（19 条候选里 9 只银行原样入选）；快照使用的 `data.eastmoney.com` 则一直可用。`CONCEPT` 单值返回 str、多值返回 list，统一归一成 `a|b|c` 文本，避免 list 原样进入 DataFrame 破坏下游字符串处理。
+
 - [改进] 观察名单报告新增行业配额诊断行，`meta` 记 `industry_quota_effective` 与 `industry_missing_count`，配额因缺少行业数据而空转时脚本额外打 warning。行业配额对 `industry` 为空的条目一律放行（无法分组，强行淘汰会误伤），因此「配置在、逻辑在、数据不在」时报告看起来完全正常，只是名单里挤满同一个行业——首次实跑正是如此：19 条候选行业全空、9 只银行原样入选，而 `max_per_industry` 早已配好。
 
 - [修复] 观察名单改为保存逐策略背书（`strategies: {策略名: {score, last_seen, bucket}}`），`bucket` / `buckets` 变成派生属性。此前 `bucket` 是存储字段，跨运行会被最后一轮无条件覆盖：周一 daily 跑成 aggressive、周五 weekly 跑成 defensive，连带 TTL（14↔45 天）与行业配额（4↔2）一起漂移。主桶按 `aggressive > balanced > defensive` 取，让衰减最快的桶治理时效；TTL 改为按每条背书自身所属桶结算，条目只要还剩任一条有效背书就保留，全部失效才算 ttl 出局（此前 `strategies` 只存分数且从不清理）。同时符合多个桶的票只在主桶列一行、只占一个名额，报告标注「兼 X」。名单 schema 升到 v2，`load_watchlist` 兼容名字列表 / `{名: 分数}` 两种旧格式并在 meta 记 `migrated_from_schema_version`；旧快照没有逐策略信息，回填成条目级取值，等各策略重新背书后 `buckets` 才准确。

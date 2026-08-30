@@ -490,9 +490,15 @@ def _fetch_em_datacenter() -> pd.DataFrame:
             "sr": "1",
             "ps": str(page_size),
             "p": str(page),
+            # INDUSTRY / CONCEPT 随快照一起取：它们不额外增加请求，也不改变
+            # 返回行数，却让行业配额、策略内的 portfolio_profile 和 theme_heat
+            # 拿到数据。此前只能靠 INDUSTRY_PROVIDER=akshare 补，而 akshare 的
+            # 板块接口走的是 push2.eastmoney.com，在 GitHub Actions 上稳定
+            # 502 / RemoteDisconnected；本接口的 data.eastmoney.com 则是通的。
             "sty": "SECUCODE,SECURITY_CODE,SECURITY_NAME_ABBR,NEW_PRICE,"
                    "CHANGE_RATE,VOLUME_RATIO,DEAL_AMOUNT,TURNOVERRATE,"
-                   "PE9,PBNEWMRQ,TOTAL_MARKET_CAP,CIRCULATION_MARKET_CAP",
+                   "PE9,PBNEWMRQ,TOTAL_MARKET_CAP,CIRCULATION_MARKET_CAP,"
+                   "INDUSTRY,CONCEPT",
             "filter": '(MARKET+in+("上交所主板","深交所主板","深交所创业板","上交所科创板","北交所"))',
             "source": "SELECT_SECURITIES",
             "client": "WEB",
@@ -519,8 +525,24 @@ def _fetch_em_datacenter() -> pd.DataFrame:
     if not all_items:
         raise RuntimeError("em_datacenter returned no data")
 
+    for item in all_items:
+        item["CONCEPT"] = _join_label_list(item.get("CONCEPT"))
+
     df = pd.DataFrame(all_items)
     return _normalize(df, source="em_datacenter")
+
+
+def _join_label_list(value: object) -> str:
+    """把 CONCEPT 归一成 `a|b|c` 文本。
+
+    该接口只有一个概念时返回 str、多个时返回 list，直接进 DataFrame 会让下游的
+    字符串处理拿到 list。`|` 是本模块既有的多标签分隔符（`_merge_label_text`
+    与 `_summary_boards` 都按它切分）。
+    """
+    if isinstance(value, (list, tuple)):
+        return "|".join(str(item).strip() for item in value if str(item).strip())
+    text = str(value or "").strip()
+    return "" if text.lower() in {"nan", "none", "<na>"} else text
 
 
 def _eastmoney_get(url: str, **kwargs) -> requests.Response:

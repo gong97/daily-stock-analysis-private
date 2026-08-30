@@ -113,6 +113,7 @@ def stub_engine(monkeypatch):
         "WATCHLIST_TTL_DAYS",
         "WATCHLIST_MAX_SIZE",
         "WATCHLIST_MAX_PER_INDUSTRY",
+        "WATCHLIST_MAX_PER_INDUSTRY_TOTAL",
         "WATCHLIST_NOTIFY",
         "GITHUB_STEP_SUMMARY",
     ):
@@ -252,7 +253,7 @@ def test_industry_quota_trims_crowded_industry(market_scan, stub_engine, monkeyp
         "balanced": 2,
         "aggressive": 2,
     }
-    assert "同行业已满额" in (tmp_path / "latest_report.md").read_text(encoding="utf-8")
+    assert "同行业在该桶已满额" in (tmp_path / "latest_report.md").read_text(encoding="utf-8")
 
 
 def test_max_per_industry_zero_keeps_everything(market_scan, stub_engine, monkeypatch, tmp_path):
@@ -328,3 +329,48 @@ def test_bucket_does_not_drift_between_runs(market_scan, stub_engine, monkeypatc
 
     report = (tmp_path / "latest_report.md").read_text(encoding="utf-8")
     assert "（兼 防守）" in report
+
+
+def test_global_industry_cap_trims_across_buckets(market_scan, stub_engine, monkeypatch, tmp_path):
+    """桶内配额放行后，全局上限仍能把跨桶叠加的同行业压下来。"""
+    import src.services.screening.pipeline as pipeline_module
+
+    def _banks_everywhere(strategy, **_kwargs):
+        # 每个策略选不同的票，都是银行；桶内配额（各桶 ≤2）因此不会触发
+        by_strategy = {
+            "capital_heat": ["000001"],       # aggressive
+            "volume_breakout": ["000002"],    # aggressive
+            "shrink_pullback": ["000003"],    # balanced
+            "dual_low": ["600519"],           # defensive
+        }
+        return _result(strategy, by_strategy.get(strategy, []), industry="银行")
+
+    monkeypatch.setattr(pipeline_module, "screen", _banks_everywhere)
+    assert market_scan.main(
+        _args(tmp_path, "--cadence", "all", "--max-per-industry", "2",
+              "--max-per-industry-total", "2")
+    ) == 0
+
+    current = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))
+    assert len(current["entries"]) == 2
+    assert current["meta"]["max_per_industry_total"] == 2
+    assert "同行业已达全局上限" in (tmp_path / "latest_report.md").read_text(encoding="utf-8")
+
+
+def test_global_industry_cap_zero_disables_it(market_scan, stub_engine, monkeypatch, tmp_path):
+    import src.services.screening.pipeline as pipeline_module
+
+    def _banks_everywhere(strategy, **_kwargs):
+        by_strategy = {
+            "capital_heat": ["000001"], "volume_breakout": ["000002"],
+            "shrink_pullback": ["000003"], "dual_low": ["600519"],
+        }
+        return _result(strategy, by_strategy.get(strategy, []), industry="银行")
+
+    monkeypatch.setattr(pipeline_module, "screen", _banks_everywhere)
+    assert market_scan.main(
+        _args(tmp_path, "--cadence", "all", "--max-per-industry", "0",
+              "--max-per-industry-total", "0")
+    ) == 0
+    current = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))
+    assert len(current["entries"]) == 4
