@@ -29,7 +29,12 @@ screening:
     change_pct_min: -3.0
     change_pct_max: 5.0
     price_min: 4
-    price_max: 180
+    # 刻意不设 price_max：股价水平不承载流动性信息。实测 220 元以上的 74 只票
+    # 全部通过各策略的 amount_min，而该上限会挡掉 49 只 500 亿以上的大盘股
+    # （宁德时代、贵州茅台、中际旭创、寒武纪、北方华创……）。流动性由
+    # amount_min + market_cap_min 表达。
+    # 注意：A 股 100 股/手，贵州茅台一手约 13 万元——这是仓位约束，
+    # 属于组合层面，不该塞进选股硬筛。
     change_60d_min: -10.0
     change_60d_max: 35.0
     signal_score_min: 55
@@ -48,6 +53,12 @@ screening:
     theme_heat: 0.05
     reversal: 0.02
   scoring_profile:
+    # 行业中性化：value / liquidity / size 三个分位类因子改为行业内排名。
+    # 去掉 turnover_rate_min 之后，超大盘银行（工商/农业/中国/建设）全部进入候选池，
+    # 全市场口径下它们凭低 PE 垄断 value 因子，实测 Top 8 里 7 只是银行。
+    # 行业内重排后降到 0-1 只，且分布回到保险/建筑/电力设备/家电等多个行业。
+    industry_neutral: true
+    industry_neutral_min_size: 10
     momentum_60d_overheat_pct: 32.0
     momentum_chase_start_pct: 4.0
     momentum_chase_penalty_slope: 18.0

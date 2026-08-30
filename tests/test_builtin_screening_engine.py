@@ -1001,7 +1001,13 @@ def test_only_the_intended_strategies_opt_into_industry_neutral() -> None:
         if s.screening.scoring_profile.get("industry_neutral")
     }
     # "选好公司"的策略中性化；dual_low 要的就是全市场最便宜，必须保持原口径
-    assert enabled == {"quality_value", "momentum_quality", "balanced_alpha"}
+    assert enabled == {
+        "quality_value",
+        "momentum_quality",
+        "balanced_alpha",
+        "blue_chip_income",
+        "low_volatility_quality",
+    }
     assert not strategies["dual_low"].screening.scoring_profile.get("industry_neutral")
 
 
@@ -1059,3 +1065,34 @@ def test_shipped_industry_map_is_membership_only() -> None:
     for item in mapping.values():
         for key in item:
             assert key in {"industry", "concepts"}, f"静态表不应包含时变字段 {key}"
+
+
+def test_no_strategy_caps_price() -> None:
+    """price_max 不承载流动性信息，全库不应再使用它。
+
+    实测 220 元以上的 74 只票全部通过各策略的 amount_min，而该上限会挡掉 49 只
+    500 亿以上的大盘股（宁德时代、贵州茅台、中际旭创、寒武纪、北方华创……）。
+    流动性由 amount_min + market_cap_min 表达。
+    """
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+    offenders = {
+        name for name, s in strategies.items()
+        if s.screening.hard_filters.price_max is not None
+    }
+    assert offenders == set(), f"这些策略仍在用 price_max: {sorted(offenders)}"
+
+
+def test_blue_chip_strategies_do_not_require_high_turnover() -> None:
+    """大盘蓝筹的低换手率来自巨大流通盘，不是流动性差。
+
+    长江电力 0.28%、中国神华 0.14%、工商银行 0.09%，但成交额都在 10-21 亿。
+    要求 ≥1% 等于把最典型的红利防守股排除在外。
+    """
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+
+    assert strategies["blue_chip_income"].screening.hard_filters.turnover_rate_min is None
+    assert strategies["shrink_pullback"].screening.hard_filters.turnover_rate_min <= 0.5
+
+    # 动量/热度类策略的高换手是信号本身，不能一并放宽
+    for name in ("capital_heat", "theme_momentum", "volume_breakout"):
+        assert strategies[name].screening.hard_filters.turnover_rate_min >= 2.0

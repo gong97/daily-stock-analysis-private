@@ -86,6 +86,16 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v5
 
+      - name: 同步最新观察名单
+        # 必须在扫描之前同步：扫描读的是 checkout 时的 current.json，而提交步骤
+        # 直到最后才 rebase。任何在这期间落地的改动都会被静默合并进产物，
+        # 产出「行业数据与名单成员来自不同输入」的文件——实测发生过：
+        # 配额在 5 条空行业条目上放行（4 只银行越过上限 2），随后回填提交被
+        # rebase 合入，文件看起来正常但结论是错的。
+        run: |
+          git pull --ff-only origin "${GITHUB_REF_NAME}"
+          echo "📥 已同步到 $(git rev-parse --short HEAD)"
+
       - name: 设置 Python 环境
         uses: actions/setup-python@v6
         with:
@@ -237,8 +247,14 @@ jobs:
           fi
           RUN_DATE="$(TZ='Asia/Shanghai' date '+%Y-%m-%d')"
           git commit -m "chore: refresh ${CADENCE} market scan watchlist (${RUN_DATE})"
-          # 并发的 daily/weekly 运行可能已经推过一次，rebase 后重试一次再放弃。
-          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          # 扫描前已经同步过，这里的 rebase 只用于覆盖「扫描期间又有新提交」的窄窗口。
+          # 不再吞掉失败：冲突意味着产物与远端数据不一致，宁可让这次运行失败，
+          # 也不要推上一份自相矛盾的名单。
+          if ! git pull --rebase origin "${GITHUB_REF_NAME}"; then
+            git rebase --abort || true
+            echo "::error::观察名单与远端冲突——扫描期间远端有新提交，本次结果已作废"
+            exit 1
+          fi
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: 上传扫描产物

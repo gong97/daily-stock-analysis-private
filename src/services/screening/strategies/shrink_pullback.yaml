@@ -22,7 +22,10 @@ screening:
   hard_filters:
     exclude_st: true
     amount_min: 80000000
-    turnover_rate_min: 1.0
+    # 0.3% 而不是原先的 1.0%：本策略的「缩量」由 volume_ratio_20d 表达，
+    # 换手率下限只作为最低可交易性门槛。1.0% 会把全部大盘蓝筹排除
+    # （工商银行 0.09%、中国神华 0.14%），与回踩买入的场景无关。
+    turnover_rate_min: 0.3
     require_ma_bullish: true
     require_price_above_ma20: true
     signal_score_min: 65

@@ -30,7 +30,12 @@ screening:
     pb_min: 0
     pb_max: 8.0
     price_min: 3
-    price_max: 180
+    # 刻意不设 price_max：股价水平不承载流动性信息。实测 220 元以上的 74 只票
+    # 全部通过各策略的 amount_min，而该上限会挡掉 49 只 500 亿以上的大盘股
+    # （宁德时代、贵州茅台、中际旭创、寒武纪、北方华创……）。流动性由
+    # amount_min + market_cap_min 表达。
+    # 注意：A 股 100 股/手，贵州茅台一手约 13 万元——这是仓位约束，
+    # 属于组合层面，不该塞进选股硬筛。
   tech_weight: 0.45
   factor_weights:
     reversal: 0.40
