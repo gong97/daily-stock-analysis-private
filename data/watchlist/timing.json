@@ -1,0 +1,123 @@
+{
+  "runs": [
+    {
+      "run_date": "2026-08-30",
+      "recorded_at": "2026-08-30T02:31:25",
+      "cadence": "weekly",
+      "total_elapsed_sec": 171.51,
+      "strategies": [
+        {
+          "strategy": "balanced_alpha",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 96.52,
+          "snapshot_count": 5208,
+          "after_filter_count": 1190,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "em_datacenter",
+          "run_id": "4365b384a0dd",
+          "error": "",
+          "degradation": [
+            "Snapshot source fallback: sina: snapshot source sina timed out after 60s",
+            "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+            "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+          ]
+        },
+        {
+          "strategy": "blue_chip_income",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 0.05,
+          "snapshot_count": 5208,
+          "after_filter_count": 121,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "213ba5651a66",
+          "error": "",
+          "degradation": []
+        },
+        {
+          "strategy": "dual_low",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 0.05,
+          "snapshot_count": 5208,
+          "after_filter_count": 239,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "6680932dfc41",
+          "error": "",
+          "degradation": []
+        },
+        {
+          "strategy": "low_volatility_quality",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 44.45,
+          "snapshot_count": 5208,
+          "after_filter_count": 58,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "35c0b394619c",
+          "error": "",
+          "degradation": [
+            "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 565 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=100",
+            "Daily hard-filter rejections: change_60d_min removed 7 (100->93); change_60d_max removed 1 (93->92); signal_score_min removed 16 (92->76); volatility_20d_pct_max removed 16 (76->60); max_drawdown_20d_pct_min removed 2 (60->58)"
+          ]
+        },
+        {
+          "strategy": "momentum_quality",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 0.1,
+          "snapshot_count": 5208,
+          "after_filter_count": 619,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "e26c9fdb6f2e",
+          "error": "",
+          "degradation": []
+        },
+        {
+          "strategy": "quality_value",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 0.05,
+          "snapshot_count": 5208,
+          "after_filter_count": 446,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "7eca89817ec1",
+          "error": "",
+          "degradation": []
+        },
+        {
+          "strategy": "shrink_pullback",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 30.29,
+          "snapshot_count": 5208,
+          "after_filter_count": 10,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "178773be0cb7",
+          "error": "",
+          "degradation": [
+            "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 2742 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=100",
+            "Daily K-line quality flags: short_history_lt60=1",
+            "Daily hard-filter rejections: require_ma_bullish removed 67 (100->33); volume_ratio_20d_max removed 3 (33->30); pullback_to_ma20_pct_max removed 8 (30->22); volatility_20d_pct_max removed 12 (22->10)"
+          ]
+        }
+      ]
+    }
+  ]
+}
