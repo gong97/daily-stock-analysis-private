@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "meta": {
     "last_run_date": "2026-08-31",
     "last_run_cadence": "weekly",
@@ -25,12 +25,15 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-08-31T01:01:58+08:00",
+    "updated_at": "2026-08-31T01:32:34+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
       "aggressive": 4
-    }
+    },
+    "migrated_from_schema_version": 1,
+    "industry_quota_effective": false,
+    "industry_missing_count": 19
   },
   "entries": [
     {
@@ -38,11 +41,15 @@
       "name": "兴业银行",
       "holding_period": "watchlist",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 86.239,
       "best_score": 86.239,
       "latest_rank": 1,
@@ -51,9 +58,21 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "balanced_alpha": 79.4654,
-        "momentum_quality": 74.5228,
-        "quality_value": 86.239
+        "balanced_alpha": {
+          "score": 77.4523,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "momentum_quality": {
+          "score": 74.5228,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "quality_value": {
+          "score": 86.239,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -62,11 +81,15 @@
       "name": "上海银行",
       "holding_period": "watchlist",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 84.372,
       "best_score": 84.372,
       "latest_rank": 1,
@@ -75,10 +98,26 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "balanced_alpha": 78.2766,
-        "blue_chip_income": 81.7828,
-        "dual_low": 84.372,
-        "quality_value": 84.1691
+        "balanced_alpha": {
+          "score": 76.4145,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "blue_chip_income": {
+          "score": 81.7828,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "dual_low": {
+          "score": 84.372,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "quality_value": {
+          "score": 84.1691,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -88,10 +127,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 84.0803,
       "best_score": 84.0803,
       "latest_rank": 2,
@@ -100,7 +142,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "dual_low": 84.0803
+        "dual_low": {
+          "score": 84.0803,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -110,10 +156,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 83.8849,
       "best_score": 83.8849,
       "latest_rank": 3,
@@ -122,9 +171,21 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "blue_chip_income": 80.4196,
-        "dual_low": 83.8849,
-        "quality_value": 83.1207
+        "blue_chip_income": {
+          "score": 80.4196,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "dual_low": {
+          "score": 83.8849,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "quality_value": {
+          "score": 83.1207,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -134,10 +195,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 83.7894,
       "best_score": 83.7894,
       "latest_rank": 3,
@@ -146,10 +210,26 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "blue_chip_income": 82.2248,
-        "dual_low": 83.7433,
-        "low_volatility_quality": 77.7346,
-        "quality_value": 83.7894
+        "blue_chip_income": {
+          "score": 82.2248,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "dual_low": {
+          "score": 83.7433,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "low_volatility_quality": {
+          "score": 77.7346,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "quality_value": {
+          "score": 83.7894,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -159,10 +239,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 83.1542,
       "best_score": 83.1542,
       "latest_rank": 5,
@@ -171,7 +254,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "dual_low": 83.1542
+        "dual_low": {
+          "score": 83.1542,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -181,10 +268,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 82.7985,
       "best_score": 82.7985,
       "latest_rank": 5,
@@ -193,8 +283,16 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "blue_chip_income": 80.3243,
-        "quality_value": 82.7985
+        "blue_chip_income": {
+          "score": 80.3243,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "quality_value": {
+          "score": 82.7985,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -204,10 +302,13 @@
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 80.3706,
       "best_score": 80.3706,
       "latest_rank": 4,
@@ -216,7 +317,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "blue_chip_income": 80.3706
+        "blue_chip_income": {
+          "score": 80.3706,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -225,11 +330,15 @@
       "name": "工商银行",
       "holding_period": "swing",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 79.6307,
       "best_score": 79.6307,
       "latest_rank": 1,
@@ -238,9 +347,21 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "balanced_alpha": 77.7217,
-        "low_volatility_quality": 79.6307,
-        "momentum_quality": 73.6845
+        "balanced_alpha": {
+          "score": 76.299,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "low_volatility_quality": {
+          "score": 79.6307,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "momentum_quality": {
+          "score": 73.6845,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -249,11 +370,15 @@
       "name": "中国平安",
       "holding_period": "swing",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 79.608,
       "best_score": 79.608,
       "latest_rank": 2,
@@ -262,9 +387,21 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "balanced_alpha": 77.8023,
-        "low_volatility_quality": 79.608,
-        "momentum_quality": 74.1571
+        "balanced_alpha": {
+          "score": 76.4879,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "low_volatility_quality": {
+          "score": 79.608,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "momentum_quality": {
+          "score": 74.1571,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -273,11 +410,15 @@
       "name": "招商银行",
       "holding_period": "swing",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 77.8278,
       "best_score": 77.8278,
       "latest_rank": 3,
@@ -286,30 +427,16 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "low_volatility_quality": 77.8278,
-        "momentum_quality": 73.1592
-      },
-      "pinned": false
-    },
-    {
-      "code": "601919",
-      "name": "中远海控",
-      "holding_period": "watchlist",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "industry": "",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-08-31",
-      "hit_count": 4,
-      "latest_score": 77.4961,
-      "best_score": 77.4961,
-      "latest_rank": 5,
-      "price": 16.88,
-      "change_pct": -1.34,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "balanced_alpha": 77.4961
+        "low_volatility_quality": {
+          "score": 77.8278,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "momentum_quality": {
+          "score": 73.1592,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -319,10 +446,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 76.5614,
       "best_score": 76.5614,
       "latest_rank": 1,
@@ -331,7 +461,40 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": 76.5614
+        "shrink_pullback": {
+          "score": 76.5614,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "601919",
+      "name": "中远海控",
+      "holding_period": "watchlist",
+      "cadence": "weekly",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "",
+      "first_seen": "2026-08-30",
+      "last_seen": "2026-08-31",
+      "hit_count": 5,
+      "latest_score": 76.303,
+      "best_score": 77.4961,
+      "latest_rank": 4,
+      "price": 16.88,
+      "change_pct": -1.344,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "balanced_alpha": {
+          "score": 76.303,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -341,10 +504,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "defensive",
+      "buckets": [
+        "defensive"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 76.2829,
       "best_score": 76.2829,
       "latest_rank": 5,
@@ -353,7 +519,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "low_volatility_quality": 76.2829
+        "low_volatility_quality": {
+          "score": 76.2829,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        }
       },
       "pinned": false
     },
@@ -363,10 +533,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 76.1578,
       "best_score": 76.1578,
       "latest_rank": 2,
@@ -375,7 +548,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": 76.1578
+        "shrink_pullback": {
+          "score": 76.1578,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -385,10 +562,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 75.6533,
       "best_score": 75.6533,
       "latest_rank": 3,
@@ -397,7 +577,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": 75.6533
+        "shrink_pullback": {
+          "score": 75.6533,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -407,10 +591,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 73.2227,
       "best_score": 73.2227,
       "latest_rank": 4,
@@ -419,7 +606,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "momentum_quality": 73.2227
+        "momentum_quality": {
+          "score": 73.2227,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -429,10 +620,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 73.1164,
       "best_score": 73.1164,
       "latest_rank": 4,
@@ -441,7 +635,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": 73.1164
+        "shrink_pullback": {
+          "score": 73.1164,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     },
@@ -451,10 +649,13 @@
       "holding_period": "swing",
       "cadence": "weekly",
       "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
       "industry": "",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 4,
+      "hit_count": 5,
       "latest_score": 71.7224,
       "best_score": 71.7224,
       "latest_rank": 5,
@@ -463,7 +664,11 @@
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": 71.7224
+        "shrink_pullback": {
+          "score": 71.7224,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
       },
       "pinned": false
     }

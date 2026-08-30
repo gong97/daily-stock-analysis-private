@@ -529,6 +529,143 @@
           ]
         }
       ]
+    },
+    {
+      "run_date": "2026-08-31",
+      "recorded_at": "2026-08-30T17:32:34",
+      "cadence": "weekly",
+      "total_elapsed_sec": 402.0,
+      "strategies": [
+        {
+          "strategy": "balanced_alpha",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 83.87,
+          "snapshot_count": 5546,
+          "after_filter_count": 1160,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "sina",
+          "run_id": "abc285332255",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136"
+          ]
+        },
+        {
+          "strategy": "blue_chip_income",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 117.07,
+          "snapshot_count": 5208,
+          "after_filter_count": 121,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "em_datacenter",
+          "run_id": "f0004f823662",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Snapshot source fallback: sina: missing required columns volume_ratio",
+            "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+            "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+          ]
+        },
+        {
+          "strategy": "dual_low",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 27.63,
+          "snapshot_count": 5208,
+          "after_filter_count": 239,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "d28095730013",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136"
+          ]
+        },
+        {
+          "strategy": "low_volatility_quality",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 60.58,
+          "snapshot_count": 5208,
+          "after_filter_count": 58,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "c5a5c9bbde01",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 565 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=100",
+            "Daily hard-filter rejections: change_60d_min removed 7 (100->93); change_60d_max removed 1 (93->92); signal_score_min removed 16 (92->76); volatility_20d_pct_max removed 16 (76->60); max_drawdown_20d_pct_min removed 2 (60->58)"
+          ]
+        },
+        {
+          "strategy": "momentum_quality",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 31.84,
+          "snapshot_count": 5208,
+          "after_filter_count": 619,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "617cdfc55b75",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136"
+          ]
+        },
+        {
+          "strategy": "quality_value",
+          "cadence": "weekly",
+          "holding_period": "watchlist",
+          "elapsed_sec": 28.15,
+          "snapshot_count": 5208,
+          "after_filter_count": 446,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "80c7daf46a83",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136"
+          ]
+        },
+        {
+          "strategy": "shrink_pullback",
+          "cadence": "weekly",
+          "holding_period": "swing",
+          "elapsed_sec": 52.86,
+          "snapshot_count": 5208,
+          "after_filter_count": 10,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "124243a9ebc0",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 2742 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=100",
+            "Daily K-line quality flags: short_history_lt60=1",
+            "Daily hard-filter rejections: require_ma_bullish removed 67 (100->33); volume_ratio_20d_max removed 3 (33->30); pullback_to_ma20_pct_max removed 8 (30->22); volatility_20d_pct_max removed 12 (22->10)"
+          ]
+        }
+      ]
     }
   ]
 }
