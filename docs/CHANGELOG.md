@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 全市场扫描的 `DAILY_ENRICH_MAX_CANDIDATES` 从 100 提到 300。需要日 K 的三个策略（`low_volatility_quality`、`shrink_pullback`、`volume_breakout`）的日线硬筛只在这个 Top-N 子集上判定，其余候选连判都没判就出局——实测 `shrink_pullback` 快照层存活 3123 只，取 100 时仅 3.2% 的候选被真正判定过。子集按快照层因子分预排，而快照因子与形态判据基本无关，因此提高该值实质性扩大了覆盖面。当前每轮总耗时 weekly 约 380 秒、daily 约 280 秒，job 超时 60 分钟，余量充足；日 K 保留 24 小时文件缓存。
+
 - [修复] 移除全部策略的 `price_max` 硬过滤：股价水平不承载流动性信息。实测 220 元以上的 74 只票全部通过各策略的 `amount_min`（仅 1 只成交额低于 2 亿），而该上限挡掉了 49 只 500 亿以上的大盘股（宁德时代、贵州茅台、中际旭创、寒武纪、北方华创等）。流动性改由 `amount_min` + `market_cap_min` 表达；一手成本属于仓位约束，不应放在选股硬筛里。
 - [修复] `blue_chip_income` 去掉 `turnover_rate_min`、`shrink_pullback` 从 1.0% 降到 0.3%：大盘蓝筹的低换手率来自巨大流通盘而非流动性差——长江电力 0.28%、中国神华 0.14%、工商银行 0.09%，但成交额都在 10-21 亿。原阈值把最典型的红利防守股排除在外，与 `blue_chip_income` 的定位矛盾。动量/热度类策略（`capital_heat`、`theme_momentum`、`volume_breakout`）的高换手是信号本身，保持不变。
 - [改进] `blue_chip_income` 与 `low_volatility_quality` 同步启用行业中性化：放宽换手率门槛后超大盘银行全部进入候选池，全市场口径下它们凭低 PE 垄断 value 因子，实测 Top 8 中 7 只为银行；行业内重排后降至 0-1 只，分布回到保险/建筑/电力设备/家电等多个行业。

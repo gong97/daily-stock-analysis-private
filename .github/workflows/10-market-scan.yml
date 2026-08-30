@@ -138,7 +138,12 @@ jobs:
           # 也各自拉最多 DAILY_ENRICH_MAX_CANDIDATES 条历史。逐只拉取是本工作流最主要的耗时来源，
           # 日 K 缓存跨策略复用。设为 true 可让所有策略的评分都带上日线特征，代价是耗时数倍增长。
           DAILY_ENRICH_ENABLED: ${{ vars.DAILY_ENRICH_ENABLED || 'false' }}
-          DAILY_ENRICH_MAX_CANDIDATES: ${{ vars.DAILY_ENRICH_MAX_CANDIDATES || '100' }}
+          # 300 而不是 100：日线硬筛只在这个子集上判定，其余候选直接出局。
+          # shrink_pullback 快照层存活 3123 只，取 100 时只有 3.2% 的候选被真正判定过。
+          # 实测每轮总耗时 weekly ~380s / daily ~280s，而 job 超时 60 分钟，余量充足；
+          # 日 K 有 24 小时文件缓存，同一天多个策略取到同一只票时复用。
+          # 若 timing.json 显示耗时逼近超时，或 degradation 里 daily 行错误变多，先回调这个值。
+          DAILY_ENRICH_MAX_CANDIDATES: ${{ vars.DAILY_ENRICH_MAX_CANDIDATES || '300' }}
           DAILY_FETCH_MAX_WORKERS: ${{ vars.DAILY_FETCH_MAX_WORKERS || '2' }}
           SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS: ${{ vars.SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS || '24' }}
 
