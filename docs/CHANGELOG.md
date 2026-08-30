@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 新增 `scripts/refresh_industry_map.py` 与随仓库版本化的静态行业映射表 `data/watchlist/industry_map.csv`（5147 只、103 个行业），通过 `INDUSTRY_MAP_FILES` 在硬筛与评分之前套用。此前行业数据只能来自快照，而快照源之间口径不一致：`sina` 没有行业列、`em_datacenter` 有，哪个源胜出取决于当轮可用性——实测同一轮里 `balanced_alpha` 走 sina 导致 5 条候选行业全空，而行业为空的条目会被行业配额豁免，从而绕过限制留在名单里。静态表只填空值、不覆盖快照自带的更新鲜行业，也不包含任何热度字段（热度每天变，静态化即错误）；脚本在有效行数低于 `--min-rows` 时拒绝覆盖，避免抓取异常清空映射表。
+
 - [修复] 观察名单的 `hit_count` 改为按**扫描日**去重，不再按 `merge_run` 调用次数累计：同一天重复手动运行同一个 cadence 时该值会一路增长，而它通过名单排序的命中加分（每多一次 +2 分、上限 +10）参与行业配额与容量裁剪，等于让工作流运行次数参与选股。同时 `last_seen` 改为只前进不后退，用更早的日期补跑一轮不再把时间基准拉回去（那会凭空延长 TTL）；补跑仍然照常记录策略背书与 `best_score`。
 
 - [新功能] 选股评分支持行业中性化：策略 `scoring_profile` 新增 `industry_neutral` 与 `industry_neutral_min_size`（默认关闭 / 10），开启后 `value`、`liquidity`、`size` 三个分位类因子改为行业内排名。此前 `_rank_score()` 做全市场单一分位，分位反映的是「该票所在行业贵不贵」而非「该票在同类里贵不贵」：39 只银行的 value 因子均值 89.1（行业内重排后 51.0），招商银行全市场口径 87.5 但在银行内部只有 25.7。行业内有效样本（按非空值计）少于阈值、或行业为空时回退全市场口径——实测 102 个行业里 29 个不足 10 只。`quality_value` / `momentum_quality` / `balanced_alpha` 启用；`dual_low` 等保持全市场口径，因为它要的就是全市场最便宜的资产。实测同一份快照 Top 8：`quality_value` 银行 1 只、`dual_low` 银行 6 只。

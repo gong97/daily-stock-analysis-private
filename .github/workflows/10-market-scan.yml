@@ -140,6 +140,14 @@ jobs:
           # 供 theme_momentum 使用。它走 push2.eastmoney.com，在 Actions 上稳定
           # 502 / RemoteDisconnected（已实测两轮），因此保持开启但**不可依赖**——
           # 它是 fail-open 的，失败只在 degradation 留记录，不影响扫描与名单。
+          # 静态行业映射表（scripts/refresh_industry_map.py 生成，随仓库版本化）。
+          # 它在 enrich_industry_concepts() 里生效，而该函数在**硬筛和评分之前**执行，
+          # 因此行业配额、策略内 portfolio_profile、theme_heat / topic_alignment 都能拿到数据。
+          # 关键收益：快照源之间行业口径不一致——sina 没有行业列，em_datacenter 有，
+          # 哪个源胜出取决于当轮可用性。静态表把这个差异抹平，且只填空值、
+          # 永不覆盖快照自带的更新鲜的行业（_apply_industry_column 的 current.eq("") 条件）。
+          # 行业归属月度量级才变，建议每月跑一次刷新脚本并提交。
+          INDUSTRY_MAP_FILES: ${{ vars.INDUSTRY_MAP_FILES || 'data/watchlist/industry_map.csv' }}
           INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'akshare' }}
           INDUSTRY_PROVIDER_MAX_BOARDS: ${{ vars.INDUSTRY_PROVIDER_MAX_BOARDS || '80' }}
           SCREENING_INDUSTRY_PROVIDER_CACHE_DIR: data/watchlist/cache/industry

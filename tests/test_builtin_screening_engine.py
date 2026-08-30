@@ -22,6 +22,7 @@ from src.services.screening.models import HardFilterConfig, Pick, ScreeningConfi
 from src.services.screening import scorer as screening_scorer
 from src.services.screening.scorer import compute_screen_scores
 from src.services.screening import snapshot as screening_snapshot
+from src.services.screening.industry import enrich_industry_concepts, load_industry_map
 from src.services.screening.strategy import list_strategies, load_all_strategies
 
 
@@ -1002,3 +1003,59 @@ def test_only_the_intended_strategies_opt_into_industry_neutral() -> None:
     # "选好公司"的策略中性化；dual_low 要的就是全市场最便宜，必须保持原口径
     assert enabled == {"quality_value", "momentum_quality", "balanced_alpha"}
     assert not strategies["dual_low"].screening.scoring_profile.get("industry_neutral")
+
+
+def test_industry_map_fills_gaps_without_overwriting(tmp_path) -> None:
+    """静态行业表只补空值，不覆盖快照自带的更新鲜的行业。
+
+    快照源之间行业口径不一致：sina 没有行业列，em_datacenter 有，哪个源胜出取决于
+    当轮可用性——实测同一轮里 balanced_alpha 走 sina（候选行业全空）而其余策略走
+    em_datacenter。静态表抹平这个差异，但不能反过来用陈旧数据污染新鲜快照。
+    """
+    map_path = tmp_path / "industry_map.csv"
+    map_path.write_text(
+        "code,industry,concepts\n"
+        "600016,银行,过时概念\n"
+        "600030,非银行金融,\n",
+        encoding="utf-8",
+    )
+
+    snapshot = pd.DataFrame([
+        # 快照已有行业：必须保留，不能被表里的值改写
+        {"code": "600016", "name": "民生银行", "price": 5.0, "industry": "股份制银行"},
+        # 快照缺行业：由表补上
+        {"code": "600030", "name": "中信证券", "price": 25.0, "industry": ""},
+        # 表里没有：保持为空，不报错
+        {"code": "999999", "name": "新股", "price": 10.0, "industry": ""},
+    ])
+
+    out, notes = enrich_industry_concepts(snapshot, map_files=[map_path], provider="none")
+    by_code = out.set_index("code")["industry"].to_dict()
+
+    assert by_code["600016"] == "股份制银行", "快照自带的行业不能被静态表覆盖"
+    assert by_code["600030"] == "非银行金融", "快照缺失的行业应由静态表补上"
+    assert by_code["999999"] == ""
+    assert any("industry map loaded" in note for note in notes)
+
+
+def test_industry_map_round_trips_through_load(tmp_path) -> None:
+    path = tmp_path / "m.csv"
+    path.write_text(
+        "code,industry,concepts\n000001,银行,深圳特区|跨境支付\n", encoding="utf-8"
+    )
+    mapping = load_industry_map(path)
+    assert mapping["000001"]["industry"] == "银行"
+    assert mapping["000001"]["concepts"] == "深圳特区|跨境支付"
+
+
+def test_shipped_industry_map_is_membership_only() -> None:
+    """随仓库版本化的映射表不得包含热度字段——那些每天都变，静态化就是错的。"""
+    path = REPO_ROOT / "data" / "watchlist" / "industry_map.csv"
+    if not path.is_file():
+        return   # 尚未生成时跳过，不阻断
+    mapping = load_industry_map(path)
+    assert len(mapping) > 3000, "映射表条目过少，可能是抓取异常时被覆盖"
+    assert len({item.get("industry") for item in mapping.values()}) > 50
+    for item in mapping.values():
+        for key in item:
+            assert key in {"industry", "concepts"}, f"静态表不应包含时变字段 {key}"

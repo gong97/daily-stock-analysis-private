@@ -13,6 +13,7 @@
 | `timing.json` | 脚本 | 最近 20 次运行的各策略耗时，用于按实测调频 |
 | `history/` | 脚本 | 每次运行的原始候选与分数 |
 | `latest_report.md` | 脚本 | 最近一次的 Markdown 报告 |
+| `industry_map.csv` | `scripts/refresh_industry_map.py` | code → 行业/概念 的静态映射表，建议每月刷新；只含成分归属，不含热度字段 |
 | `pinned.txt` | 人工 | 手工固定的代码，永不淘汰且排在名单最前 |
 | `cache/industry/` | 脚本 | akshare 行业/概念板块映射缓存，随仓库版本化以避免每轮重打约 162 次请求 |
 

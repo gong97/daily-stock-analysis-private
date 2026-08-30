@@ -367,6 +367,38 @@ akshare 板块数据的两半变化速度差一个数量级，而**贵的那半�
 部分板块拉取失败时，本轮仍返回可用映射，但**不写成分缓存**——否则残缺映射会被当成新鲜结果
 固化 720 小时。
 
+### 行业数据来源：静态映射表优先
+
+行业数据有三个可能来源，可靠性依次下降：
+
+| 来源 | 覆盖 | 可靠性 |
+| --- | --- | --- |
+| `INDUSTRY_MAP_FILES` 静态表 | 全市场，随仓库版本化 | 零网络，确定性 |
+| `em_datacenter` 快照的 `INDUSTRY` 字段 | 全市场 | 该 host 在 CI 上稳定可用 |
+| `INDUSTRY_PROVIDER=akshare` 板块接口 | 全市场 + 板块热度 | 走 push2.eastmoney.com，**CI 上稳定失败** |
+
+**为什么需要静态表**：快照源之间行业口径不一致——`sina` 完全没有行业列，
+`em_datacenter` 有。哪个源胜出取决于当轮各源的可用性，因此同一轮扫描里不同策略
+可能拿到不同口径的数据。实测就出现过 `balanced_alpha` 走 sina（5 条候选行业全空）
+而其余 6 个策略走 em_datacenter 的情况；行业为空的条目会被行业配额豁免，
+于是绕过限制留在名单里。
+
+静态表在 `enrich_industry_concepts()` 里生效，而该函数在**硬筛和评分之前**执行，
+因此行业配额、策略内 `portfolio_profile`、`theme_heat` 与 `topic_alignment` 都能拿到数据。
+它**只填空值**（`_apply_industry_column` 的 `current.eq("") & incoming.ne("")`），
+永远不会覆盖快照自带的更新鲜的行业。
+
+生成与刷新：
+
+```bash
+python scripts/refresh_industry_map.py          # 写 data/watchlist/industry_map.csv
+```
+
+脚本从 `em_datacenter` 快照抽取 code → 行业/概念，**只保留成分归属，不保留任何热度字段**
+（热度每天都变，静态化就是错的）。有效行数低于 `--min-rows`（默认 3000）时拒绝覆盖，
+避免抓取异常把映射表清空。当前表 5147 只股票、103 个行业，约 670KB。
+行业归属月度量级才变，建议每月刷新一次并提交。
+
 ### 跨策略行业配额
 
 配额分两层，因为桶内配额管不住跨桶叠加：
