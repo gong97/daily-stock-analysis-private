@@ -1,47 +1,47 @@
 # 全市场扫描观察名单（weekly）
 
 - 扫描日期：2026-08-31
-- 名单规模：21（防守 6｜均衡 15｜进攻 0）
-- 本次新进：5｜本次移出：3
-- 策略数：7｜总耗时：393.0s
+- 名单规模：25（防守 7｜均衡 18｜进攻 0）
+- 本次新进：4｜本次移出：3
+- 策略数：7｜总耗时：401.6s
 - 行业配额：已生效，本次裁掉 3 条；另有 5 条缺少行业数据未参与分组
 
 ## 新进入观察名单
 
 | 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
 | --- | --- | --- | --- | --- | --- |
-| 均衡 | 002432 | 九安医疗 | 医疗器械 | 76.89 | balanced_alpha, momentum_quality |
-| 均衡 | 000651 | 格力电器 | 白色家电 | 76.18 | balanced_alpha, low_volatility_quality, momentum_quality |
-| 防守 | 601390 | 中国中铁 | 基础建设 | 81.71 | dual_low, quality_value |
-| 均衡 | 601233 | 桐昆股份 | 合成纤维及树脂 | 72.05 | momentum_quality |
-| 均衡 | 002241 | 歌尔股份 | 电子设备制造 | 70.79 | shrink_pullback |
+| 均衡 | 002466 | 天齐锂业 | 稀有金属 | 75.56 | momentum_quality |
+| 均衡 | 000425 | 徐工机械 | 专用设备 | 74.82 | momentum_quality |
+| 均衡 | 000100 | TCL科技 | 电子元件 | 73.55 | momentum_quality |
+| 防守 | 601877 | 正泰电器 | 输变电设备 | 82.79 | quality_value |
 
 ## 移出观察名单
 
-- 601398（同行业在该桶已满额）
 - 600036（同行业在该桶已满额）
+- 601398（同行业在该桶已满额）
 - 000001（同行业已达全局上限）
 
-## 当前名单 · 防守（6）
+## 当前名单 · 防守（7）
 
-| # | 代码 | 名称 | 行业 | 最近分 | 命中 | 首次入选 | 最近入选 | 策略 |
+| # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 600015 | 华夏银行 | 银行 | 84.01 | 6 | 2026-08-30 | 2026-08-31 | dual_low |
 | 2 | 600016 | 民生银行 |  | 83.15 | 5 | 2026-08-30 | 2026-08-31 | dual_low |
 | 3 | 601328 | 交通银行 |  | 82.80 | 5 | 2026-08-30 | 2026-08-31 | blue_chip_income, quality_value |
-| 4 | 601601 | 中国太保 | 非银行金融 | 77.23 | 6 | 2026-08-30 | 2026-08-31 | blue_chip_income |
+| 4 | 601601 | 中国太保 | 非银行金融 | 80.26 | 6 | 2026-08-30 | 2026-08-31 | blue_chip_income, quality_value |
 | 5 | 601288 | 农业银行 |  | 76.28 | 5 | 2026-08-30 | 2026-08-31 | low_volatility_quality |
-| 6 | 601390 | 中国中铁 | 基础建设 | 81.71 | 1 | 2026-08-31 | 2026-08-31 | dual_low, quality_value |
+| 6 | 601877 | 正泰电器 | 输变电设备 | 82.79 | 1 | 2026-08-31 | 2026-08-31 | quality_value |
+| 7 | 601390 | 中国中铁 | 基础建设 | 81.71 | 1 | 2026-08-31 | 2026-08-31 | dual_low, quality_value |
 
-## 当前名单 · 均衡（15）
+## 当前名单 · 均衡（18）
 
-| # | 代码 | 名称 | 行业 | 最近分 | 命中 | 首次入选 | 最近入选 | 策略 |
+| # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 601166（兼 防守） | 兴业银行 | 银行 | 86.23 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, momentum_quality, quality_value |
+| 1 | 601919（兼 防守） | 中远海控 | 港口航运 | 84.64 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, quality_value |
 | 2 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 83.88 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
 | 3 | 601229（兼 防守） | 上海银行 | 银行 | 81.66 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
-| 4 | 601919（兼 防守） | 中远海控 | 港口航运 | 81.36 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, quality_value |
-| 5 | 601318（兼 防守） | 中国平安 | 非银行金融 | 79.77 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality |
+| 4 | 601318（兼 防守） | 中国平安 | 非银行金融 | 79.77 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality |
+| 5 | 601166（兼 防守） | 兴业银行 | 银行 | 77.45 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, momentum_quality, quality_value |
 | 6 | 600309 | 万华化学 | 化学原料 | 76.56 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
 | 7 | 000783 | 长江证券 | 非银行金融 | 76.16 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
 | 8 | 000807 | 云铝股份 | 基本金属 | 75.65 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
@@ -49,9 +49,12 @@
 | 10 | 600030 | 中信证券 |  | 73.22 | 5 | 2026-08-30 | 2026-08-31 | momentum_quality |
 | 11 | 601600 | 中国铝业 |  | 71.72 | 5 | 2026-08-30 | 2026-08-31 | shrink_pullback |
 | 12 | 002432 | 九安医疗 | 医疗器械 | 76.89 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality |
-| 13 | 000651（兼 防守） | 格力电器 | 白色家电 | 76.18 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality |
-| 14 | 601233 | 桐昆股份 | 合成纤维及树脂 | 72.05 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
-| 15 | 002241 | 歌尔股份 | 电子设备制造 | 70.79 | 1 | 2026-08-31 | 2026-08-31 | shrink_pullback |
+| 13 | 002466 | 天齐锂业 | 稀有金属 | 75.56 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
+| 14 | 000425 | 徐工机械 | 专用设备 | 74.82 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
+| 15 | 000100 | TCL科技 | 电子元件 | 73.55 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
+| 16 | 000651（兼 防守） | 格力电器 | 白色家电 | 72.77 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality |
+| 17 | 601233 | 桐昆股份 | 合成纤维及树脂 | 72.05 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
+| 18 | 002241 | 歌尔股份 | 电子设备制造 | 70.79 | 1 | 2026-08-31 | 2026-08-31 | shrink_pullback |
 
 > 分数是各策略硬筛存活池内的分位排名，**不可跨桶比较**。标「兼 X」的票同时符合多个桶，只在主桶计一个名额。
 
@@ -59,10 +62,10 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| balanced_alpha | watchlist | 131.3 | 5147 | 1177 | 5 | 否 |
-| blue_chip_income | watchlist | 31.0 | 5147 | 119 | 5 | 否 |
-| dual_low | watchlist | 30.4 | 5147 | 233 | 5 | 否 |
-| low_volatility_quality | swing | 70.2 | 5147 | 57 | 5 | 是 |
-| momentum_quality | swing | 29.9 | 5147 | 613 | 5 | 否 |
-| quality_value | watchlist | 28.3 | 5147 | 438 | 5 | 否 |
-| shrink_pullback | swing | 71.8 | 5147 | 10 | 5 | 是 |
+| balanced_alpha | watchlist | 79.1 | 5546 | 1160 | 5 | 否 |
+| blue_chip_income | watchlist | 120.1 | 5147 | 119 | 5 | 否 |
+| dual_low | watchlist | 29.5 | 5147 | 233 | 5 | 否 |
+| low_volatility_quality | swing | 62.1 | 5147 | 57 | 5 | 是 |
+| momentum_quality | swing | 29.3 | 5147 | 613 | 5 | 否 |
+| quality_value | watchlist | 29.1 | 5147 | 438 | 5 | 否 |
+| shrink_pullback | swing | 52.4 | 5147 | 10 | 5 | 是 |
