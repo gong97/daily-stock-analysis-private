@@ -40,7 +40,7 @@ on:
         default: false
         type: boolean
       refresh_industry_map:
-        description: '强制重建行业映射缓存（约 162 次 akshare 请求，建议每月一次）'
+        description: '强制重建行业成分映射（约 162 次 akshare 请求；日常无需勾选，TTL 会自然过期）'
         required: false
         default: false
         type: boolean
@@ -100,14 +100,14 @@ jobs:
       - name: 创建必要目录
         run: mkdir -p data/watchlist/cache/industry logs
 
-      - name: 按需重建行业映射缓存
-        # 行业映射缓存随仓库版本化，但它的 TTL 判定用的是文件 mtime，而
-        # actions/checkout 每次都会把 mtime 重置成"刚刚"，所以committed 缓存
-        # 在 runner 上永远不会自动过期。删掉缓存文件是唯一的强制刷新方式。
+      - name: 按需重建行业成分映射
+        # 过期判定已改用缓存 JSON 里的 created_at（不再依赖会被 checkout 重置的 mtime），
+        # 所以两级缓存都会自然过期。这一步只用于在 720 小时 TTL 到期前手动重建成分映射，
+        # 例如板块成分发生了较大调整。只删 *.json，保留 *.history.jsonl 的热度历史。
         if: github.event.inputs.refresh_industry_map == 'true'
         run: |
           rm -f data/watchlist/cache/industry/*.json
-          echo "🔄 已清除行业映射缓存，本次运行将重新拉取"
+          echo "🔄 已清除行业缓存（保留热度历史），本次运行将重新拉取成分与热度"
 
       - name: 执行全市场扫描
         env:
@@ -134,16 +134,18 @@ jobs:
 
           # ===== 行业/概念 =====
           # 必须开启：快照源 em_datacenter 的 sty 参数不请求任何行业字段，
-          # 没有行业数据时策略内的 portfolio_profile（如 balanced_alpha 的
-          # 金融 bucket + max_same_bucket:1）会整个空转，theme_heat 因子也退化成常数。
-          # 代价：首次最多 162 次 akshare 请求（2 个板块列表 + 各 80 个板块成分），
-          # 逐板块 fail-open。缓存目录指向已版本化的 data/watchlist/cache，
-          # 因此该成本只在缓存过期时付一次，而不是每轮扫描。
+          # 没有行业数据时策略内的 portfolio_profile 会整个空转、theme_heat 退化成常数、
+          # 观察名单的行业配额也无从分组。
+          #
+          # 缓存分两级（见 docs/screening-engine.md「行业数据的两级缓存」）：
+          #   成分映射  最多 162 次请求，月度才变 → TTL 720 小时
+          #   板块热度  仅 2 次请求，每天都变     → TTL 20 小时（跨一个交易日，不跨两个）
+          # 每次热度刷新还会向 .history.jsonl 追加一行，喂 board_heat_trend/persistence/cooling。
           INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'akshare' }}
           INDUSTRY_PROVIDER_MAX_BOARDS: ${{ vars.INDUSTRY_PROVIDER_MAX_BOARDS || '80' }}
           SCREENING_INDUSTRY_PROVIDER_CACHE_DIR: data/watchlist/cache/industry
-          # 行业归属变化很慢，7 天足够；避免每周都重新打 162 次请求。
-          SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS || '168' }}
+          SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS || '20' }}
+          SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS || '720' }}
 
           # ===== 观察名单 =====
           WATCHLIST_DIR: data/watchlist

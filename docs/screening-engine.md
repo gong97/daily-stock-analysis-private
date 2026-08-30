@@ -266,6 +266,32 @@ DSA 中存在两类用途不同的策略文件：
 
 报告和 `current.csv` 都按桶分段输出，并明确标注分数不可跨桶比较。
 
+### 行业数据的两级缓存
+
+akshare 板块数据的两半变化速度差一个数量级，而**贵的那半恰好是慢的**：
+
+| 来源 | 请求数 | 产出 | 变化速度 | TTL |
+| --- | --- | --- | --- | --- |
+| `list_func()` 板块列表 | **2** | `*_heat_score`、`*_rank`、`*_change_pct`、`board_heat_summary` | 每天 | `SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS`（默认 24，工作流设 20） |
+| `cons_func()` 板块成分 | **最多 2×MAX_BOARDS** | `industry`、`concepts` | 月度 | `SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS`（默认 720） |
+
+因此 `fetch_akshare_board_map()` 把两者分开缓存：成分命中缓存时，一次日度热度刷新只发
+**2 个请求**，而不是约 162 个。
+
+**过期判定用缓存 JSON 里的 `created_at`，不用文件 mtime。** 这在 CI 上是决定性的：
+`actions/checkout` 会把每个文件的 mtime 重置成检出时刻，随仓库版本化的缓存若按 mtime 判断
+将永远"新鲜"，TTL 完全失效。`created_at` 缺失时才退回 mtime。
+
+**热度历史**：每次热度刷新会向 `akshare_board_heat_*.json.history.jsonl` 追加一行/板块
+（同一天只记一次），由 `load_board_heat_trends()` 按 5 次观测的滚动窗口算出
+`board_heat_trend_score`、`board_heat_persistence_score`、`board_heat_cooling_score`、
+`board_heat_observations`。**没有这份历史，这四个字段根本不存在**，任何基于它们调参的策略
+（如 `theme_momentum` 的退潮惩罚）都是在对空气打分。历史文件随仓库版本化，
+因此需要连续若干个交易日的运行才能积累出有效窗口。
+
+部分板块拉取失败时，本轮仍返回可用映射，但**不写成分缓存**——否则残缺映射会被当成新鲜结果
+固化 720 小时。
+
 ### 跨策略行业配额
 
 选股引擎的 `apply_portfolio_overlay` 只在**单个策略内部**生效：即使 `balanced_alpha` 的

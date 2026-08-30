@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 行业 provider 的板块缓存拆成成分（慢）与热度（快）两级，并改用缓存 JSON 里的 `created_at` 判过期而非文件 mtime。此前单一缓存把每天变化的板块热度和月度才变的成分绑在同一个 TTL 上：取短 TTL 则每轮重打约 162 次 akshare 请求，取长 TTL 则 `theme_heat` 因子会吃上一周前的热度；而 `actions/checkout` 会重置 mtime，使随仓库版本化的缓存按 mtime 判断永不过期。拆分后成分命中缓存时，日度热度刷新只需 2 个请求。部分板块拉取失败时本轮仍可用但不写成分缓存，避免残缺映射被固化。
+- [修复] akshare provider 路径现在也会加载并应用板块热度趋势：每次热度刷新向 `*.history.jsonl` 追加一行/板块（同一天只记一次），经 `load_board_heat_trends()` 产出 `board_heat_trend_score` / `persistence` / `cooling` / `observations`。此前这些字段只在 `INDUSTRY_MAP_FILES` 分支加载且仓库内没有任何写入方，导致依赖它们调参的策略（`theme_momentum` 的退潮惩罚）实际未生效。
+- [测试] 新增 `tests/test_screening_industry_cache.py`，以假 akshare 断言请求次数：成分缓存命中时热度刷新只发 2 个列表请求、双缓存命中时零请求，并覆盖 created_at 过期、mtime 兜底、历史按天去重与部分失败不落缓存。
+
 - [新功能] 观察名单按策略 YAML 的 `style.risk_profile` 分成 defensive / balanced / aggressive 三桶，TTL、行业配额与容量改为**按桶独立结算**：`latest_score` 是各策略硬筛存活池内的分位排名，跨桶不可比，此前的全局裁剪会让数量占优的防守策略把进攻票系统性挤出名单。`bucket` 与 `cadence` 是两根不同的轴（`oversold_reversal` 是 balanced 但跑 daily），跟随最高分策略确定，与策略跑动顺序无关。默认限额 defensive 45 天/25 只/同行业 2、balanced 30 天/20 只/2、aggressive 14 天/15 只/4；`WATCHLIST_TTL_DAYS` / `WATCHLIST_MAX_SIZE` / `WATCHLIST_MAX_PER_INDUSTRY` 支持留空、统一标量、`默认值,bucket:覆盖值` 与逐桶四种写法，逐桶配置总是覆盖统一默认值且与书写顺序无关。报告与 `current.csv` 按桶分段并标注分数不可跨桶比较；名单仍是一份数据，保留同一只票被防守与进攻策略同时命中的交集信号。
 
 - [新功能] 新增 DSA 原生进攻侧选股策略 `theme_momentum`（主题动能，short_term → 每交易日扫描）：以 `theme_heat` 0.27 + `momentum` 0.25 + `activity` 0.20 为主导，并首次启用 `topic_alignment` 因子；用 `market_cap_max`（策略库首处使用）限定中小市值，刻意不配 `pe_ttm_*` / `pb_*` 且不给 `value` 权重，避免亏损成长股被硬过滤的 NaN 淘汰规则和 `value` 因子的 `na_score=25` 系统性压制；追高容忍度在硬筛、momentum 评分、stability 权重、风险叠加、L3 scorecard 五层同步放宽，退潮惩罚（`theme_heat_cooling_*`）强于升温加分。依赖 `INDUSTRY_PROVIDER` 的板块数据，`data_requirements` 标记 `industry_context`。

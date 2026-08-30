@@ -180,92 +180,214 @@ def fetch_akshare_board_map(
     cache_dir: str | Path | None | object = _CACHE_DIR_UNSET,
     cache_ttl_seconds: float | None = None,
     cache_ttl_hours: float | None = None,
+    constituents_cache_ttl_hours: float | None = None,
 ) -> tuple[dict[str, dict[str, object]], list[str]]:
     """Build a code mapping from AkShare industry/concept board constituents.
 
-    This is intentionally optional because it may require many third-party
-    requests. For production, a cached CSV/JSON map is preferred.
+    The two halves of this data change at very different rates, and the
+    expensive half is the slow one:
+
+    - Board **constituents** (``cons_func`` per board) cost up to
+      ``2 * max_boards`` requests and only produce ``industry`` / ``concepts``,
+      which change on the order of months.
+    - Board **heat** (``list_func``) costs 2 requests and produces every
+      ``*_heat_score`` / ``*_rank`` / ``*_change_pct`` field, which change daily.
+
+    They are therefore cached separately: constituents under
+    ``constituents_cache_ttl_hours`` (long) and heat under ``cache_ttl_hours``
+    (short). A daily refresh costs 2 requests instead of ~162.
+
+    Each heat refresh also appends one row per board to a companion
+    ``.history.jsonl``, which feeds :func:`load_board_heat_trends` and thereby
+    the ``board_heat_trend_score`` / ``persistence`` / ``cooling`` fields.
+    Without that history those fields never exist and any strategy tuned on
+    them is silently scoring on nothing.
     """
     board_limit = max(int(max_boards), 1)
     notes: list[str] = []
     resolved_cache_dir = _resolve_akshare_board_cache_dir(cache_dir)
-    cache_path = (
-        _akshare_board_cache_path(resolved_cache_dir, max_boards=board_limit)
-        if resolved_cache_dir is not None
-        else None
-    )
-    if cache_path is not None:
-        cached_mapping, cache_note = _read_akshare_board_cache(
-            cache_path,
-            max_boards=board_limit,
-            ttl_seconds=_resolve_cache_ttl_seconds(
-                cache_ttl_seconds=cache_ttl_seconds,
-                cache_ttl_hours=cache_ttl_hours,
-            ),
-        )
-        if cache_note:
-            notes.append(cache_note)
-        if cached_mapping is not None:
-            return cached_mapping, notes
 
-    import akshare as ak
+    constituents_path = heat_path = history_path = None
+    if resolved_cache_dir is not None:
+        constituents_path = _board_cache_path(resolved_cache_dir, "constituents", max_boards=board_limit)
+        heat_path = _board_cache_path(resolved_cache_dir, "heat", max_boards=board_limit)
+        history_path = _board_heat_history_path(resolved_cache_dir, max_boards=board_limit)
+
+    heat_ttl = _resolve_cache_ttl_seconds(
+        cache_ttl_seconds=cache_ttl_seconds,
+        cache_ttl_hours=cache_ttl_hours,
+    )
+    constituents_ttl = _resolve_constituents_ttl_seconds(constituents_cache_ttl_hours)
+
+    constituents, note = _read_board_cache(
+        constituents_path, kind="constituents", max_boards=board_limit, ttl_seconds=constituents_ttl,
+    )
+    if note:
+        notes.append(note)
+    heat, note = _read_board_cache(
+        heat_path, kind="heat", max_boards=board_limit, ttl_seconds=heat_ttl,
+    )
+    if note:
+        notes.append(note)
+
+    heat_refreshed = False
+    if constituents is None or heat is None:
+        import akshare as ak
+
+        board_specs = [
+            ("industry", ak.stock_board_industry_name_em, ak.stock_board_industry_cons_em),
+            ("concepts", ak.stock_board_concept_name_em, ak.stock_board_concept_cons_em),
+        ]
+        fetched_heat: dict[str, object] = {}
+        fetched_constituents: dict[str, dict[str, object]] = {}
+        constituents_ok = True
+
+        for field, list_func, cons_func in board_specs:
+            try:
+                boards = list_func()
+            except Exception as exc:
+                notes.append(f"akshare {field} board list failed: {exc}")
+                constituents_ok = False
+                continue
+            board_items = _board_items(boards)[:board_limit]
+            fetched_heat[field] = {
+                str(item["name"]): {
+                    "rank": _safe_float(item.get("rank")),
+                    "change_pct": _safe_float(item.get("change_pct")),
+                }
+                for item in board_items
+                if _safe_text(item.get("name"))
+            }
+
+            if constituents is not None:
+                # 成分缓存还新鲜，本轮只刷热度：这就是从 162 次降到 2 次的地方。
+                continue
+
+            loaded = 0
+            for board_item in board_items:
+                board = str(board_item["name"])
+                try:
+                    members = cons_func(symbol=board)
+                except Exception as exc:
+                    notes.append(f"akshare {field} board skipped {board}: {exc}")
+                    constituents_ok = False
+                    continue
+                for _, row in members.iterrows():
+                    code = _normalize_code(row.get("代码") or row.get("code"))
+                    if not code or code == "000000":
+                        continue
+                    item = fetched_constituents.setdefault(code, {"industry": "", "concepts": ""})
+                    if field == "industry" and not item["industry"]:
+                        item["industry"] = board
+                    elif field == "concepts":
+                        item["concepts"] = _merge_label_text(item.get("concepts", ""), board)
+                loaded += 1
+            notes.append(f"akshare {field} boards loaded: {loaded}/{len(board_items)}")
+
+        if any(fetched_heat.values()):
+            heat = fetched_heat
+            heat_refreshed = True
+            if heat_path is not None:
+                note = _write_board_cache(heat_path, "heat", heat, max_boards=board_limit)
+                if note:
+                    notes.append(note)
+        if constituents is None and fetched_constituents and constituents_ok:
+            constituents = fetched_constituents
+            if constituents_path is not None:
+                note = _write_board_cache(
+                    constituents_path, "constituents", fetched_constituents, max_boards=board_limit,
+                )
+                if note:
+                    notes.append(note)
+        elif constituents is None and fetched_constituents:
+            # 部分板块拉取失败：本轮可用，但不写缓存，避免把残缺映射固化成"新鲜"结果。
+            constituents = fetched_constituents
+            notes.append("akshare constituents partially failed; cache not written")
+
+    if not constituents:
+        return {}, notes
+
+    mapping = _combine_constituents_and_heat(constituents, heat or {})
+
+    if heat_refreshed and history_path is not None and heat:
+        note = _append_board_heat_history(history_path, heat)
+        if note:
+            notes.append(note)
+
+    if history_path is not None and history_path.is_file():
+        try:
+            trends = load_board_heat_trends(history_path)
+        except Exception as exc:
+            notes.append(f"board heat trends skipped: {history_path} error={exc}")
+        else:
+            if trends:
+                _apply_board_heat_trends(mapping, trends)
+                notes.append(f"board heat trends applied: boards={len(trends)}")
+
+    return mapping, notes
+
+
+def _combine_constituents_and_heat(
+    constituents: dict[str, dict[str, object]],
+    heat: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    """Attach per-board heat fields onto the (separately cached) membership map.
+
+    Reproduces the original single-pass semantics: ``industry`` keeps the first
+    board it was assigned, concepts accumulate, and ``board_heat_score`` /
+    ``board_heat_summary`` take the max / merged value across every board the
+    code belongs to.
+    """
+    industry_heat = heat.get("industry") if isinstance(heat.get("industry"), dict) else {}
+    concept_heat = heat.get("concepts") if isinstance(heat.get("concepts"), dict) else {}
 
     mapping: dict[str, dict[str, object]] = {}
-    board_specs = [
-        ("industry", ak.stock_board_industry_name_em, ak.stock_board_industry_cons_em),
-        ("concepts", ak.stock_board_concept_name_em, ak.stock_board_concept_cons_em),
-    ]
-    for field, list_func, cons_func in board_specs:
-        try:
-            boards = list_func()
-        except Exception as exc:
-            notes.append(f"akshare {field} board list failed: {exc}")
-            continue
-        board_items = _board_items(boards)[:board_limit]
-        loaded = 0
-        for board_item in board_items:
-            board = board_item["name"]
-            try:
-                members = cons_func(symbol=board)
-            except Exception as exc:
-                notes.append(f"akshare {field} board skipped {board}: {exc}")
+    for code, source in constituents.items():
+        item: dict[str, object] = {
+            "industry": _safe_text(source.get("industry")),
+            "concepts": _safe_text(source.get("concepts")),
+        }
+
+        industry_board = str(item["industry"])
+        stats = industry_heat.get(industry_board) if industry_board else None
+        if isinstance(stats, dict):
+            rank = _safe_float(stats.get("rank"))
+            change_pct = _safe_float(stats.get("change_pct"))
+            score = _board_heat_score(change_pct=change_pct, rank=rank)
+            if rank is not None:
+                item["industry_rank"] = int(rank)
+            if change_pct is not None:
+                item["industry_change_pct"] = change_pct
+            item["industry_heat_score"] = score
+            item["board_heat_score"] = _max_numeric(item.get("board_heat_score"), score)
+            item["board_heat_summary"] = _merge_summary_text(
+                _safe_text(item.get("board_heat_summary")),
+                _board_heat_summary(industry_board, change_pct=change_pct, rank=rank),
+            )
+
+        for concept_board in _split_label_text(item["concepts"]):
+            stats = concept_heat.get(concept_board)
+            if not isinstance(stats, dict):
                 continue
-            heat_score = _board_heat_score(
-                change_pct=_safe_float(board_item.get("change_pct")),
-                rank=_safe_float(board_item.get("rank")),
+            rank = _safe_float(stats.get("rank"))
+            change_pct = _safe_float(stats.get("change_pct"))
+            score = _board_heat_score(change_pct=change_pct, rank=rank)
+            item["concept_heat_score"] = _max_numeric(item.get("concept_heat_score"), score)
+            item["board_heat_score"] = _max_numeric(item.get("board_heat_score"), score)
+            item["board_heat_summary"] = _merge_summary_text(
+                _safe_text(item.get("board_heat_summary")),
+                _board_heat_summary(concept_board, change_pct=change_pct, rank=rank),
             )
-            heat_summary = _board_heat_summary(
-                board,
-                change_pct=_safe_float(board_item.get("change_pct")),
-                rank=_safe_float(board_item.get("rank")),
-            )
-            for _, row in members.iterrows():
-                code = _normalize_code(row.get("代码") or row.get("code"))
-                if not code or code == "000000":
-                    continue
-                item = mapping.setdefault(code, {"industry": "", "concepts": ""})
-                if field == "industry" and not item["industry"]:
-                    item["industry"] = board
-                    if board_item.get("rank") is not None:
-                        item["industry_rank"] = int(float(board_item["rank"]))
-                    if board_item.get("change_pct") is not None:
-                        item["industry_change_pct"] = _safe_float(board_item.get("change_pct"))
-                    item["industry_heat_score"] = heat_score
-                elif field == "concepts":
-                    item["concepts"] = _merge_label_text(item.get("concepts", ""), board)
-                    item["concept_heat_score"] = _max_numeric(item.get("concept_heat_score"), heat_score)
-                item["board_heat_score"] = _max_numeric(item.get("board_heat_score"), heat_score)
-                item["board_heat_summary"] = _merge_summary_text(
-                    _safe_text(item.get("board_heat_summary")),
-                    heat_summary,
-                )
-            loaded += 1
-        notes.append(f"akshare {field} boards loaded: {loaded}/{len(board_items)}")
-    if cache_path is not None and mapping:
-        cache_note = _write_akshare_board_cache(cache_path, mapping, max_boards=board_limit)
-        if cache_note:
-            notes.append(cache_note)
-    return mapping, notes
+
+        mapping[code] = item
+    return mapping
+
+
+def _split_label_text(value: object) -> list[str]:
+    text = _safe_text(value)
+    if not text:
+        return []
+    return [part.strip() for part in text.split("|") if part.strip()]
 
 
 def save_industry_map(mapping: dict[str, dict[str, object]], path_like: str | Path) -> Path:
@@ -465,64 +587,159 @@ def _resolve_cache_ttl_seconds(
     return max(0.0, float(raw_hours)) * 3600
 
 
-def _akshare_board_cache_path(cache_dir: Path, *, max_boards: int) -> Path:
-    return cache_dir / f"akshare_board_map_{_AKSHARE_BOARD_CACHE_SCHEMA}_max_boards_{int(max_boards)}.json"
+def _resolve_constituents_ttl_seconds(cache_ttl_hours: float | None) -> float:
+    """成分映射的 TTL，默认 30 天；它只随成分调整变化，不需要跟着热度天天重拉。"""
+    if cache_ttl_hours is not None:
+        return max(0.0, float(cache_ttl_hours)) * 3600
+    raw_hours = os.getenv("SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS", "").strip() or "720"
+    try:
+        return max(0.0, float(raw_hours)) * 3600
+    except ValueError:
+        return 720 * 3600
 
 
-def _read_akshare_board_cache(
-    path: Path,
+def _board_cache_path(cache_dir: Path, kind: str, *, max_boards: int) -> Path:
+    return cache_dir / f"akshare_board_{kind}_{_AKSHARE_BOARD_CACHE_SCHEMA}_max_boards_{int(max_boards)}.json"
+
+
+def _board_heat_history_path(cache_dir: Path, *, max_boards: int) -> Path:
+    return _board_cache_path(cache_dir, "heat", max_boards=max_boards).with_suffix(".json.history.jsonl")
+
+
+def _cache_age_seconds(path: Path, payload: object) -> float:
+    """缓存年龄优先按 payload 里的 created_at 算，取不到才退回文件 mtime。
+
+    这一点在 CI 上是决定性的：`actions/checkout` 会把每个文件的 mtime 重置成
+    检出时刻，因此随仓库版本化的缓存用 mtime 判断永远"新鲜"，TTL 完全失效。
+    """
+    if isinstance(payload, dict):
+        created_at = _safe_text(payload.get("created_at"))
+        if created_at:
+            try:
+                created = datetime.fromisoformat(created_at)
+            except ValueError:
+                created = None
+            if created is not None:
+                if created.tzinfo is not None:
+                    created = created.astimezone().replace(tzinfo=None)
+                return max((datetime.now() - created).total_seconds(), 0.0)
+    try:
+        return max(time.time() - path.stat().st_mtime, 0.0)
+    except OSError:
+        return float("inf")
+
+
+def _read_board_cache(
+    path: Path | None,
     *,
+    kind: str,
     max_boards: int,
     ttl_seconds: float,
-) -> tuple[dict[str, dict[str, object]] | None, str]:
-    try:
-        stat = path.stat()
-    except FileNotFoundError:
+) -> tuple[dict | None, str]:
+    if path is None:
         return None, ""
     if ttl_seconds <= 0:
-        return None, f"industry provider cache expired: {path}"
-    age_seconds = time.time() - stat.st_mtime
-    if age_seconds > ttl_seconds:
-        return None, f"industry provider cache expired: {path}"
+        return None, f"industry {kind} cache disabled: ttl=0"
+    if not path.is_file():
+        return None, ""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        return None, f"industry provider cache skipped: {path} error={exc}"
+        return None, f"industry {kind} cache skipped: {path} error={exc}"
     if not isinstance(payload, dict):
-        return None, f"industry provider cache skipped: {path} invalid payload"
+        return None, f"industry {kind} cache skipped: {path} invalid payload"
     if (
         payload.get("schema") != _AKSHARE_BOARD_CACHE_SCHEMA
         or payload.get("provider") != "akshare"
+        or payload.get("kind") != kind
         or int(payload.get("max_boards", 0) or 0) != int(max_boards)
     ):
-        return None, f"industry provider cache skipped: {path} schema mismatch"
-    mapping = _normalize_cached_mapping(payload.get("mapping"))
-    if mapping is None:
-        return None, f"industry provider cache skipped: {path} invalid mapping"
-    return mapping, f"industry provider cache hit: {path} rows={len(mapping)}"
+        return None, f"industry {kind} cache skipped: {path} schema mismatch"
+
+    age_seconds = _cache_age_seconds(path, payload)
+    if age_seconds > ttl_seconds:
+        return None, (
+            f"industry {kind} cache expired: {path} "
+            f"age_hours={age_seconds / 3600:.1f} ttl_hours={ttl_seconds / 3600:.1f}"
+        )
+
+    data = payload.get("data")
+    if kind == "constituents":
+        normalized = _normalize_cached_mapping(data)
+        if normalized is None:
+            return None, f"industry {kind} cache skipped: {path} invalid mapping"
+        return normalized, (
+            f"industry {kind} cache hit: {path} rows={len(normalized)} "
+            f"age_hours={age_seconds / 3600:.1f}"
+        )
+
+    if not isinstance(data, dict):
+        return None, f"industry {kind} cache skipped: {path} invalid data"
+    boards = sum(len(v) for v in data.values() if isinstance(v, dict))
+    return data, (
+        f"industry {kind} cache hit: {path} boards={boards} "
+        f"age_hours={age_seconds / 3600:.1f}"
+    )
 
 
-def _write_akshare_board_cache(
-    path: Path,
-    mapping: dict[str, dict[str, object]],
-    *,
-    max_boards: int,
-) -> str:
+def _write_board_cache(path: Path, kind: str, data: object, *, max_boards: int) -> str:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema": _AKSHARE_BOARD_CACHE_SCHEMA,
             "provider": "akshare",
+            "kind": kind,
             "max_boards": int(max_boards),
             "created_at": datetime.now().isoformat(),
-            "mapping": _json_safe_mapping(mapping),
+            "data": _json_safe_mapping(data) if kind == "constituents" else data,
         }
         tmp_path = path.with_name(f".{path.name}.{time.time_ns()}.tmp")
         tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp_path.replace(path)
-        return f"industry provider cache saved: {path} rows={len(mapping)}"
+        return f"industry {kind} cache saved: {path}"
     except Exception as exc:
-        return f"industry provider cache skipped: {path} error={exc}"
+        return f"industry {kind} cache write failed: {path} error={exc}"
+
+
+def _append_board_heat_history(path: Path, heat: dict[str, object]) -> str:
+    """把本次热度按板块追加一行，供 load_board_heat_trends 计算趋势。
+
+    同一天只记一次：一天内重复运行不应该把 5 次观测的滚动窗口灌满同一天的值。
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if f'"generated_at": "{today}' in line or f'"generated_at":"{today}' in line:
+                    return ""
+    except OSError as exc:
+        return f"board heat history read failed: {path} error={exc}"
+
+    rows: list[str] = []
+    generated_at = datetime.now().isoformat(timespec="seconds")
+    for field_boards in heat.values():
+        if not isinstance(field_boards, dict):
+            continue
+        for board, stats in field_boards.items():
+            if not isinstance(stats, dict):
+                continue
+            score = _board_heat_score(
+                change_pct=_safe_float(stats.get("change_pct")),
+                rank=_safe_float(stats.get("rank")),
+            )
+            rows.append(json.dumps(
+                {"generated_at": generated_at, "board": board, "max_board_heat_score": score},
+                ensure_ascii=False,
+            ))
+    if not rows:
+        return ""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(rows) + "\n")
+    except OSError as exc:
+        return f"board heat history write failed: {path} error={exc}"
+    return f"board heat history appended: {path} boards={len(rows)}"
 
 
 def _normalize_cached_mapping(value: object) -> dict[str, dict[str, object]] | None:
