@@ -34,7 +34,8 @@
     "migrated_from_schema_version": 1,
     "industry_quota_effective": true,
     "industry_missing_count": 5,
-    "max_per_industry_total": 3
+    "max_per_industry_total": 3,
+    "industry_backfilled_from_map": 5
   },
   "entries": [
     {
@@ -217,7 +218,7 @@
       "buckets": [
         "defensive"
       ],
-      "industry": "",
+      "industry": "银行",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 5,
@@ -246,7 +247,7 @@
       "buckets": [
         "defensive"
       ],
-      "industry": "",
+      "industry": "银行",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 5,
@@ -483,7 +484,7 @@
       "buckets": [
         "defensive"
       ],
-      "industry": "",
+      "industry": "银行",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 5,
@@ -604,7 +605,7 @@
       "buckets": [
         "balanced"
       ],
-      "industry": "",
+      "industry": "非银行金融",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 5,
@@ -633,7 +634,7 @@
       "buckets": [
         "balanced"
       ],
-      "industry": "",
+      "industry": "基本金属",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 5,
