@@ -40,6 +40,7 @@ from src.services.screening_watchlist import (
     apply_industry_quota,
     apply_pinned,
     expire_entries,
+    format_date,
     load_pinned_codes,
     load_watchlist,
     merge_run,
@@ -992,3 +993,75 @@ def test_report_labels_the_global_cap_reason():
     )
     assert "同行业已达全局上限" in report
     assert "同行业在该桶已满额" in report
+
+# ---------------------------------------------------------------------------
+# hit_count 按扫描日去重
+# ---------------------------------------------------------------------------
+def _run(entries, run_date, score=80.0, strategy="dual_low"):
+    return merge_run(
+        entries,
+        {strategy: [_pick("600519", score=score)]},
+        run_date=run_date,
+        holding_periods={strategy: "watchlist"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={strategy: "defensive"},
+    )
+
+
+def test_hit_count_does_not_grow_on_same_day_reruns():
+    """同一天反复手动跑 weekly，hit_count 不应累计。
+
+    hit_count 会通过 rank_score 的命中加分（最多 +10 分）影响行业配额和容量裁剪，
+    累计等于让"运行次数"参与选股。
+    """
+    entries, _ = _run({}, RUN_DATE)
+    assert entries["600519"].hit_count == 1
+
+    for _ in range(4):
+        entries, added = _run(entries, RUN_DATE)
+        assert added == []
+    assert entries["600519"].hit_count == 1
+
+
+def test_hit_count_increments_on_a_new_scan_day():
+    entries, _ = _run({}, date(2026, 8, 24))
+    entries, _ = _run(entries, date(2026, 8, 24))     # 同日重跑
+    entries, _ = _run(entries, date(2026, 8, 25))     # 新的一天
+    entries, _ = _run(entries, date(2026, 8, 25))     # 同日重跑
+    assert entries["600519"].hit_count == 2
+
+
+def test_hit_count_counts_a_day_once_across_daily_and_weekly_runs():
+    """周五 daily 与 weekly 两条流水线都命中同一只票，仍然只算一天。"""
+    entries, _ = merge_run(
+        {},
+        {"capital_heat": [_pick("600519", score=70.0)]},
+        run_date=RUN_DATE,
+        holding_periods={"capital_heat": "short_term"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={"capital_heat": "aggressive"},
+    )
+    entries, _ = _run(entries, RUN_DATE)
+    entry = entries["600519"]
+    assert entry.hit_count == 1
+    # 两条背书都记下来了，只是没有重复计数
+    assert sorted(entry.strategies) == ["capital_heat", "dual_low"]
+
+
+def test_last_seen_never_moves_backwards():
+    """用更早的日期补跑一轮，不能把名单的时间基准拉回去——那会凭空延长 TTL。"""
+    entries, _ = _run({}, RUN_DATE)
+    entries, _ = _run(entries, date(2026, 8, 1))
+    entry = entries["600519"]
+    assert entry.last_seen == format_date(RUN_DATE)
+    assert entry.hit_count == 1
+
+
+def test_backfilling_an_older_day_still_records_the_strategy_hit():
+    """补跑旧日期不计数、不回退 last_seen，但策略背书仍然更新。"""
+    entries, _ = _run({}, RUN_DATE)
+    entries, _ = _run(entries, date(2026, 8, 1), score=99.0, strategy="quality_value")
+    entry = entries["600519"]
+    assert sorted(entry.strategies) == ["dual_low", "quality_value"]
+    assert entry.best_score == 99.0
+    assert entry.hit_count == 1

@@ -374,3 +374,22 @@ def test_global_industry_cap_zero_disables_it(market_scan, stub_engine, monkeypa
     ) == 0
     current = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))
     assert len(current["entries"]) == 4
+
+
+def test_repeated_same_day_runs_do_not_inflate_hit_count(market_scan, stub_engine, tmp_path):
+    """同一天反复手动跑同一个 cadence，hit_count 不累计。
+
+    hit_count 会通过 rank_score 的命中加分影响行业配额与容量裁剪，
+    累计等于让"工作流运行次数"参与选股。
+    """
+    for _ in range(3):
+        assert market_scan.main(_args(tmp_path, "--cadence", "weekly")) == 0
+
+    current = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))
+    assert current["entries"], "名单不应为空"
+    assert {e["hit_count"] for e in current["entries"]} == {1}
+
+    # 每次运行仍然照常留下 history 与 timing 记录
+    assert len(list((tmp_path / "history").glob("*.json"))) == 1   # 同一天覆盖同一个文件
+    timing = json.loads((tmp_path / "timing.json").read_text(encoding="utf-8"))
+    assert len(timing["runs"]) == 3

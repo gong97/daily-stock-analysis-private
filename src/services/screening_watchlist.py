@@ -631,8 +631,9 @@ def merge_run(
     同一只票被多个策略选中时按最高分记录 `latest_score`，`latest_rank` /
     `cadence` / `holding_period` / `bucket` 一并取自那个最高分策略，而不是最后跑完的那个
     —— 否则名单里的扫描频率会变成"策略名字母序最后一个"，与实际代表性无关。
-    `hit_count` 每次扫描最多 +1（不按策略数重复累加），避免多策略同时命中把
-    命中次数灌水。
+    `hit_count` 计的是**被选中的扫描日数**：同一次扫描里被多个策略命中只算一次，
+    同一天重复运行也只算一次。它不是 `merge_run` 的调用次数——否则手动重跑几轮
+    就能靠 `rank_score` 的命中加分把一只票顶进名单。`last_seen` 同理只前进不后退。
 
     Returns:
         `(合并后的名单, 本次新进入的代码)`
@@ -641,6 +642,8 @@ def merge_run(
     run_date_text = format_date(run_date)
     added: List[str] = []
     seen_this_run: set = set()
+    # 每个代码在本轮开始前的 last_seen，用于按扫描日去重计数。
+    previous_seen: Dict[str, Optional[date]] = {}
 
     for strategy, picks in picks_by_strategy.items():
         holding_period = str(holding_periods.get(strategy, "") or "")
@@ -664,7 +667,14 @@ def merge_run(
 
             if code not in seen_this_run:
                 seen_this_run.add(code)
-                entry.hit_count += 1
+                # hit_count 计的是**被选中的扫描日数**，不是 merge_run 的调用次数。
+                # 同一天重复手动跑 weekly 不该重复计数：hit_count 会通过
+                # rank_score 的命中加分（最多 +10 分）影响行业配额和容量裁剪，
+                # 手动重跑几次就能把一只票顶上去，那是运行次数在选股而不是策略。
+                previous_seen[code] = parse_date(entry.last_seen)
+                seen_before = previous_seen[code]
+                if seen_before is None or seen_before < run_date:
+                    entry.hit_count += 1
                 # 同一次扫描内先归零，后续策略再按最高分覆盖。
                 entry.latest_score = score
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
@@ -676,7 +686,11 @@ def merge_run(
                 entry.cadence = cadence
                 entry.holding_period = holding_period
 
-            entry.last_seen = run_date_text
+            # last_seen 只前进不后退：用更早的日期补跑一轮，不应该把名单的时间
+            # 基准拉回去，否则 TTL 会凭空延长。
+            seen_before = previous_seen.get(code)
+            if seen_before is None or seen_before <= run_date:
+                entry.last_seen = run_date_text
             entry.best_score = max(entry.best_score, score)
             # 逐策略背书：entry.bucket 由这些记录派生，不再由本轮直接写死。
             entry.strategies[strategy] = StrategyHit(
@@ -1069,7 +1083,7 @@ def render_report(
         label = BUCKET_LABELS.get(bucket, bucket)
         lines.append(f"## 当前名单 · {label}（{len(bucket_entries)}）")
         lines.append("")
-        lines.append("| # | 代码 | 名称 | 行业 | 最近分 | 命中 | 首次入选 | 最近入选 | 策略 |")
+        lines.append("| # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |")
         lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
         ordered = sort_entries(bucket_entries.values(), run_date=run_date)
         for index, entry in enumerate(ordered[:max_rows], start=1):
