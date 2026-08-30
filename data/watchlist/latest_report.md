@@ -2,18 +2,9 @@
 
 - 扫描日期：2026-08-31
 - 名单规模：25（防守 7｜均衡 18｜进攻 0）
-- 本次新进：4｜本次移出：3
-- 策略数：7｜总耗时：401.6s
+- 本次新进：0｜本次移出：3
+- 策略数：7｜总耗时：405.8s
 - 行业配额：已生效，本次裁掉 3 条；另有 5 条缺少行业数据未参与分组
-
-## 新进入观察名单
-
-| 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
-| --- | --- | --- | --- | --- | --- |
-| 均衡 | 002466 | 天齐锂业 | 稀有金属 | 75.56 | momentum_quality |
-| 均衡 | 000425 | 徐工机械 | 专用设备 | 74.82 | momentum_quality |
-| 均衡 | 000100 | TCL科技 | 电子元件 | 73.55 | momentum_quality |
-| 防守 | 601877 | 正泰电器 | 输变电设备 | 82.79 | quality_value |
 
 ## 移出观察名单
 
@@ -62,10 +53,10 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| balanced_alpha | watchlist | 79.1 | 5546 | 1160 | 5 | 否 |
-| blue_chip_income | watchlist | 120.1 | 5147 | 119 | 5 | 否 |
-| dual_low | watchlist | 29.5 | 5147 | 233 | 5 | 否 |
-| low_volatility_quality | swing | 62.1 | 5147 | 57 | 5 | 是 |
-| momentum_quality | swing | 29.3 | 5147 | 613 | 5 | 否 |
-| quality_value | watchlist | 29.1 | 5147 | 438 | 5 | 否 |
-| shrink_pullback | swing | 52.4 | 5147 | 10 | 5 | 是 |
+| balanced_alpha | watchlist | 76.6 | 5546 | 1160 | 5 | 否 |
+| blue_chip_income | watchlist | 119.9 | 5147 | 119 | 5 | 否 |
+| dual_low | watchlist | 27.4 | 5147 | 233 | 5 | 否 |
+| low_volatility_quality | swing | 62.8 | 5147 | 57 | 5 | 是 |
+| momentum_quality | swing | 30.2 | 5147 | 613 | 5 | 否 |
+| quality_value | watchlist | 28.6 | 5147 | 438 | 5 | 否 |
+| shrink_pullback | swing | 60.1 | 5147 | 10 | 5 | 是 |
