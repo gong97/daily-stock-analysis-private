@@ -49,6 +49,9 @@ SUPPORTED_BUCKETS = (BUCKET_DEFENSIVE, BUCKET_BALANCED, BUCKET_AGGRESSIVE)
 # 未知 risk_profile 落到中间桶：既不会被当成可以长期留存的防守票，
 # 也不会拿到进攻桶更宽松的行业配额。
 FALLBACK_BUCKET = BUCKET_BALANCED
+# 主桶优先级：一只票同时符合多个桶时，用哪个桶结算 TTL/配额/容量。
+# 理由见 WatchlistEntry.bucket 的 docstring——让衰减最快的桶治理时效。
+BUCKET_PRIORITY = (BUCKET_AGGRESSIVE, BUCKET_BALANCED, BUCKET_DEFENSIVE)
 
 # 标量默认值，同时作为未知桶的兜底。
 DEFAULT_TTL_DAYS = 30
@@ -90,7 +93,8 @@ _STALENESS_PENALTY_PER_DAY = 0.5
 
 _DATE_FMT = "%Y-%m-%d"
 
-WATCHLIST_SCHEMA_VERSION = 1
+# 2: strategies 从 {名: 分数} 改为 {名: {score,last_seen,bucket}}，bucket 变成派生值。
+WATCHLIST_SCHEMA_VERSION = 2
 
 
 def parse_date(value: Any) -> Optional[date]:
@@ -109,14 +113,60 @@ def format_date(value: date) -> str:
 
 
 @dataclass
+class StrategyHit:
+    """某个策略对某只票的一次背书。
+
+    逐策略保存 `bucket` 和 `last_seen`，是为了让 `WatchlistEntry.bucket` 变成
+    **派生值**而不是某一瞬间的快照。此前 bucket 是存储字段，跨运行会被最后一轮
+    无条件覆盖：周一 daily 跑成 aggressive、周五 weekly 跑成 defensive，
+    连带 TTL（14↔45 天）和行业配额（4↔2）一起漂移。
+    """
+
+    score: float = 0.0
+    last_seen: str = ""
+    bucket: str = FALLBACK_BUCKET
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"score": self.score, "last_seen": self.last_seen, "bucket": self.bucket}
+
+    @classmethod
+    def from_any(
+        cls,
+        value: Any,
+        *,
+        default_bucket: str,
+        default_last_seen: str,
+    ) -> "StrategyHit":
+        """兼容三种历史格式：名字列表、`{名: 分数}`、以及当前的 `{名: {...}}`。
+
+        迁移旧快照时逐策略信息并不存在，只能回填成条目级的值——因此升级后的
+        头一两轮 `buckets` 会偏保守，等各策略重新背书后才准确。
+        """
+        if isinstance(value, Mapping):
+            return cls(
+                score=_as_float(value.get("score"), 0.0) or 0.0,
+                last_seen=str(value.get("last_seen") or default_last_seen),
+                bucket=resolve_bucket(value.get("bucket") or default_bucket),
+            )
+        return cls(
+            score=_as_float(value, 0.0) or 0.0,
+            last_seen=default_last_seen,
+            bucket=resolve_bucket(default_bucket),
+        )
+
+
+@dataclass
 class WatchlistEntry:
-    """观察名单中的一只股票。"""
+    """观察名单中的一只股票。
+
+    `bucket` / `buckets` 都是从 `strategies` 派生的，不存储：同一份数据永远得出
+    同一个分桶，与策略跑动顺序和运行先后无关。
+    """
 
     code: str
     name: str = ""
     holding_period: str = ""
     cadence: str = FALLBACK_CADENCE
-    bucket: str = FALLBACK_BUCKET
     industry: str = ""
     first_seen: str = ""
     last_seen: str = ""
@@ -128,8 +178,34 @@ class WatchlistEntry:
     change_pct: Optional[float] = None
     risk_level: str = ""
     risk_flags: List[str] = field(default_factory=list)
-    strategies: Dict[str, float] = field(default_factory=dict)
+    strategies: Dict[str, StrategyHit] = field(default_factory=dict)
     pinned: bool = False
+
+    @property
+    def buckets(self) -> List[str]:
+        """该票当前仍然有效的全部分桶，按优先级排序；可能同时属于多个。
+
+        过期背书由 `expire_entries` 剪掉，因此这里读到的都是有效的。
+        """
+        present = {hit.bucket for hit in self.strategies.values()}
+        return [bucket for bucket in BUCKET_PRIORITY if bucket in present]
+
+    @property
+    def bucket(self) -> str:
+        """主桶：用于 TTL、行业配额和容量结算。
+
+        优先级 aggressive > balanced > defensive，取的不是"哪个更重要"，而是
+        **让衰减最快的那个来治理时效**：进攻属性是当下正在发生的事，14 天不再
+        被确认就该出局；防守属性是长期底色，掉出名单也随时能被 dual_low 选回来。
+        反过来配会让已经退潮的进攻票靠"它也便宜"赖在名单里 45 天。
+        """
+        buckets = self.buckets
+        return buckets[0] if buckets else FALLBACK_BUCKET
+
+    @property
+    def secondary_buckets(self) -> List[str]:
+        """主桶之外还符合的桶，用于报告里的「兼 X」标注。"""
+        return self.buckets[1:]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -137,7 +213,10 @@ class WatchlistEntry:
             "name": self.name,
             "holding_period": self.holding_period,
             "cadence": self.cadence,
+            # bucket / buckets 是派生值，写出来只为让产物可直接阅读；
+            # from_dict 不读它们，一律从 strategies 重新推导。
             "bucket": self.bucket,
+            "buckets": self.buckets,
             "industry": self.industry,
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
@@ -149,7 +228,7 @@ class WatchlistEntry:
             "change_pct": self.change_pct,
             "risk_level": self.risk_level,
             "risk_flags": list(self.risk_flags),
-            "strategies": dict(self.strategies),
+            "strategies": {name: hit.to_dict() for name, hit in self.strategies.items()},
             "pinned": self.pinned,
         }
 
@@ -158,24 +237,30 @@ class WatchlistEntry:
         code = str(raw.get("code") or "").strip()
         if not code:
             raise ValueError("watchlist entry missing code")
+        last_seen = str(raw.get("last_seen") or "")
+        legacy_bucket = resolve_bucket(raw.get("bucket"))
+
         strategies_raw = raw.get("strategies") or {}
-        strategies: Dict[str, float] = {}
+        strategies: Dict[str, StrategyHit] = {}
         if isinstance(strategies_raw, Mapping):
-            for key, value in strategies_raw.items():
-                strategies[str(key)] = _as_float(value, 0.0) or 0.0
+            items = strategies_raw.items()
         elif isinstance(strategies_raw, (list, tuple)):
-            # 兼容早期把 strategies 存成名字列表的快照。
-            for key in strategies_raw:
-                strategies[str(key)] = 0.0
+            items = ((name, 0.0) for name in strategies_raw)
+        else:
+            items = ()
+        for key, value in items:
+            strategies[str(key)] = StrategyHit.from_any(
+                value, default_bucket=legacy_bucket, default_last_seen=last_seen
+            )
+
         return cls(
             code=code,
             name=str(raw.get("name") or ""),
             holding_period=str(raw.get("holding_period") or ""),
             cadence=str(raw.get("cadence") or FALLBACK_CADENCE),
-            bucket=resolve_bucket(raw.get("bucket")),
             industry=str(raw.get("industry") or ""),
             first_seen=str(raw.get("first_seen") or ""),
-            last_seen=str(raw.get("last_seen") or ""),
+            last_seen=last_seen,
             hit_count=int(_as_float(raw.get("hit_count"), 0.0) or 0.0),
             latest_score=_as_float(raw.get("latest_score"), 0.0) or 0.0,
             best_score=_as_float(raw.get("best_score"), 0.0) or 0.0,
@@ -417,6 +502,15 @@ def load_watchlist(path: Path) -> Tuple[Dict[str, WatchlistEntry], Dict[str, Any
             continue
         entries[entry.code] = entry
     meta = dict(payload.get("meta") or {})
+    schema_version = int(_as_float(payload.get("schema_version"), 0) or 0)
+    if entries and schema_version < WATCHLIST_SCHEMA_VERSION:
+        logger.info(
+            "观察名单已从 schema v%s 迁移到 v%s：逐策略的 last_seen/bucket 在旧快照里不存在，"
+            "已回填成条目级取值；等各策略重新背书后 buckets 才准确。",
+            schema_version or "?",
+            WATCHLIST_SCHEMA_VERSION,
+        )
+        meta["migrated_from_schema_version"] = schema_version
     return entries, meta
 
 
@@ -433,7 +527,7 @@ def save_watchlist(path: Path, entries: Mapping[str, WatchlistEntry], meta: Mapp
 def save_watchlist_csv(path: Path, entries: Mapping[str, WatchlistEntry]) -> None:
     """导出一份便于肉眼扫的扁平表。"""
     columns = [
-        "code", "name", "industry", "bucket", "cadence", "holding_period",
+        "code", "name", "industry", "bucket", "buckets", "cadence", "holding_period",
         "first_seen", "last_seen", "hit_count", "latest_score", "best_score",
         "risk_level", "strategies", "pinned",
     ]
@@ -448,6 +542,7 @@ def save_watchlist_csv(path: Path, entries: Mapping[str, WatchlistEntry]) -> Non
             entry.name,
             entry.industry,
             entry.bucket,
+            "|".join(entry.buckets),
             entry.cadence,
             entry.holding_period,
             entry.first_seen,
@@ -570,17 +665,18 @@ def merge_run(
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
                 entry.cadence = cadence
                 entry.holding_period = holding_period
-                entry.bucket = bucket
             elif score > entry.latest_score:
                 entry.latest_score = score
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
                 entry.cadence = cadence
                 entry.holding_period = holding_period
-                entry.bucket = bucket
 
             entry.last_seen = run_date_text
             entry.best_score = max(entry.best_score, score)
-            entry.strategies[strategy] = score
+            # 逐策略背书：entry.bucket 由这些记录派生，不再由本轮直接写死。
+            entry.strategies[strategy] = StrategyHit(
+                score=score, last_seen=run_date_text, bucket=bucket
+            )
             entry.name = str(pick.get("name") or "") or entry.name
             entry.industry = str(pick.get("industry") or "") or entry.industry
             entry.price = _as_float(pick.get("price"), entry.price)
@@ -672,16 +768,34 @@ def expire_entries(
     kept: Dict[str, WatchlistEntry] = {}
     removed: List[Tuple[str, str]] = []
 
-    for bucket, bucket_entries in group_by_bucket(entries.values()).items():
+    # 先按**每条背书自己所属桶的 TTL** 剪枝：进攻策略的背书 14 天失效，
+    # 防守策略的 45 天。条目只要还剩任一条有效背书就留下，全部失效才算 ttl 出局。
+    # 剪枝必须在分桶之前，否则一条早已失效的进攻背书会继续把条目拉进进攻桶。
+    surviving: Dict[str, WatchlistEntry] = {}
+    for code, entry in entries.items():
+        live: Dict[str, StrategyHit] = {}
+        for name, hit in entry.strategies.items():
+            hit_ttl = limit_for(
+                ttl_days, hit.bucket,
+                default=DEFAULT_TTL_DAYS_BY_BUCKET.get(hit.bucket, DEFAULT_TTL_DAYS),
+            )
+            hit_seen = parse_date(hit.last_seen) or parse_date(entry.last_seen)
+            if hit_ttl > 0 and hit_seen is not None and (run_date - hit_seen).days > hit_ttl:
+                continue
+            live[name] = hit
+        if len(live) != len(entry.strategies):
+            entry.strategies = live
+        if not live and not entry.pinned:
+            removed.append((code, "ttl"))
+            continue
+        surviving[code] = entry
+
+    for bucket, bucket_entries in group_by_bucket(surviving.values()).items():
         if not bucket_entries:
             continue
         bucket_kept, bucket_removed = _expire_one_bucket(
             bucket_entries,
             run_date=run_date,
-            ttl_days=limit_for(
-                ttl_days, bucket,
-                default=DEFAULT_TTL_DAYS_BY_BUCKET.get(bucket, DEFAULT_TTL_DAYS),
-            ),
             max_size=limit_for(
                 max_size, bucket,
                 default=DEFAULT_MAX_SIZE_BY_BUCKET.get(bucket, DEFAULT_MAX_SIZE),
@@ -701,30 +815,19 @@ def _expire_one_bucket(
     entries: Mapping[str, WatchlistEntry],
     *,
     run_date: date,
-    ttl_days: int,
     max_size: int,
     max_per_industry: int,
 ) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
-    """单个 bucket 内的 TTL → 行业配额 → 容量三步淘汰。"""
-    kept: Dict[str, WatchlistEntry] = {}
-    removed: List[Tuple[str, str]] = []
+    """单个 bucket 内的行业配额 → 容量两步淘汰。
 
-    for code, entry in entries.items():
-        if entry.pinned:
-            kept[code] = entry
-            continue
-        last_seen = parse_date(entry.last_seen)
-        if ttl_days > 0 and last_seen is not None and (run_date - last_seen).days > ttl_days:
-            removed.append((code, "ttl"))
-            continue
-        kept[code] = entry
-
-    kept, industry_removed = apply_industry_quota(
-        kept,
+    TTL 不在这里做：它按**每条策略背书自己的桶**结算，已在 `expire_entries`
+    分桶之前完成，否则一条早已失效的进攻背书会继续把条目拉进进攻桶。
+    """
+    kept, removed = apply_industry_quota(
+        dict(entries),
         run_date=run_date,
         max_per_industry=max_per_industry,
     )
-    removed.extend(industry_removed)
 
     if max_size > 0:
         survivors: Dict[str, WatchlistEntry] = {}
@@ -837,8 +940,13 @@ def render_report(
         ordered = sort_entries(bucket_entries.values(), run_date=run_date)
         for index, entry in enumerate(ordered[:max_rows], start=1):
             flag = "📌 " if entry.pinned else ""
+            # 同时符合多个桶的票只在主桶列一行、只占一个名额，在这里标注它的其余属性。
+            also = entry.secondary_buckets
+            also_text = (
+                "（兼 " + "、".join(BUCKET_LABELS.get(b, b) for b in also) + "）" if also else ""
+            )
             lines.append(
-                f"| {index} | {flag}{entry.code} | {entry.name} | {entry.industry} | "
+                f"| {index} | {flag}{entry.code}{also_text} | {entry.name} | {entry.industry} | "
                 f"{entry.latest_score:.2f} | {entry.hit_count} | {entry.first_seen} | "
                 f"{entry.last_seen} | {', '.join(sorted(entry.strategies))} |"
             )
@@ -853,7 +961,10 @@ def render_report(
         lines.append("_本次名单为空。_")
         lines.append("")
     else:
-        lines.append("> 分数是各策略硬筛存活池内的分位排名，**不可跨桶比较**。")
+        lines.append(
+            "> 分数是各策略硬筛存活池内的分位排名，**不可跨桶比较**。"
+            "标「兼 X」的票同时符合多个桶，只在主桶计一个名额。"
+        )
         lines.append("")
 
     lines.append("## 策略耗时")

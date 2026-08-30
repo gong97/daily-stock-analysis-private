@@ -21,6 +21,8 @@ from src.services.screening_watchlist import (
     DEFAULT_TTL_DAYS_BY_BUCKET,
     FALLBACK_BUCKET,
     SUPPORTED_BUCKETS,
+    BUCKET_PRIORITY,
+    StrategyHit,
     group_by_bucket,
     limit_for,
     parse_bucket_limits,
@@ -51,6 +53,33 @@ from src.services.screening_watchlist import (
 pytestmark = pytest.mark.unit
 
 RUN_DATE = date(2026, 8, 28)
+
+
+def _hit(score: float, bucket: str = BUCKET_BALANCED, last_seen: str = "2026-08-28") -> StrategyHit:
+    return StrategyHit(score=score, last_seen=last_seen, bucket=bucket)
+
+
+def _make(
+    code: str,
+    *,
+    bucket: str = BUCKET_BALANCED,
+    score: float = 80.0,
+    industry: str = "测试",
+    last_seen: str = "2026-08-28",
+    pinned: bool = False,
+    hit_count: int = 1,
+    strategy: str = "s",
+) -> WatchlistEntry:
+    """建一条 entry；bucket 通过策略背书表达，因为它已经是派生属性。"""
+    return WatchlistEntry(
+        code=code,
+        industry=industry,
+        last_seen=last_seen,
+        latest_score=score,
+        hit_count=hit_count,
+        pinned=pinned,
+        strategies={strategy: _hit(score, bucket, last_seen)},
+    )
 
 
 def _pick(code: str, *, score: float, rank: int = 1, name: str = "", industry: str = "") -> dict:
@@ -141,7 +170,8 @@ def test_merge_run_creates_entries_and_reports_added():
     assert entry.latest_score == 80.0
     assert entry.best_score == 80.0
     assert entry.cadence == CADENCE_WEEKLY
-    assert entry.strategies == {"dual_low": 80.0}
+    assert entry.strategies["dual_low"].score == 80.0
+    assert entry.strategies["dual_low"].last_seen == "2026-08-28"
 
 
 def test_merge_run_counts_one_hit_per_run_even_with_multiple_strategies():
@@ -234,8 +264,8 @@ def test_merge_run_does_not_mutate_input_mapping():
 # ---------------------------------------------------------------------------
 def test_expire_entries_drops_stale_codes():
     entries = {
-        "600519": WatchlistEntry(code="600519", last_seen="2026-08-27"),
-        "000001": WatchlistEntry(code="000001", last_seen="2026-06-01"),
+        "600519": _make("600519", last_seen="2026-08-27"),
+        "000001": _make("000001", last_seen="2026-06-01"),
     }
     kept, removed = expire_entries(entries, run_date=RUN_DATE, ttl_days=30, max_size=0)
     assert set(kept) == {"600519"}
@@ -243,7 +273,7 @@ def test_expire_entries_drops_stale_codes():
 
 
 def test_expire_entries_ttl_zero_disables_expiry():
-    entries = {"000001": WatchlistEntry(code="000001", last_seen="2020-01-01")}
+    entries = {"000001": _make("000001", last_seen="2020-01-01")}
     kept, removed = expire_entries(entries, run_date=RUN_DATE, ttl_days=0, max_size=0)
     assert set(kept) == {"000001"}
     assert removed == []
@@ -251,19 +281,22 @@ def test_expire_entries_ttl_zero_disables_expiry():
 
 def test_expire_entries_enforces_capacity_by_rank():
     entries = {
-        code: WatchlistEntry(code=code, last_seen="2026-08-28", latest_score=score, hit_count=1)
+        code: _make(code, score=score)
         for code, score in [("000001", 50.0), ("000002", 90.0), ("000003", 70.0)]
     }
-    kept, removed = expire_entries(entries, run_date=RUN_DATE, ttl_days=0, max_size=2)
+    # 关掉行业配额，隔离出容量这一步（三条默认同属一个行业，否则会先被配额裁掉）
+    kept, removed = expire_entries(
+        entries, run_date=RUN_DATE, ttl_days=0, max_size=2, max_per_industry=0
+    )
     assert set(kept) == {"000002", "000003"}
     assert removed == [("000001", "capacity")]
 
 
 def test_expire_entries_never_drops_pinned_and_pinned_does_not_consume_quota():
     entries = {
-        "600519": WatchlistEntry(code="600519", last_seen="2020-01-01", pinned=True),
-        "000002": WatchlistEntry(code="000002", last_seen="2026-08-28", latest_score=90.0),
-        "000003": WatchlistEntry(code="000003", last_seen="2026-08-28", latest_score=70.0),
+        "600519": _make("600519", last_seen="2020-01-01", pinned=True),
+        "000002": _make("000002", score=90.0),
+        "000003": _make("000003", score=70.0),
     }
     kept, removed = expire_entries(entries, run_date=RUN_DATE, ttl_days=30, max_size=2)
     # pinned 既不因 TTL 掉队，也不占用 max_size 名额
@@ -272,7 +305,7 @@ def test_expire_entries_never_drops_pinned_and_pinned_does_not_consume_quota():
 
 
 def test_apply_pinned_marks_existing_and_adds_placeholder():
-    entries = {"600519": WatchlistEntry(code="600519", pinned=True)}
+    entries = {"600519": _make("600519", pinned=True)}
     result = apply_pinned(entries, ["000001"])
     assert result["600519"].pinned is False  # 已从 pinned.txt 移除
     assert result["000001"].pinned is True
@@ -304,7 +337,7 @@ def test_save_and_load_watchlist_round_trip(tmp_path):
             hit_count=3,
             latest_score=88.5,
             best_score=91.0,
-            strategies={"dual_low": 88.5},
+            strategies={"dual_low": _hit(88.5, BUCKET_DEFENSIVE)},
         )
     }
     save_watchlist(path, entries, {"last_run_cadence": "weekly"})
@@ -312,7 +345,8 @@ def test_save_and_load_watchlist_round_trip(tmp_path):
     assert meta["last_run_cadence"] == "weekly"
     assert loaded["600519"].name == "贵州茅台"
     assert loaded["600519"].hit_count == 3
-    assert loaded["600519"].strategies == {"dual_low": 88.5}
+    assert loaded["600519"].strategies["dual_low"].score == 88.5
+    assert loaded["600519"].bucket == BUCKET_DEFENSIVE
 
 
 def test_load_watchlist_missing_or_corrupt_file_is_fail_open(tmp_path):
@@ -329,12 +363,12 @@ def test_load_watchlist_tolerates_legacy_strategy_list(tmp_path):
         encoding="utf-8",
     )
     loaded, _ = load_watchlist(path)
-    assert loaded["600519"].strategies == {"dual_low": 0.0}
+    assert loaded["600519"].strategies["dual_low"].score == 0.0
 
 
 def test_save_watchlist_csv_writes_header_and_rows(tmp_path):
     path = tmp_path / "current.csv"
-    save_watchlist_csv(path, {"600519": WatchlistEntry(code="600519", name="贵州茅台")})
+    save_watchlist_csv(path, {"600519": _make("600519")})
     text = path.read_text(encoding="utf-8")
     assert text.splitlines()[0].startswith("code,name,industry")
     assert "600519" in text
@@ -342,9 +376,9 @@ def test_save_watchlist_csv_writes_header_and_rows(tmp_path):
 
 def test_to_stock_list_orders_pinned_first_then_by_rank():
     entries = {
-        "000001": WatchlistEntry(code="000001", last_seen="2026-08-28", latest_score=95.0),
-        "000002": WatchlistEntry(code="000002", last_seen="2026-08-28", latest_score=60.0),
-        "600519": WatchlistEntry(code="600519", last_seen="2026-08-28", latest_score=10.0, pinned=True),
+        "000001": _make("000001", score=95.0),
+        "000002": _make("000002", score=60.0),
+        "600519": _make("600519", score=10.0, pinned=True),
     }
     assert to_stock_list(entries, run_date=RUN_DATE) == ["600519", "000001", "000002"]
 
@@ -390,7 +424,7 @@ def test_render_report_contains_core_sections():
             last_seen="2026-08-28",
             hit_count=1,
             latest_score=88.0,
-            strategies={"dual_low": 88.0},
+            strategies={"dual_low": _hit(88.0, BUCKET_DEFENSIVE)},
         )
     }
     report = render_report(
@@ -431,14 +465,7 @@ def test_render_report_without_changes_still_renders_current_list():
 # 跨策略行业配额
 # ---------------------------------------------------------------------------
 def _entry(code: str, industry: str, score: float, *, pinned: bool = False) -> WatchlistEntry:
-    return WatchlistEntry(
-        code=code,
-        industry=industry,
-        last_seen="2026-08-28",
-        latest_score=score,
-        hit_count=1,
-        pinned=pinned,
-    )
+    return _make(code, score=score, industry=industry, pinned=pinned)
 
 
 def test_industry_quota_keeps_only_top_n_per_industry():
@@ -526,10 +553,8 @@ def test_default_max_per_industry_is_active_by_default():
 # ---------------------------------------------------------------------------
 def _bucketed(code: str, bucket: str, score: float, *, industry: str = "测试",
               last_seen: str = "2026-08-28", pinned: bool = False) -> WatchlistEntry:
-    return WatchlistEntry(
-        code=code, bucket=bucket, industry=industry, last_seen=last_seen,
-        latest_score=score, hit_count=1, pinned=pinned,
-    )
+    return _make(code, bucket=bucket, score=score, industry=industry,
+                 last_seen=last_seen, pinned=pinned)
 
 
 def test_resolve_bucket_maps_risk_profile_and_falls_back():
@@ -685,3 +710,155 @@ def test_render_report_segments_by_bucket():
     assert "当前名单 · 均衡" not in report  # 空桶不渲染
     assert "不可跨桶比较" in report
     assert "防守 1｜均衡 0｜进攻 1" in report
+
+# ---------------------------------------------------------------------------
+# 逐策略状态：bucket 派生、双属性、逐策略 TTL
+# ---------------------------------------------------------------------------
+def _dual() -> WatchlistEntry:
+    """既被防守策略也被进攻策略选中的票。"""
+    return WatchlistEntry(
+        code="600519", industry="白酒", last_seen="2026-08-28", latest_score=80.0, hit_count=2,
+        strategies={
+            "dual_low": _hit(84.0, BUCKET_DEFENSIVE),
+            "theme_momentum": _hit(76.0, BUCKET_AGGRESSIVE),
+        },
+    )
+
+
+def test_bucket_priority_puts_the_fastest_decaying_bucket_first():
+    assert BUCKET_PRIORITY[0] == BUCKET_AGGRESSIVE
+    assert BUCKET_PRIORITY[-1] == BUCKET_DEFENSIVE
+
+
+def test_entry_exposes_all_buckets_and_a_primary_one():
+    entry = _dual()
+    assert entry.buckets == [BUCKET_AGGRESSIVE, BUCKET_DEFENSIVE]
+    assert entry.bucket == BUCKET_AGGRESSIVE          # 主桶取衰减最快的
+    assert entry.secondary_buckets == [BUCKET_DEFENSIVE]
+
+
+def test_entry_without_strategies_falls_back():
+    assert WatchlistEntry(code="600519").bucket == FALLBACK_BUCKET
+    assert WatchlistEntry(code="600519").buckets == []
+
+
+def test_bucket_is_stable_across_runs():
+    """回归：此前 bucket 是存储字段，跨运行会被最后一轮无条件覆盖。
+
+    周一 daily 跑进攻组、周五 weekly 跑防守组，同一只票的 bucket 会从
+    aggressive 翻成 defensive，连带 TTL 14↔45 天、行业配额 4↔2 一起漂移。
+    """
+    entries, _ = merge_run(
+        {},
+        {"theme_momentum": [_pick("600519", score=76.0)]},
+        run_date=date(2026, 8, 24),
+        holding_periods={"theme_momentum": "short_term"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={"theme_momentum": "aggressive"},
+    )
+    assert entries["600519"].bucket == BUCKET_AGGRESSIVE
+
+    entries, _ = merge_run(
+        entries,
+        {"dual_low": [_pick("600519", score=84.0)]},
+        run_date=RUN_DATE,
+        holding_periods={"dual_low": "watchlist"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={"dual_low": "defensive"},
+    )
+    entry = entries["600519"]
+    # 防守背书追加进来，但没有覆盖掉进攻属性
+    assert entry.buckets == [BUCKET_AGGRESSIVE, BUCKET_DEFENSIVE]
+    assert entry.bucket == BUCKET_AGGRESSIVE
+    assert entry.strategies["theme_momentum"].last_seen == "2026-08-24"
+    assert entry.strategies["dual_low"].last_seen == "2026-08-28"
+
+
+def test_stale_strategy_hits_are_pruned_by_their_own_bucket_ttl():
+    """进攻背书 14 天失效、防守背书 45 天——同一条目上按各自的桶结算。"""
+    entry = WatchlistEntry(
+        code="600519", industry="白酒", last_seen="2026-08-28",
+        strategies={
+            # 距 RUN_DATE(08-28) 32 天：超过 aggressive 的 14 天，未超 defensive 的 45 天
+            "theme_momentum": _hit(76.0, BUCKET_AGGRESSIVE, last_seen="2026-07-27"),
+            "dual_low": _hit(84.0, BUCKET_DEFENSIVE, last_seen="2026-07-27"),
+        },
+    )
+    kept, removed = expire_entries(
+        {"600519": entry}, run_date=RUN_DATE, ttl_days=None, max_size=0, max_per_industry=0
+    )
+    assert removed == []
+    survivor = kept["600519"]
+    assert sorted(survivor.strategies) == ["dual_low"]     # 进攻背书被剪掉
+    assert survivor.bucket == BUCKET_DEFENSIVE             # 主桶随之变成防守
+
+
+def test_entry_is_removed_only_when_every_hit_expires():
+    entry = WatchlistEntry(
+        code="600519", last_seen="2026-01-01",
+        strategies={
+            "theme_momentum": _hit(76.0, BUCKET_AGGRESSIVE, last_seen="2026-01-01"),
+            "dual_low": _hit(84.0, BUCKET_DEFENSIVE, last_seen="2026-01-01"),
+        },
+    )
+    kept, removed = expire_entries(
+        {"600519": entry}, run_date=RUN_DATE, ttl_days=None, max_size=0, max_per_industry=0
+    )
+    assert kept == {}
+    assert removed == [("600519", "ttl")]
+
+
+def test_dual_bucket_entry_occupies_one_slot_in_its_primary_bucket_only():
+    entries = {
+        "600519": _dual(),
+        "000001": _make("000001", bucket=BUCKET_AGGRESSIVE, score=90.0, industry="半导体"),
+        "000002": _make("000002", bucket=BUCKET_DEFENSIVE, score=90.0, industry="银行"),
+    }
+    kept, _ = expire_entries(
+        entries, run_date=RUN_DATE, ttl_days=0,
+        max_size={BUCKET_AGGRESSIVE: 1, BUCKET_DEFENSIVE: 5, BUCKET_BALANCED: 5},
+        max_per_industry=0,
+    )
+    # 600519 只在进攻桶占名额，因此和 000001 争那唯一一个位置
+    assert "000002" in kept
+    assert len([c for c in kept if c in {"600519", "000001"}]) == 1
+
+
+def test_report_marks_dual_bucket_entries_in_their_primary_section():
+    report = render_report(
+        run_date=RUN_DATE, cadence="all", entries={"600519": _dual()},
+        added=[], removed=[], summaries=[],
+    )
+    assert "当前名单 · 进攻（1）" in report
+    assert "当前名单 · 防守" not in report   # 不在防守段重复列行
+    assert "（兼 防守）" in report
+    assert "只在主桶计一个名额" in report
+
+
+def test_legacy_snapshot_migrates_and_records_a_note(tmp_path):
+    path = tmp_path / "current.json"
+    path.write_text(json.dumps({
+        "schema_version": 1,
+        "entries": [{
+            "code": "600519", "bucket": "defensive", "last_seen": "2026-08-28",
+            "strategies": {"dual_low": 88.5},
+        }],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    loaded, meta = load_watchlist(path)
+    entry = loaded["600519"]
+    # 逐策略的 bucket/last_seen 旧快照里没有，回填成条目级取值
+    assert entry.strategies["dual_low"].bucket == BUCKET_DEFENSIVE
+    assert entry.strategies["dual_low"].last_seen == "2026-08-28"
+    assert entry.bucket == BUCKET_DEFENSIVE
+    assert meta["migrated_from_schema_version"] == 1
+
+
+def test_save_writes_current_schema_version(tmp_path):
+    path = tmp_path / "current.json"
+    save_watchlist(path, {"600519": _dual()}, {})
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 2
+    entry = payload["entries"][0]
+    assert entry["buckets"] == [BUCKET_AGGRESSIVE, BUCKET_DEFENSIVE]
+    assert entry["strategies"]["dual_low"]["bucket"] == BUCKET_DEFENSIVE

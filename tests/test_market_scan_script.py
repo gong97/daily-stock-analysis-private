@@ -300,3 +300,31 @@ def test_per_bucket_limits_accept_bucket_syntax(market_scan, stub_engine, tmp_pa
     assert buckets.count("balanced") == 1
     assert current["meta"]["max_size"]["aggressive"] == 1
     assert current["meta"]["max_size"]["defensive"] == 25
+
+
+def test_bucket_does_not_drift_between_runs(market_scan, stub_engine, monkeypatch, tmp_path):
+    """跨运行回归：周一进攻组、周五防守组，同一只票不应被后一轮改写分桶。"""
+    import src.services.screening.pipeline as pipeline_module
+
+    def _only(strategy, **_kwargs):
+        return _result(strategy, ["600036"]) if strategy in _wanted[0] else _result(strategy, [])
+
+    _wanted = [{"capital_heat", "volume_breakout"}]
+    monkeypatch.setattr(pipeline_module, "screen", _only)
+    assert market_scan.main(_args(tmp_path, "--cadence", "daily")) == 0
+    first = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))["entries"][0]
+    assert first["bucket"] == "aggressive"
+
+    _wanted[0] = {"dual_low"}
+    assert market_scan.main(_args(tmp_path, "--cadence", "weekly")) == 0
+    second = json.loads((tmp_path / "current.json").read_text(encoding="utf-8"))["entries"][0]
+
+    # 防守背书追加进来，进攻属性仍在，主桶不变
+    assert second["buckets"] == ["aggressive", "defensive"]
+    assert second["bucket"] == "aggressive"
+    assert sorted(second["strategies"]) == ["capital_heat", "dual_low", "volume_breakout"]
+    assert second["strategies"]["dual_low"]["bucket"] == "defensive"
+    assert second["strategies"]["capital_heat"]["bucket"] == "aggressive"
+
+    report = (tmp_path / "latest_report.md").read_text(encoding="utf-8")
+    assert "（兼 防守）" in report

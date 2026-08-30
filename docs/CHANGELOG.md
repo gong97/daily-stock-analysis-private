@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 观察名单改为保存逐策略背书（`strategies: {策略名: {score, last_seen, bucket}}`），`bucket` / `buckets` 变成派生属性。此前 `bucket` 是存储字段，跨运行会被最后一轮无条件覆盖：周一 daily 跑成 aggressive、周五 weekly 跑成 defensive，连带 TTL（14↔45 天）与行业配额（4↔2）一起漂移。主桶按 `aggressive > balanced > defensive` 取，让衰减最快的桶治理时效；TTL 改为按每条背书自身所属桶结算，条目只要还剩任一条有效背书就保留，全部失效才算 ttl 出局（此前 `strategies` 只存分数且从不清理）。同时符合多个桶的票只在主桶列一行、只占一个名额，报告标注「兼 X」。名单 schema 升到 v2，`load_watchlist` 兼容名字列表 / `{名: 分数}` 两种旧格式并在 meta 记 `migrated_from_schema_version`；旧快照没有逐策略信息，回填成条目级取值，等各策略重新背书后 `buckets` 才准确。
+
 - [修复] 行业 provider 的板块缓存拆成成分（慢）与热度（快）两级，并改用缓存 JSON 里的 `created_at` 判过期而非文件 mtime。此前单一缓存把每天变化的板块热度和月度才变的成分绑在同一个 TTL 上：取短 TTL 则每轮重打约 162 次 akshare 请求，取长 TTL 则 `theme_heat` 因子会吃上一周前的热度；而 `actions/checkout` 会重置 mtime，使随仓库版本化的缓存按 mtime 判断永不过期。拆分后成分命中缓存时，日度热度刷新只需 2 个请求。部分板块拉取失败时本轮仍可用但不写成分缓存，避免残缺映射被固化。
 - [修复] akshare provider 路径现在也会加载并应用板块热度趋势：每次热度刷新向 `*.history.jsonl` 追加一行/板块（同一天只记一次），经 `load_board_heat_trends()` 产出 `board_heat_trend_score` / `persistence` / `cooling` / `observations`。此前这些字段只在 `INDUSTRY_MAP_FILES` 分支加载且仓库内没有任何写入方，导致依赖它们调参的策略（`theme_momentum` 的退潮惩罚）实际未生效。
 - [测试] 新增 `tests/test_screening_industry_cache.py`，以假 akshare 断言请求次数：成分缓存命中时热度刷新只发 2 个列表请求、双缓存命中时零请求，并覆盖 created_at 过期、mtime 兜底、历史按天去重与部分失败不落缓存。
