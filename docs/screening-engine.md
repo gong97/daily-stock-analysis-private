@@ -125,7 +125,7 @@ DSA 中存在两类用途不同的策略文件：
 
 | 组件 | 位置 | 职责 |
 | --- | --- | --- |
-| 名单逻辑 | `src/services/screening_watchlist.py` | 策略分层、名单合并/淘汰、STOCK_LIST 导出与报告渲染；纯逻辑，不触网 |
+| 名单逻辑 | `src/services/screening_watchlist.py` | 策略分层、名单合并/淘汰与报告渲染；纯逻辑，不触网 |
 | 编排入口 | `scripts/market_scan.py` | 按分层批量调用 `pipeline.screen()`，落盘产物、可选落库与推送 |
 | 调度 | `.github/workflows/10-market-scan.yml` | daily / weekly 两条 cron，产物提交回仓库 |
 
@@ -164,7 +164,7 @@ DSA 中存在两类用途不同的策略文件：
 | --- | --- |
 | `current.json` | 名单真源：每只票的入选策略与分数、首次/最近入选日、命中次数、行业、风险标记 |
 | `current.csv` | 同一份名单的扁平表，便于直接查看 |
-| `STOCK_LIST.txt` | 逗号分隔代码，供日报流程当作 `STOCK_LIST` 使用（`--write-stock-list`） |
+| `STOCK_LIST.txt` | 逗号分隔代码，便于手工取用（需 `--write-stock-list`）；日报流程**不**消费它 |
 | `timing.json` | 最近 20 次运行的各策略耗时 |
 | `history/<日期>-<频率>.json` | 当次各策略的原始候选与分数，用于回溯"当时为什么选它" |
 | `latest_report.md` | 最近一次的 Markdown 报告（新进 / 移出 / 当前名单 / 策略耗时） |
@@ -175,21 +175,29 @@ DSA 中存在两类用途不同的策略文件：
 按「最近得分 + 命中加分 − 陈旧扣分」排序裁剪。`pinned.txt` 中的代码不占名额也不会被裁掉，
 因此自动扫描不会冲掉手工长期跟踪的票。
 
-### 与日报的衔接
+### 与日报的关系：两条独立流水线
 
-工作流把 `data/watchlist/` 提交回仓库。日报工作流在仓库变量 `WATCHLIST_AS_STOCK_LIST=true`
-且 `data/watchlist/STOCK_LIST.txt` 非空时，优先用它作为 `STOCK_LIST`，否则维持原有的
-`STOCK_LIST_CONFIG` → runner 环境变量 → 最小默认值顺序。
+全市场扫描和日报是**互不干扰的两条线**，不共享股票列表：
 
-如果希望同时更新仓库变量 `STOCK_LIST` 本身，需要设置仓库变量 `WATCHLIST_SYNC_STOCK_LIST=true`
-并配置一个有 Variables 写权限的 PAT（`WATCHLIST_REPO_TOKEN`）——默认 `GITHUB_TOKEN` 无法修改仓库变量。
-未配置时该步骤静默跳过，名单仍以 `STOCK_LIST.txt` 形式留在仓库中。
+| | 输入 | 产出 |
+| --- | --- | --- |
+| `10-market-scan.yml` | 全市场快照 | 观察名单 + **独立的观察名单报告邮件** |
+| `00-daily-analysis.yml` | `STOCK_LIST`（= 持仓股） | 日报邮件 |
+
+观察名单**不会**写进 `STOCK_LIST`。这是刻意的：`STOCK_LIST` 是持仓股列表，
+`src/core/tiered_analysis.py` 的分层逻辑正建立在这个前提上——「该加仓 / 该减仓」
+两侧都有实际行动价值，因此不需要再和持仓求交集。一旦把扫描候选并进去，
+「该减仓」一侧对未持仓的票就失去了意义，深度复盘名额也会被无效候选占掉。
+
+扫描结果通过 `WATCHLIST_NOTIFY`（工作流里默认 `true`）走 `route_type="report"`
+推送，落在 `NOTIFICATION_REPORT_CHANNELS` 配置的渠道上。名单本身以
+`data/watchlist/` 提交回仓库，供历史回溯。
 
 ### 运行方式
 
 ```bash
 # 每周组（swing + watchlist）
-python scripts/market_scan.py --cadence weekly --write-stock-list --save-db
+python scripts/market_scan.py --cadence weekly --save-db
 
 # 每交易日组（short_term），并推送报告
 python scripts/market_scan.py --cadence daily --notify

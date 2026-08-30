@@ -157,11 +157,12 @@ jobs:
           DRY_RUN: ${{ steps.plan.outputs.dry_run }}
           FORCE_RUN: ${{ steps.plan.outputs.force_run }}
           EXPLICIT_STRATEGIES: ${{ github.event.inputs.strategies }}
-          WATCHLIST_NOTIFY: ${{ vars.WATCHLIST_NOTIFY || 'false' }}
+          # 观察名单报告邮件是本工作流的主要产出，默认发送。
+          WATCHLIST_NOTIFY: ${{ vars.WATCHLIST_NOTIFY || 'true' }}
           PYTHONUNBUFFERED: '1'
         run: |
           set -o pipefail
-          ARGS=(--cadence "$CADENCE" --market cn --write-stock-list --save-db)
+          ARGS=(--cadence "$CADENCE" --market cn --save-db)
 
           if [ -n "${EXPLICIT_STRATEGIES:-}" ]; then
             ARGS+=(--strategies "$EXPLICIT_STRATEGIES")
@@ -200,24 +201,6 @@ jobs:
           # 并发的 daily/weekly 运行可能已经推过一次，rebase 后重试一次再放弃。
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
           git push origin "HEAD:${GITHUB_REF_NAME}"
-
-      - name: 同步 STOCK_LIST 仓库变量
-        # 需要一个有 Variables 写权限的 PAT；默认 GITHUB_TOKEN 无法修改仓库变量。
-        # 未配置 WATCHLIST_REPO_TOKEN 时静默跳过，名单仍然以 STOCK_LIST.txt 形式落在仓库里。
-        if: steps.plan.outputs.dry_run != 'true' && vars.WATCHLIST_SYNC_STOCK_LIST == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.WATCHLIST_REPO_TOKEN }}
-        run: |
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "⚠️ 未配置 WATCHLIST_REPO_TOKEN，跳过 STOCK_LIST 仓库变量同步"
-            exit 0
-          fi
-          if [ ! -s data/watchlist/STOCK_LIST.txt ]; then
-            echo "⚠️ STOCK_LIST.txt 为空，跳过同步（避免把自选股清空）"
-            exit 0
-          fi
-          gh variable set STOCK_LIST --body "$(cat data/watchlist/STOCK_LIST.txt)" --repo "${GITHUB_REPOSITORY}"
-          echo "✅ 已同步 STOCK_LIST 仓库变量"
 
       - name: 上传扫描产物
         uses: actions/upload-artifact@v6

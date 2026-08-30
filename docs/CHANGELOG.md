@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-- [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`STOCK_LIST.txt`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
-- [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact；配置 `WATCHLIST_SYNC_STOCK_LIST=true` 与 `WATCHLIST_REPO_TOKEN` 后可同步更新 `STOCK_LIST` 仓库变量。
-- [改进] 日报工作流在仓库变量 `WATCHLIST_AS_STOCK_LIST=true` 且 `data/watchlist/STOCK_LIST.txt` 非空时优先使用扫描沉淀的观察名单作为 `STOCK_LIST`，否则维持原有的 `STOCK_LIST_CONFIG` → runner 环境变量 → 最小默认值顺序。
-- [文档] `docs/screening-engine.md` 补充「全市场扫描与观察名单」：分层依据、名单产物契约、与日报的衔接方式和运行方式；`.env.example` 同步新增 `WATCHLIST_*` 配置项。
+- [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。同一只票被多个策略同时选中时，`latest_score` / `latest_rank` / `cadence` / `holding_period` 统一取自得分最高的那个策略，与策略跑动顺序无关。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
+- [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact，并推送独立的观察名单报告邮件（`WATCHLIST_NOTIFY`，工作流内默认开启），主题为「📈 全市场扫描报告 - 日期」。
+- [改进] `NotificationService.send()` / `send_with_results()` 新增可选的 `email_subject`，允许非日报类报告指定自己的邮件主题；不传时行为与此前完全一致（邮件渠道仍生成默认的「股票智能分析报告」主题）。
+- [设计] 全市场扫描与日报是两条互不干扰的流水线：观察名单只通过自己的报告邮件呈现，**不会**并入日报的 `STOCK_LIST`。`STOCK_LIST` 保持为持仓股列表，这是 `src/core/tiered_analysis.py` 分层逻辑的前提——并入扫描候选会让「该减仓」一侧对未持仓的票失去意义，并挤占深度复盘名额。
+- [文档] `docs/screening-engine.md` 补充「全市场扫描与观察名单」：分层依据、名单产物契约、与日报的关系和运行方式；`.env.example` 同步新增 `WATCHLIST_*` 配置项。
 - [测试] 新增 `tests/test_screening_watchlist.py` 与 `tests/test_market_scan_script.py`，覆盖分层映射、名单合并去重、TTL/容量淘汰、pinned 保护、产物落盘和失败降级路径。
 
 - [新功能] Agent Chat 按会话持久化 Skill 选择，支持刷新和会话切换恢复，并区分省略 `skills`、显式空列表与非空选择；无持久化状态的历史会话继续使用运行时默认且不会被静默转为显式选择，复用分析 `context` 中残留的 legacy `skills` / `strategies` 也不会覆盖顶层三态或会话状态，非空但全部无效的 Skill 请求不会被当成显式空列表并清空既有选择

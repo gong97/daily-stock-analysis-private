@@ -357,7 +357,7 @@ def load_pinned_codes(path: Path) -> List[str]:
 
 
 def to_stock_list(entries: Mapping[str, WatchlistEntry], *, run_date: Optional[date] = None) -> List[str]:
-    """按名单排序输出 STOCK_LIST 用的代码序列。"""
+    """按名单排序输出逗号分隔清单用的代码序列（供 --write-stock-list 手工取用）。"""
     return [entry.code for entry in sort_entries(entries.values(), run_date=run_date)]
 
 
@@ -510,7 +510,7 @@ def expire_entries(
 def apply_pinned(entries: Mapping[str, WatchlistEntry], pinned_codes: Sequence[str]) -> Dict[str, WatchlistEntry]:
     """把手工固定的代码标记为 pinned，缺失的补一条占位条目。
 
-    这样"扫描结果写回 STOCK_LIST"不会把手工加的票冲掉。
+    这样每周重扫时，手工盯的票不会因为某次没被任何策略选中就掉出名单。
     """
     result: Dict[str, WatchlistEntry] = {code: entry for code, entry in entries.items()}
     wanted = {str(code).strip() for code in pinned_codes if str(code).strip()}

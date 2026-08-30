@@ -2548,6 +2548,7 @@ class NotificationService(
         email_stock_codes: Optional[List[str]],
         email_send_to_all: bool,
         route_type: Optional[str] = None,
+        email_subject: Optional[str] = None,
     ) -> bool:
         use_image = self._should_use_image_for_channel(channel, image_bytes)
         sanitized_content = strip_hidden_markdown_metadata(content).strip()
@@ -2577,6 +2578,14 @@ class NotificationService(
                 receivers = self.get_receivers_for_stocks(email_stock_codes)
             if use_image:
                 return self._send_email_with_inline_image(image_bytes, receivers=receivers)
+            # 只在调用方显式给了主题时才传，保持默认调用签名不变
+            # （邮件渠道自己会按日期生成默认的日报主题）。
+            if email_subject:
+                return self.send_to_email(
+                    sanitized_content,
+                    subject=email_subject,
+                    receivers=receivers,
+                )
             return self.send_to_email(
                 sanitized_content,
                 receivers=receivers,
@@ -2616,6 +2625,7 @@ class NotificationService(
         dedup_key: Optional[str] = None,
         cooldown_key: Optional[str] = None,
         structured_payload: Optional[Dict[str, Any]] = None,
+        email_subject: Optional[str] = None,
     ) -> NotificationDispatchResult:
         """
         Send a notification and return per-channel diagnostics.
@@ -2637,6 +2647,7 @@ class NotificationService(
             dedup_key: 可选稳定去重 key；未设置时使用内容 hash
             cooldown_key: 可选冷却 key；未设置时使用路由/级别默认 key
             structured_payload: 可选的个股或市场结构化结果，仅用于图片模板精确填充
+            email_subject: 可选的邮件主题；None 时由邮件渠道生成默认的日报主题
 
         Returns:
             Structured dispatch diagnostics.
@@ -2772,6 +2783,7 @@ class NotificationService(
                     email_stock_codes=email_stock_codes,
                     email_send_to_all=email_send_to_all,
                     route_type=route_type,
+                    email_subject=email_subject,
                 )
                 latency_ms = int((time.monotonic() - started_at) * 1000)
 
@@ -2834,9 +2846,14 @@ class NotificationService(
         dedup_key: Optional[str] = None,
         cooldown_key: Optional[str] = None,
         structured_payload: Optional[Dict[str, Any]] = None,
+        email_subject: Optional[str] = None,
     ) -> bool:
         """
         统一发送接口 - 向所有已配置的渠道发送。
+
+        Args:
+            email_subject: 可选的邮件主题；None 时邮件渠道生成默认的日报主题。
+                非日报类报告（如全市场扫描观察名单）应显式传入，避免主题误导。
 
         Returns:
             是否至少有一个渠道发送成功
@@ -2850,6 +2867,7 @@ class NotificationService(
             dedup_key=dedup_key,
             cooldown_key=cooldown_key,
             structured_payload=structured_payload,
+            email_subject=email_subject,
         )
         return bool(result.success)
 

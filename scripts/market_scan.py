@@ -5,12 +5,16 @@
 按策略 YAML 的 ``style.holding_period`` 把内置选股策略分成不同扫描频率
 （``short_term`` → daily，``swing`` / ``watchlist`` → weekly），逐个跑
 ``src.services.screening.pipeline.screen()`` 的全市场扫描，把候选合并进
-``data/watchlist/current.json``，并按需写回 ``STOCK_LIST``、落库和推送通知。
+``data/watchlist/current.json``，落库并推送独立的观察名单报告。
+
+观察名单是独立于日报的一条流水线：它**不会**写进日报的 ``STOCK_LIST``。
+``STOCK_LIST`` 是持仓股列表（见 ``src/core/tiered_analysis.py`` 的前提），
+把扫描候选并进去会让「该减仓」一侧对未持仓的票失去意义。
 
 使用方法::
 
     python scripts/market_scan.py --cadence weekly
-    python scripts/market_scan.py --cadence daily --notify --write-stock-list
+    python scripts/market_scan.py --cadence daily --notify
     python scripts/market_scan.py --strategies dual_low,quality_value --dry-run
 
 默认关闭 LLM 重排（``--use-llm`` 开启），因此单次扫描不消耗 LLM 额度，
@@ -134,7 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--write-stock-list",
         action="store_true",
-        help="把名单写成 STOCK_LIST.txt（逗号分隔），供日报流程消费",
+        help="额外导出一份逗号分隔的 STOCK_LIST.txt，便于手工取用；日报流程不消费它",
     )
     parser.add_argument(
         "--dry-run",
@@ -256,6 +260,8 @@ def _notify(report: str, *, run_date: date, cadence: str) -> None:
             # 观察名单属于报告类通知，走 NOTIFICATION_REPORT_CHANNELS 的渠道过滤。
             route_type="report",
             dedup_key=f"market_scan:{cadence}:{format_date(run_date)}",
+            # 显式指定主题，否则邮件渠道会套用日报的「股票智能分析报告」。
+            email_subject=f"📈 全市场扫描报告 - {format_date(run_date)}",
         )
         logger.info("观察名单报告推送%s", "成功" if sent else "失败（无可用渠道）")
     except Exception as exc:

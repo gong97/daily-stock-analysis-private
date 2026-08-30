@@ -2066,6 +2066,39 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         )
 
     @mock.patch("src.notification.get_config")
+    def test_email_subject_is_forwarded_when_caller_supplies_one(
+        self, mock_get_config: mock.MagicMock
+    ):
+        """非日报类报告（如全市场扫描）显式传入的主题要落到邮件渠道。"""
+        cfg = _make_config(
+            email_sender="user@qq.com",
+            email_password="PASS",
+            email_receivers=["default@example.com"],
+        )
+        mock_get_config.return_value = cfg
+
+        service = NotificationService()
+        service.send_to_email = mock.MagicMock(return_value=True)
+
+        subject = "📈 全市场扫描报告 - 2026-08-29"
+        ok = service._send_to_static_channel(
+            NotificationChannel.EMAIL,
+            "# Market Scan\n\nBody",
+            image_bytes=None,
+            email_stock_codes=None,
+            email_send_to_all=False,
+            route_type="report",
+            email_subject=subject,
+        )
+
+        self.assertTrue(ok)
+        service.send_to_email.assert_called_once_with(
+            "# Market Scan\n\nBody",
+            subject=subject,
+            receivers=None,
+        )
+
+    @mock.patch("src.notification.get_config")
     def test_static_text_channels_strip_hidden_market_metadata_before_sender(
         self, mock_get_config: mock.MagicMock
     ):
