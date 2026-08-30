@@ -25,7 +25,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-08-31T05:05:38+08:00",
+    "updated_at": "2026-08-31T05:32:22+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -33,7 +33,7 @@
     },
     "migrated_from_schema_version": 1,
     "industry_quota_effective": true,
-    "industry_missing_count": 5,
+    "industry_missing_count": 0,
     "max_per_industry_total": 3,
     "industry_backfilled_from_map": 5
   },
@@ -61,17 +61,17 @@
       "risk_flags": [],
       "strategies": {
         "balanced_alpha": {
-          "score": 76.303,
+          "score": 78.6563,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         },
         "blue_chip_income": {
-          "score": 78.0628,
+          "score": 76.0107,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
         },
         "low_volatility_quality": {
-          "score": 73.4132,
+          "score": 73.975,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
         },
@@ -84,6 +84,11 @@
           "score": 84.6404,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
+        },
+        "shrink_pullback": {
+          "score": 76.9339,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
         }
       },
       "pinned": false
@@ -140,7 +145,7 @@
       "risk_flags": [],
       "strategies": {
         "blue_chip_income": {
-          "score": 80.2788,
+          "score": 79.8401,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
         },
@@ -155,7 +160,7 @@
           "bucket": "defensive"
         },
         "balanced_alpha": {
-          "score": 76.3005,
+          "score": 79.5734,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -176,9 +181,9 @@
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 6,
-      "latest_score": 81.6611,
+      "latest_score": 81.4672,
       "best_score": 84.372,
-      "latest_rank": 2,
+      "latest_rank": 5,
       "price": 9.3,
       "change_pct": -2.62,
       "risk_level": "low",
@@ -210,64 +215,46 @@
       "pinned": false
     },
     {
-      "code": "600016",
-      "name": "民生银行",
-      "holding_period": "watchlist",
+      "code": "601318",
+      "name": "中国平安",
+      "holding_period": "swing",
       "cadence": "weekly",
-      "bucket": "defensive",
+      "bucket": "balanced",
       "buckets": [
+        "balanced",
         "defensive"
       ],
-      "industry": "银行",
+      "industry": "非银行金融",
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
-      "hit_count": 5,
-      "latest_score": 83.1542,
-      "best_score": 83.1542,
-      "latest_rank": 5,
-      "price": 3.42,
-      "change_pct": -0.58,
+      "hit_count": 6,
+      "latest_score": 80.8503,
+      "best_score": 80.8503,
+      "latest_rank": 1,
+      "price": 55.85,
+      "change_pct": -0.04,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "dual_low": {
-          "score": 83.1542,
+        "balanced_alpha": {
+          "score": 76.4879,
           "last_seen": "2026-08-31",
-          "bucket": "defensive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "601328",
-      "name": "交通银行",
-      "holding_period": "watchlist",
-      "cadence": "weekly",
-      "bucket": "defensive",
-      "buckets": [
-        "defensive"
-      ],
-      "industry": "银行",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-08-31",
-      "hit_count": 5,
-      "latest_score": 82.7985,
-      "best_score": 82.7985,
-      "latest_rank": 5,
-      "price": 7.1,
-      "change_pct": 0.42,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "blue_chip_income": {
-          "score": 80.3243,
+          "bucket": "balanced"
+        },
+        "low_volatility_quality": {
+          "score": 80.8503,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
         },
-        "quality_value": {
-          "score": 82.7985,
+        "momentum_quality": {
+          "score": 73.4915,
           "last_seen": "2026-08-31",
-          "bucket": "defensive"
+          "bucket": "balanced"
+        },
+        "shrink_pullback": {
+          "score": 79.9735,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
         }
       },
       "pinned": false
@@ -285,9 +272,9 @@
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 6,
-      "latest_score": 80.2594,
-      "best_score": 80.3706,
-      "latest_rank": 4,
+      "latest_score": 80.7949,
+      "best_score": 80.7949,
+      "latest_rank": 1,
       "price": 31.77,
       "change_pct": -0.72,
       "risk_level": "low",
@@ -296,7 +283,7 @@
       ],
       "strategies": {
         "blue_chip_income": {
-          "score": 77.2254,
+          "score": 80.7949,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
         },
@@ -304,46 +291,6 @@
           "score": 80.2594,
           "last_seen": "2026-08-31",
           "bucket": "defensive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "601318",
-      "name": "中国平安",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced",
-        "defensive"
-      ],
-      "industry": "非银行金融",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-08-31",
-      "hit_count": 6,
-      "latest_score": 79.7732,
-      "best_score": 79.7732,
-      "latest_rank": 1,
-      "price": 55.85,
-      "change_pct": -0.04,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "balanced_alpha": {
-          "score": 76.4879,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        },
-        "low_volatility_quality": {
-          "score": 79.7732,
-          "last_seen": "2026-08-31",
-          "bucket": "defensive"
-        },
-        "momentum_quality": {
-          "score": 73.4915,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
         }
       },
       "pinned": false
@@ -389,35 +336,6 @@
       "pinned": false
     },
     {
-      "code": "600309",
-      "name": "万华化学",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "化学原料",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-08-31",
-      "hit_count": 6,
-      "latest_score": 76.5614,
-      "best_score": 76.5614,
-      "latest_rank": 1,
-      "price": 78.04,
-      "change_pct": 2.79,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "shrink_pullback": {
-          "score": 76.5614,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "000783",
       "name": "长江证券",
       "holding_period": "swing",
@@ -447,6 +365,35 @@
       "pinned": false
     },
     {
+      "code": "600309",
+      "name": "万华化学",
+      "holding_period": "swing",
+      "cadence": "weekly",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "化学原料",
+      "first_seen": "2026-08-30",
+      "last_seen": "2026-08-31",
+      "hit_count": 6,
+      "latest_score": 75.6207,
+      "best_score": 76.5614,
+      "latest_rank": 4,
+      "price": 78.04,
+      "change_pct": 2.79,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "shrink_pullback": {
+          "score": 75.6207,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "000807",
       "name": "云铝股份",
       "holding_period": "swing",
@@ -459,47 +406,18 @@
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 6,
-      "latest_score": 75.6533,
+      "latest_score": 74.9968,
       "best_score": 75.6533,
-      "latest_rank": 3,
+      "latest_rank": 5,
       "price": 27.23,
       "change_pct": 2.02,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "shrink_pullback": {
-          "score": 75.6533,
+          "score": 74.9968,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "601288",
-      "name": "农业银行",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "defensive",
-      "buckets": [
-        "defensive"
-      ],
-      "industry": "银行",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-08-31",
-      "hit_count": 5,
-      "latest_score": 76.2829,
-      "best_score": 76.2829,
-      "latest_rank": 5,
-      "price": 6.79,
-      "change_pct": 0.0,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "low_volatility_quality": {
-          "score": 76.2829,
-          "last_seen": "2026-08-31",
-          "bucket": "defensive"
         }
       },
       "pinned": false
@@ -597,28 +515,33 @@
       "pinned": false
     },
     {
-      "code": "600030",
-      "name": "中信证券",
-      "holding_period": "swing",
+      "code": "002432",
+      "name": "九安医疗",
+      "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "balanced",
       "buckets": [
         "balanced"
       ],
-      "industry": "非银行金融",
-      "first_seen": "2026-08-30",
+      "industry": "医疗器械",
+      "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
-      "hit_count": 5,
-      "latest_score": 73.2227,
-      "best_score": 73.2227,
-      "latest_rank": 4,
-      "price": 27.93,
-      "change_pct": 0.0,
+      "hit_count": 1,
+      "latest_score": 80.1072,
+      "best_score": 80.1072,
+      "latest_rank": 1,
+      "price": 67.86,
+      "change_pct": -2.23,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
+        "balanced_alpha": {
+          "score": 80.1072,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
         "momentum_quality": {
-          "score": 73.2227,
+          "score": 72.1579,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -655,33 +578,117 @@
       "pinned": false
     },
     {
-      "code": "002432",
-      "name": "九安医疗",
+      "code": "000425",
+      "name": "徐工机械",
       "holding_period": "watchlist",
       "cadence": "weekly",
       "bucket": "balanced",
       "buckets": [
         "balanced"
       ],
-      "industry": "医疗器械",
+      "industry": "专用设备",
       "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
       "hit_count": 1,
-      "latest_score": 76.8918,
-      "best_score": 76.8918,
+      "latest_score": 78.5127,
+      "best_score": 78.5127,
+      "latest_rank": 4,
+      "price": 7.95,
+      "change_pct": -0.75,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "momentum_quality": {
+          "score": 74.82,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "balanced_alpha": {
+          "score": 78.5127,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "002241",
+      "name": "歌尔股份",
+      "holding_period": "watchlist",
+      "cadence": "weekly",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "电子设备制造",
+      "first_seen": "2026-08-31",
+      "last_seen": "2026-08-31",
+      "hit_count": 1,
+      "latest_score": 78.047,
+      "best_score": 78.047,
+      "latest_rank": 5,
+      "price": 23.51,
+      "change_pct": -1.59,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "shrink_pullback": {
+          "score": 70.7933,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "balanced_alpha": {
+          "score": 78.047,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "000651",
+      "name": "格力电器",
+      "holding_period": "swing",
+      "cadence": "weekly",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced",
+        "defensive"
+      ],
+      "industry": "白色家电",
+      "first_seen": "2026-08-31",
+      "last_seen": "2026-08-31",
+      "hit_count": 1,
+      "latest_score": 76.6262,
+      "best_score": 76.6262,
       "latest_rank": 3,
-      "price": 67.86,
-      "change_pct": -2.23,
+      "price": 39.0,
+      "change_pct": -0.69,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "balanced_alpha": {
-          "score": 76.8918,
+          "score": 76.1759,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         },
+        "low_volatility_quality": {
+          "score": 72.9168,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
         "momentum_quality": {
-          "score": 72.1579,
+          "score": 72.4095,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "blue_chip_income": {
+          "score": 75.0256,
+          "last_seen": "2026-08-31",
+          "bucket": "defensive"
+        },
+        "shrink_pullback": {
+          "score": 76.6262,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -718,35 +725,6 @@
       "pinned": false
     },
     {
-      "code": "000425",
-      "name": "徐工机械",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "专用设备",
-      "first_seen": "2026-08-31",
-      "last_seen": "2026-08-31",
-      "hit_count": 1,
-      "latest_score": 74.82,
-      "best_score": 74.82,
-      "latest_rank": 3,
-      "price": 7.95,
-      "change_pct": -0.75,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "momentum_quality": {
-          "score": 74.82,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "000100",
       "name": "TCL科技",
       "holding_period": "swing",
@@ -769,46 +747,6 @@
       "strategies": {
         "momentum_quality": {
           "score": 73.5546,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "000651",
-      "name": "格力电器",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced",
-        "defensive"
-      ],
-      "industry": "白色家电",
-      "first_seen": "2026-08-31",
-      "last_seen": "2026-08-31",
-      "hit_count": 1,
-      "latest_score": 72.7728,
-      "best_score": 76.1759,
-      "latest_rank": 4,
-      "price": 39.0,
-      "change_pct": -0.69,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "balanced_alpha": {
-          "score": 76.1759,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        },
-        "low_volatility_quality": {
-          "score": 72.7728,
-          "last_seen": "2026-08-31",
-          "bucket": "defensive"
-        },
-        "momentum_quality": {
-          "score": 72.4095,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -845,30 +783,30 @@
       "pinned": false
     },
     {
-      "code": "002241",
-      "name": "歌尔股份",
+      "code": "600028",
+      "name": "中国石化",
       "holding_period": "swing",
       "cadence": "weekly",
-      "bucket": "balanced",
+      "bucket": "defensive",
       "buckets": [
-        "balanced"
+        "defensive"
       ],
-      "industry": "电子设备制造",
+      "industry": "石油天然气",
       "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
       "hit_count": 1,
-      "latest_score": 70.7933,
-      "best_score": 70.7933,
+      "latest_score": 70.205,
+      "best_score": 70.205,
       "latest_rank": 5,
-      "price": 23.51,
-      "change_pct": -1.59,
+      "price": 5.46,
+      "change_pct": 3.21,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": {
-          "score": 70.7933,
+        "low_volatility_quality": {
+          "score": 70.205,
           "last_seen": "2026-08-31",
-          "bucket": "balanced"
+          "bucket": "defensive"
         }
       },
       "pinned": false
