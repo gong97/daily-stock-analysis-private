@@ -403,8 +403,11 @@ def merge_run(
 ) -> Tuple[Dict[str, WatchlistEntry], List[str]]:
     """把一次扫描的候选并入名单。
 
-    同一只票被多个策略选中时按最高分记录 `latest_score`，`hit_count` 每次扫描
-    最多 +1（不按策略数重复累加），避免多策略同时命中把命中次数灌水。
+    同一只票被多个策略选中时按最高分记录 `latest_score`，`latest_rank` /
+    `cadence` / `holding_period` 一并取自那个最高分策略，而不是最后跑完的那个
+    —— 否则名单里的扫描频率会变成"策略名字母序最后一个"，与实际代表性无关。
+    `hit_count` 每次扫描最多 +1（不按策略数重复累加），避免多策略同时命中把
+    命中次数灌水。
 
     Returns:
         `(合并后的名单, 本次新进入的代码)`
@@ -439,15 +442,17 @@ def merge_run(
                 # 同一次扫描内先归零，后续策略再按最高分覆盖。
                 entry.latest_score = score
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
+                entry.cadence = cadence
+                entry.holding_period = holding_period
             elif score > entry.latest_score:
                 entry.latest_score = score
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
+                entry.cadence = cadence
+                entry.holding_period = holding_period
 
             entry.last_seen = run_date_text
             entry.best_score = max(entry.best_score, score)
             entry.strategies[strategy] = score
-            entry.cadence = cadence
-            entry.holding_period = holding_period
             entry.name = str(pick.get("name") or "") or entry.name
             entry.industry = str(pick.get("industry") or "") or entry.industry
             entry.price = _as_float(pick.get("price"), entry.price)

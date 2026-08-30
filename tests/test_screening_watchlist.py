@@ -149,6 +149,24 @@ def test_merge_run_counts_one_hit_per_run_even_with_multiple_strategies():
     assert sorted(entry.strategies) == ["dual_low", "quality_value"]
 
 
+def test_merge_run_takes_cadence_from_highest_scoring_strategy():
+    """cadence / holding_period 跟随最高分策略，与策略跑动顺序无关。"""
+    high = ("capital_heat", "short_term", 90.0)   # → daily
+    low = ("momentum_quality", "swing", 10.0)     # → weekly
+    for first, second in ((high, low), (low, high)):
+        entries, _ = merge_run(
+            {},
+            {name: [_pick("600519", score=score)] for name, _, score in (first, second)},
+            run_date=RUN_DATE,
+            holding_periods={name: period for name, period, _ in (first, second)},
+            cadence_map=DEFAULT_CADENCE_MAP,
+        )
+        entry = entries["600519"]
+        assert entry.latest_score == 90.0
+        assert entry.cadence == "daily"
+        assert entry.holding_period == "short_term"
+
+
 def test_merge_run_second_run_increments_hit_and_keeps_best_score():
     entries, _ = merge_run(
         {},
