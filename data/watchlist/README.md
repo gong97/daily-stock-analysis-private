@@ -14,6 +14,7 @@
 | `history/` | 脚本 | 每次运行的原始候选与分数 |
 | `latest_report.md` | 脚本 | 最近一次的 Markdown 报告 |
 | `pinned.txt` | 人工 | 手工固定的代码，永不淘汰且排在名单最前 |
+| `cache/industry/` | 脚本 | akshare 行业/概念板块映射缓存，随仓库版本化以避免每轮重打约 162 次请求 |
 
 除 `pinned.txt` 外的文件都会被下一次扫描覆盖，不要手工编辑。
 
@@ -23,3 +24,5 @@
 
 `pinned.txt` 里刚加、还没被任何策略扫中的代码会以空壳条目进入名单
 （无名称/行业/价格，分数为 0），下次被扫中时才补齐这些字段。
+
+行业映射缓存的 TTL 判定用文件 mtime，而 `actions/checkout` 每次都会把 mtime 重置成"刚刚"，因此提交进仓库的缓存在 runner 上不会自动过期。需要刷新时用 workflow_dispatch 的`refresh_industry_map=true`（建议每月一次）。

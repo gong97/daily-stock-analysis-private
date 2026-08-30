@@ -1,0 +1,129 @@
+# 主题动能策略（DSA 原生，非 AlphaSift 衍生）
+# 策略库整体偏防守：10 个策略里 6 个把当日涨幅上限卡在 +5% 以内，
+# 且 value / stability 因子合计权重普遍过半。本策略是显式的进攻侧补充。
+#
+# 与另外两个进攻策略的分工：
+#   capital_heat    —— activity 主导，看个股资金活跃度，不要求板块有热度
+#   volume_breakout —— 需要日 K 形态（放量突破），因此只扫描 Top-N 子集
+#   theme_momentum  —— theme_heat 主导，看板块升温与持续性；不依赖日 K，
+#                      因此保留完整的全市场覆盖，能抓到热点向中小盘扩散的阶段
+#
+# 依赖 INDUSTRY_PROVIDER 提供板块数据：没有行业/板块热度时 theme_heat 与
+# topic_alignment 会退化成常数，本策略就失去了区分度（会退化成一个偏弱的
+# 量价动能策略）。data_requirements 会自动标记 industry_context。
+name: theme_momentum
+display_name: 主题动能
+description: 板块升温扩散中的量价共振候选，容忍追高但拒绝退潮接盘
+version: "1.0"
+category: momentum
+tags: [momentum, theme, capital_flow, short_term, aggressive]
+analysis_skills: [hot_theme, emotion_cycle, dragon_head]
+style:
+  risk_profile: aggressive
+  holding_period: short_term
+  execution_style: momentum
+  market_regime: [risk_on, trend, rotation]
+  capital_profile: medium_liquidity
+  ui_badge: 主题
+
+screening:
+  enabled: true
+  market_scope: [cn]
+  hard_filters:
+    exclude_st: true
+    # 成交额 2 亿：低于 capital_heat 的 3 亿，热点扩散阶段的中小盘还没放到那么大量
+    amount_min: 200000000
+    # 市值 30 亿 ~ 800 亿。上限是本策略的核心：这是纯配置下唯一能把大盘蓝筹
+    # 挡在门外的手段，也是整个策略库里第一个使用 market_cap_max 的地方。
+    # 没有它，低 PE / 低波动 / 大成交额的银行会继续在因子层占优。
+    market_cap_min: 3000000000
+    market_cap_max: 80000000000
+    turnover_rate_min: 3.0
+    volume_ratio_min: 1.3
+    change_pct_min: 0.5
+    change_pct_max: 9.5
+    price_min: 4
+    price_max: 300
+    # 刻意不配 pe_ttm_* / pb_*：硬过滤会把 NaN 一并淘汰，配了 pe_ttm_min 就等于
+    # 把所有亏损的成长股直接剔除，这与本策略的定位冲突。估值由风险层温和处理。
+  tech_weight: 0.7
+  factor_weights:
+    # 不配 value：亏损股在 _compute_value_score 里拿 na_score=25，
+    # 给 value 任何权重都会系统性压制成长股。
+    theme_heat: 0.27
+    momentum: 0.25
+    activity: 0.20
+    topic_alignment: 0.13
+    liquidity: 0.10
+    stability: 0.05
+    # 不配 size：size 是 log10(总市值) 的分位排名且越大越高分，
+    # 与本策略的中小盘定位相反；市值区间已由硬过滤限定。
+  scoring_profile:
+    # —— 允许追高：默认 5.0 起扣、斜率 8.0，这里推迟起点并把斜率减半 ——
+    momentum_chase_start_pct: 7.0
+    momentum_chase_penalty_slope: 6.0
+    # —— 活跃度理想区间整体上移 ——
+    activity_ideal_volume_ratio: 3.0
+    activity_high_volume_ratio: 8.0
+    activity_ideal_turnover_rate: 7.0
+    activity_high_turnover_rate: 20.0
+    # —— 稳定性只保留极端情况的约束 ——
+    stability_hot_change_pct: 9.0
+    stability_invalid_pe_penalty: 2.0
+    # —— 板块动能：升温加分加重、退潮惩罚加得更重 ——
+    # "拒绝接盘"就体现在 cooling 的斜率和上限都高于 trend 的对应值。
+    theme_heat_trend_slope: 1.2
+    theme_heat_trend_bonus_cap: 14.0
+    theme_heat_persistence_slope: 0.12
+    theme_heat_persistence_bonus_cap: 9.0
+    theme_heat_cooling_penalty_slope: 1.4
+    theme_heat_cooling_penalty_cap: 18.0
+    theme_heat_cooling_score_penalty_slope: 1.0
+    theme_heat_cooling_score_penalty_cap: 15.0
+    # 过热阈值抬到 94（默认 88、capital_heat 92）：本策略本来就在追热度，
+    # 但极端过热的板块仍然扣分。
+    theme_heat_overheat_score: 94.0
+    theme_heat_overheat_penalty_slope: 0.4
+  risk_profile:
+    # 风险层默认会把追高、放量、高换手全部扣一遍（最多 12 分），
+    # 不放宽阈值的话，前面在因子层的进攻设定会被这里原样扣回去。
+    chase_change_pct: 9.4
+    abnormal_volume_ratio: 9.0
+    high_turnover_rate: 25.0
+    # 成长股的常态：PE 为负或缺失、PB 偏高。默认分别扣 3.0 / 2.0 分。
+    invalid_pe_points: 0.5
+    high_pb: 20.0
+    high_pb_points: 1.0
+    weak_signal_score: 35.0
+  portfolio_profile:
+    # 单策略内的分散：同一主题最多 1 只，避免 5 个名额全在一个板块里。
+    # 跨策略的集中度由观察名单的 WATCHLIST_MAX_PER_INDUSTRY 兜底。
+    max_same_bucket: 1
+    concentration_penalty: 5.0
+    buckets:
+      AI算力: [AI算力, 算力, 数据中心, 服务器, 光模块, 光通信, CPO, 液冷]
+      半导体: [半导体, 芯片, 集成电路, 封装测试, 存储, 先进封装]
+      机器人: [机器人, 减速器, 执行器, 伺服, 人形机器人]
+      消费电子: [消费电子, 手机产业链, PCB, 面板, 光学]
+      新能源: [新能源, 光伏, 锂电, 电池, 储能, 风电]
+      医药: [创新药, 生物医药, CXO, 医疗器械]
+      军工: [军工, 航天, 航空, 兵装, 卫星]
+      汽车: [汽车零部件, 智能驾驶, 一体化压铸]
+  scorecard_profile:
+    # L3 本地评分默认会对"高活跃 + 低稳定"打 hot_money_instability，
+    # 而这恰好是本策略的目标形态，因此把触发线抬高、惩罚调轻。
+    capital_confirmed_bonus: 2.6
+    capital_confirmed_momentum_min: 60.0
+    capital_confirmed_activity_min: 60.0
+    hot_money_activity_min: 96.0
+    hot_money_stability_max: 20.0
+    hot_money_penalty: 1.0
+    volume_spike_ratio: 9.0
+    volume_spike_penalty: 1.5
+  ranking_hints: |
+    优先关注：
+    1. 板块正在升温且有持续性，而不是单日脉冲后已经开始退潮
+    2. 个股的量价配合与板块热度同步，避免板块热但个股滞涨的伪跟随
+    3. 主题有向中小市值扩散的迹象，龙头已经透支时优先次新梯队
+    4. 明确排除低估值防守型标的——它们由 dual_low / quality_value 覆盖
+  max_output: 5

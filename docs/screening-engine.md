@@ -138,7 +138,7 @@ DSA 中存在两类用途不同的策略文件：
 
 | holding_period | 频率 | 内置策略 |
 | --- | --- | --- |
-| `short_term` | daily（每交易日 17:30 北京时间） | `capital_heat`、`oversold_reversal`、`volume_breakout` |
+| `short_term` | daily（每交易日 17:30 北京时间） | `capital_heat`、`oversold_reversal`、`volume_breakout`、`theme_momentum` |
 | `swing` | weekly（每周五 18:30 北京时间） | `momentum_quality`、`low_volatility_quality`、`shrink_pullback` |
 | `watchlist` | weekly | `balanced_alpha`、`quality_value`、`dual_low`、`blue_chip_income` |
 
@@ -169,9 +169,11 @@ DSA 中存在两类用途不同的策略文件：
 | `history/<日期>-<频率>.json` | 当次各策略的原始候选与分数，用于回溯"当时为什么选它" |
 | `latest_report.md` | 最近一次的 Markdown 报告（新进 / 移出 / 当前名单 / 策略耗时） |
 | `pinned.txt` | 手工固定的代码（每行一个，`#` 为注释），永不淘汰且排在名单最前 |
+| `cache/industry/` | akshare 行业板块映射缓存，随仓库版本化 |
 
 名单维护规则：同一次扫描被多个策略同时选中只算一次命中；超过 `WATCHLIST_TTL_DAYS`（默认 30 天）
-没有再被任何策略选中即移出；名单规模上限 `WATCHLIST_MAX_SIZE`（默认 60），
+没有再被任何策略选中即移出；同一行业最多保留 `WATCHLIST_MAX_PER_INDUSTRY` 只（默认 2）；
+名单规模上限 `WATCHLIST_MAX_SIZE`（默认 60），
 按「最近得分 + 命中加分 − 陈旧扣分」排序裁剪。`pinned.txt` 中的代码不占名额也不会被裁掉，
 因此自动扫描不会冲掉手工长期跟踪的票。
 
@@ -192,6 +194,97 @@ DSA 中存在两类用途不同的策略文件：
 扫描结果通过 `WATCHLIST_NOTIFY`（工作流里默认 `true`）走 `route_type="report"`
 推送，落在 `NOTIFICATION_REPORT_CHANNELS` 配置的渠道上。名单本身以
 `data/watchlist/` 提交回仓库，供历史回溯。
+
+### 进攻侧策略 `theme_momentum`
+
+策略库整体偏防守——10 个原生策略里 6 个把当日涨幅上限卡在 +5% 以内，`value` + `stability`
+合计权重普遍过半，因此 weekly 名单会系统性地被低估值大盘股占满（首次实跑 19 只里 9 只银行）。
+`theme_momentum` 是显式的进攻侧补充，DSA 原生、非 AlphaSift 衍生。
+
+它和另外两个进攻策略的分工：
+
+| 策略 | 主导因子 | 是否需日 K | 覆盖范围 |
+| --- | --- | --- | --- |
+| `capital_heat` | activity 0.28 | 否 | 全市场 |
+| `volume_breakout` | 日 K 形态 | **是** | 硬筛后 Top-N 子集 |
+| `theme_momentum` | theme_heat 0.27 | 否 | **全市场** |
+
+两个设计要点：
+
+- **`market_cap_max: 800 亿`** —— 这是纯配置下唯一能把大盘蓝筹挡在门外的手段，
+  也是整个策略库里第一处使用该字段。没有它，低 PE / 低波动 / 大成交额的银行会继续在因子层占优。
+- **不配任何 `pe_ttm_*` / `pb_*`，也不给 `value` 权重** —— 硬过滤会连同 NaN 一起淘汰
+  （`series.notna()`），配了 `pe_ttm_min` 就等于把所有亏损成长股直接剔除；而
+  `_compute_value_score` 对 PE≤0 给 `na_score=25`，给 `value` 任何权重都会系统性压制成长股。
+  估值风险改由 `risk_profile` 温和处理（`invalid_pe_points` 3.0 → 0.5，`high_pb` 8 → 20）。
+
+进攻需要**五层同时调**，否则设定会被下游原样扣回去：硬筛的 `change_pct_max`、
+`momentum_chase_start_pct` / `_penalty_slope`、`stability` 权重、风险层的 `chase_change_pct`、
+以及 L3 scorecard 的 `hot_money_penalty` / `volume_spike_penalty`。该策略五层都做了对应放宽。
+
+"拒绝退潮接盘"体现在 `theme_heat_cooling_penalty_slope`（1.4）高于
+`theme_heat_trend_slope`（1.2），惩罚上限（18）也高于加分上限（14）。
+
+该策略依赖 `INDUSTRY_PROVIDER` 提供板块数据，`data_requirements` 会自动标记
+`industry_context`；没有行业数据时 `theme_heat` 与 `topic_alignment` 退化成常数，
+它会失去区分度。它也是第一个使用 `topic_alignment` 因子的策略。
+
+### 名单分桶：防守 / 均衡 / 进攻
+
+名单按策略 YAML 的 `style.risk_profile` 分成三个桶，**TTL、行业配额和容量都按桶独立结算**：
+
+| bucket | 策略 |
+| --- | --- |
+| `defensive` | blue_chip_income、dual_low、low_volatility_quality、quality_value |
+| `balanced` | balanced_alpha、momentum_quality、oversold_reversal、shrink_pullback |
+| `aggressive` | capital_heat、theme_momentum、volume_breakout |
+
+**为什么必须分桶**：`latest_score` 来自 `_rank_score(..., pct=True)`，是**该策略硬筛存活池内的
+分位排名**。`dual_low` 池子里 239 只票的 84 分，和 `theme_momentum` 池子里几十只票的 84 分
+不是一回事。全局排序会让两把不同的尺子争同一批名额——而防守策略在数量上占优
+（11 个策略里 4 个 defensive、4 个 balanced），进攻票会被系统性挤掉。
+
+分桶不等于拆成两份名单：一只票同时被 `dual_low` 和 `theme_momentum` 选中（既便宜又有资金关注）
+是最值得看的信号，只有在一份数据里才看得见。`bucket` 与 `cadence` 也是两根不同的轴——
+`oversold_reversal` 是 `balanced` 但跑 daily，不能拿 cadence 代替。
+
+各桶默认限额：
+
+| | TTL | 容量 | 同行业上限 |
+| --- | --- | --- | --- |
+| `defensive` | 45 天 | 25 | 2 |
+| `balanced` | 30 天 | 20 | 2 |
+| `aggressive` | **14 天** | 15 | **4** |
+
+进攻桶 TTL 更短（short_term 信号两周后基本失效）、行业配额更松（热点扩散天然是同板块多只，
+卡 2 只会砍掉信号本身）。三桶容量合计 60，与拆桶前的全局上限一致。
+
+`WATCHLIST_TTL_DAYS` / `WATCHLIST_MAX_SIZE` / `WATCHLIST_MAX_PER_INDUSTRY` 三项都支持
+留空（用默认）、`"30"`（三桶统一）、`"30,aggressive:10"`（默认加覆盖）、
+`"defensive:45,balanced:30,aggressive:14"`（逐桶指定）四种写法，逐桶配置总是覆盖统一默认值，
+与书写顺序无关。未知 `risk_profile` 落到 `balanced`。
+
+报告和 `current.csv` 都按桶分段输出，并明确标注分数不可跨桶比较。
+
+### 跨策略行业配额
+
+选股引擎的 `apply_portfolio_overlay` 只在**单个策略内部**生效：即使 `balanced_alpha` 的
+`portfolio_profile` 限制了同一 bucket 最多 1 只，7 个策略各选 1 只银行，名单里仍然会有 7 只银行。
+首次实跑就出现了这个结果——19 只候选里有 9 只银行。
+
+`WATCHLIST_MAX_PER_INDUSTRY` 补上这一层，并在**每个桶内**独立结算。淘汰顺序是 TTL → 行业配额 → 容量上限：
+行业配额腾出的名额会让给其他行业的候选，而不是浪费掉。`pinned` 条目豁免且不占名额；
+行业为空的条目不参与配额（无法分组，强行淘汰会误伤）。
+
+这层依赖行业数据，因此工作流把 `INDUSTRY_PROVIDER` 默认设为 `akshare`：**默认快照源
+`em_datacenter` 的 `sty` 参数不请求任何行业字段**，不补行业数据的话，不仅这层配额无从分组，
+策略内的 `portfolio_profile` 也整个空转、`theme_heat` 因子会退化成对所有候选相同的常数。
+
+代价是首次最多 162 次 akshare 请求（2 个板块列表 + 各 80 个板块成分，逐板块 fail-open）。
+缓存目录指向已版本化的 `data/watchlist/cache/industry`，所以这个成本不是每轮都付。
+注意缓存 TTL 判定用的是文件 mtime，而 `actions/checkout` 每次都会把 mtime 重置，
+因此提交进仓库的缓存在 runner 上不会自动过期——需要刷新时用 workflow_dispatch 的
+`refresh_industry_map=true`（建议每月一次）。
 
 ### 运行方式
 

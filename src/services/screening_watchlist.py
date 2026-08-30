@@ -36,8 +36,52 @@ DEFAULT_CADENCE_MAP: Dict[str, str] = {
 # holding_period 缺失或未知时的保守取值：宁可少跑，不要把未知策略拉成每日高频。
 FALLBACK_CADENCE = CADENCE_WEEKLY
 
+# 名单分桶：取自策略 YAML 的 style.risk_profile。
+#
+# 为什么必须分桶：`latest_score` 来自 `_rank_score(..., pct=True)`，是**该策略硬筛
+# 存活池内的分位排名**。dual_low 池子里 239 只票的 84 分，和 theme_momentum 池子里
+# 几十只票的 84 分不是一回事。全局排序会让两把不同的尺子争同一批名额，
+# 因此 TTL、行业配额和容量都按桶独立执行。
+BUCKET_DEFENSIVE = "defensive"
+BUCKET_BALANCED = "balanced"
+BUCKET_AGGRESSIVE = "aggressive"
+SUPPORTED_BUCKETS = (BUCKET_DEFENSIVE, BUCKET_BALANCED, BUCKET_AGGRESSIVE)
+# 未知 risk_profile 落到中间桶：既不会被当成可以长期留存的防守票，
+# 也不会拿到进攻桶更宽松的行业配额。
+FALLBACK_BUCKET = BUCKET_BALANCED
+
+# 标量默认值，同时作为未知桶的兜底。
 DEFAULT_TTL_DAYS = 30
 DEFAULT_MAX_SIZE = 60
+# 同一行业在名单中最多保留几只。选股引擎的组合分散只在单个策略内生效，
+# 跨策略的集中度（7 个策略各选 1 只银行）只能在这一层管。0 表示不限制。
+DEFAULT_MAX_PER_INDUSTRY = 2
+
+# 各桶的默认限额。三者的差异是有依据的：
+# - TTL：aggressive 是 short_term 信号，两周后基本失效；defensive 可以长期观察。
+# - 容量：三桶合计 60，与拆桶前的全局上限一致。
+# - 行业配额：热点扩散天然是同板块多只，进攻桶卡 2 只反而砍掉了信号本身。
+DEFAULT_TTL_DAYS_BY_BUCKET: Dict[str, int] = {
+    BUCKET_DEFENSIVE: 45,
+    BUCKET_BALANCED: 30,
+    BUCKET_AGGRESSIVE: 14,
+}
+DEFAULT_MAX_SIZE_BY_BUCKET: Dict[str, int] = {
+    BUCKET_DEFENSIVE: 25,
+    BUCKET_BALANCED: 20,
+    BUCKET_AGGRESSIVE: 15,
+}
+DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET: Dict[str, int] = {
+    BUCKET_DEFENSIVE: 2,
+    BUCKET_BALANCED: 2,
+    BUCKET_AGGRESSIVE: 4,
+}
+
+BUCKET_LABELS: Dict[str, str] = {
+    BUCKET_DEFENSIVE: "防守",
+    BUCKET_BALANCED: "均衡",
+    BUCKET_AGGRESSIVE: "进攻",
+}
 
 # 名单排序权重：以最近一次得分为主，命中多个策略/多次入选加分，长时间没再被选中扣分。
 _HIT_BONUS_PER_EXTRA_HIT = 2.0
@@ -72,6 +116,7 @@ class WatchlistEntry:
     name: str = ""
     holding_period: str = ""
     cadence: str = FALLBACK_CADENCE
+    bucket: str = FALLBACK_BUCKET
     industry: str = ""
     first_seen: str = ""
     last_seen: str = ""
@@ -92,6 +137,7 @@ class WatchlistEntry:
             "name": self.name,
             "holding_period": self.holding_period,
             "cadence": self.cadence,
+            "bucket": self.bucket,
             "industry": self.industry,
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
@@ -126,6 +172,7 @@ class WatchlistEntry:
             name=str(raw.get("name") or ""),
             holding_period=str(raw.get("holding_period") or ""),
             cadence=str(raw.get("cadence") or FALLBACK_CADENCE),
+            bucket=resolve_bucket(raw.get("bucket")),
             industry=str(raw.get("industry") or ""),
             first_seen=str(raw.get("first_seen") or ""),
             last_seen=str(raw.get("last_seen") or ""),
@@ -226,6 +273,78 @@ def parse_cadence_map(text: str) -> Dict[str, str]:
     return mapping
 
 
+def resolve_bucket(risk_profile: Any) -> str:
+    """策略 YAML 的 `style.risk_profile` → 名单分桶，未知取值落到 FALLBACK_BUCKET。"""
+    value = str(risk_profile or "").strip().lower()
+    return value if value in SUPPORTED_BUCKETS else FALLBACK_BUCKET
+
+
+def parse_bucket_limits(
+    text: Any,
+    *,
+    defaults: Mapping[str, int],
+    scalar_default: int,
+) -> Dict[str, int]:
+    """解析按桶配置的限额。
+
+    支持三种写法，可混用：
+
+    - 空 → 全部使用 `defaults`
+    - ``"30"`` → 三个桶统一 30
+    - ``"30,aggressive:10"`` → 默认 30，进攻桶覆盖为 10
+    - ``"defensive:45,balanced:30,aggressive:14"`` → 逐桶指定
+
+    非法项跳过并记录 warning，保证写错配置时退回默认值而不是直接崩。
+    """
+    limits = {bucket: int(defaults.get(bucket, scalar_default)) for bucket in SUPPORTED_BUCKETS}
+    raw = str(text or "").replace("；", ",").replace(";", ",").strip()
+    if not raw:
+        return limits
+
+    tokens = [item.strip() for item in raw.split(",") if item.strip()]
+
+    # 两趟：先套用不带桶名的统一默认值，再让逐桶配置覆盖它。
+    # 单趟顺序处理会让 "aggressive:10,30" 里的 30 反过来把 10 冲掉。
+    for token in tokens:
+        if ":" in token:
+            continue
+        parsed = _as_float(token, None)
+        if parsed is None or parsed < 0:
+            logger.warning("忽略非法的观察名单分桶限额（数值非法）: %s", token)
+            continue
+        for bucket in SUPPORTED_BUCKETS:
+            limits[bucket] = int(parsed)
+
+    for token in tokens:
+        if ":" not in token:
+            continue
+        bucket, _, value = token.partition(":")
+        bucket = bucket.strip().lower()
+        if bucket not in SUPPORTED_BUCKETS:
+            logger.warning(
+                "忽略非法的观察名单分桶限额（未知桶名，只支持 %s）: %s",
+                "/".join(SUPPORTED_BUCKETS),
+                token,
+            )
+            continue
+        parsed = _as_float(value.strip(), None)
+        if parsed is None or parsed < 0:
+            logger.warning("忽略非法的观察名单分桶限额（数值非法）: %s", token)
+            continue
+        limits[bucket] = int(parsed)
+
+    return limits
+
+
+def limit_for(limits: Any, bucket: str, *, default: int) -> int:
+    """从「标量或按桶映射」里取出某个桶的限额。"""
+    if isinstance(limits, Mapping):
+        return int(limits.get(bucket, limits.get(FALLBACK_BUCKET, default)))
+    if limits is None:
+        return default
+    return int(limits)
+
+
 def resolve_cadence(holding_period: str, cadence_map: Mapping[str, str]) -> str:
     """按 holding_period 决定扫描频率，未知取值退回 FALLBACK_CADENCE。"""
     key = str(holding_period or "").strip().lower()
@@ -314,16 +433,21 @@ def save_watchlist(path: Path, entries: Mapping[str, WatchlistEntry], meta: Mapp
 def save_watchlist_csv(path: Path, entries: Mapping[str, WatchlistEntry]) -> None:
     """导出一份便于肉眼扫的扁平表。"""
     columns = [
-        "code", "name", "industry", "cadence", "holding_period",
+        "code", "name", "industry", "bucket", "cadence", "holding_period",
         "first_seen", "last_seen", "hit_count", "latest_score", "best_score",
         "risk_level", "strategies", "pinned",
     ]
     lines: List[List[str]] = [columns]
-    for entry in sort_entries(entries.values(), run_date=None):
+    ordered: List[WatchlistEntry] = []
+    grouped = group_by_bucket(entries.values())
+    for bucket in SUPPORTED_BUCKETS:
+        ordered.extend(sort_entries(grouped[bucket].values(), run_date=None))
+    for entry in ordered:
         lines.append([
             entry.code,
             entry.name,
             entry.industry,
+            entry.bucket,
             entry.cadence,
             entry.holding_period,
             entry.first_seen,
@@ -400,11 +524,12 @@ def merge_run(
     run_date: date,
     holding_periods: Mapping[str, str],
     cadence_map: Mapping[str, str],
+    risk_profiles: Optional[Mapping[str, str]] = None,
 ) -> Tuple[Dict[str, WatchlistEntry], List[str]]:
     """把一次扫描的候选并入名单。
 
     同一只票被多个策略选中时按最高分记录 `latest_score`，`latest_rank` /
-    `cadence` / `holding_period` 一并取自那个最高分策略，而不是最后跑完的那个
+    `cadence` / `holding_period` / `bucket` 一并取自那个最高分策略，而不是最后跑完的那个
     —— 否则名单里的扫描频率会变成"策略名字母序最后一个"，与实际代表性无关。
     `hit_count` 每次扫描最多 +1（不按策略数重复累加），避免多策略同时命中把
     命中次数灌水。
@@ -420,6 +545,7 @@ def merge_run(
     for strategy, picks in picks_by_strategy.items():
         holding_period = str(holding_periods.get(strategy, "") or "")
         cadence = resolve_cadence(holding_period, cadence_map)
+        bucket = resolve_bucket((risk_profiles or {}).get(strategy))
         for pick in picks or []:
             code = str(pick.get("code") or "").strip()
             if not code:
@@ -444,11 +570,13 @@ def merge_run(
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
                 entry.cadence = cadence
                 entry.holding_period = holding_period
+                entry.bucket = bucket
             elif score > entry.latest_score:
                 entry.latest_score = score
                 entry.latest_rank = _as_optional_int(pick.get("rank"))
                 entry.cadence = cadence
                 entry.holding_period = holding_period
+                entry.bucket = bucket
 
             entry.last_seen = run_date_text
             entry.best_score = max(entry.best_score, score)
@@ -465,18 +593,119 @@ def merge_run(
     return merged, added
 
 
+def normalize_industry(value: str) -> str:
+    """行业名归一化，仅用于配额分组。空值返回空串（不参与配额）。"""
+    return str(value or "").strip().lower()
+
+
+def apply_industry_quota(
+    entries: Mapping[str, WatchlistEntry],
+    *,
+    run_date: date,
+    max_per_industry: int,
+) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
+    """限制同一行业在名单中的数量，超出的按排序靠后者淘汰。
+
+    这是**跨策略**的集中度控制。选股引擎的 `apply_portfolio_overlay` 只在单个
+    策略内部生效：7 个策略各自留 1 只银行，名单里仍然会有 7 只银行。这里补上
+    这一层。
+
+    行业为空的条目不参与配额（无法分组，强行淘汰会误伤），`pinned` 条目豁免且
+    不占用名额。
+    """
+    if max_per_industry <= 0:
+        return dict(entries), []
+
+    kept: Dict[str, WatchlistEntry] = {}
+    removed: List[Tuple[str, str]] = []
+    industry_counts: Dict[str, int] = {}
+
+    for entry in sort_entries(entries.values(), run_date=run_date):
+        industry = normalize_industry(entry.industry)
+        if entry.pinned or not industry:
+            kept[entry.code] = entry
+            continue
+        used = industry_counts.get(industry, 0)
+        if used < max_per_industry:
+            industry_counts[industry] = used + 1
+            kept[entry.code] = entry
+        else:
+            removed.append((entry.code, "industry_quota"))
+
+    return kept, removed
+
+
+def group_by_bucket(
+    entries: Iterable[WatchlistEntry],
+) -> Dict[str, Dict[str, WatchlistEntry]]:
+    """按 bucket 分组，保证三个桶的 key 都存在（可能为空）。"""
+    grouped: Dict[str, Dict[str, WatchlistEntry]] = {bucket: {} for bucket in SUPPORTED_BUCKETS}
+    for entry in entries:
+        grouped.setdefault(resolve_bucket(entry.bucket), {})[entry.code] = entry
+    return grouped
+
+
 def expire_entries(
     entries: Mapping[str, WatchlistEntry],
     *,
     run_date: date,
-    ttl_days: int = DEFAULT_TTL_DAYS,
-    max_size: int = DEFAULT_MAX_SIZE,
+    ttl_days: Any = None,
+    max_size: Any = None,
+    max_per_industry: Any = None,
 ) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
-    """按 TTL 和容量上限淘汰名单，`pinned` 条目永不淘汰。
+    """按 TTL、行业配额和容量上限淘汰名单，**每个 bucket 独立执行**。
+
+    三个限额参数都接受标量（三桶统一）或 `{bucket: 值}` 映射；传 None 使用
+    各桶的默认值。
+
+    为什么按桶独立：`latest_score` 是策略硬筛存活池内的分位排名，防守票的 84 分
+    和进攻票的 84 分不可比。全局裁剪会让两把不同的尺子争同一批名额——而防守策略
+    在数量上占优（11 个策略里 4 个 defensive、4 个 balanced），进攻票会被系统性挤掉。
+
+    桶内的三步顺序仍然是：TTL → 行业配额 → 容量，这样被行业配额腾出来的名额
+    可以让给同桶其他行业的候选，而不是白白浪费。`pinned` 条目永不淘汰且不占名额。
 
     Returns:
-        `(保留下来的名单, [(被淘汰代码, 原因)])`，原因取 `ttl` 或 `capacity`。
+        `(保留下来的名单, [(被淘汰代码, 原因)])`，原因取 `ttl`、`industry_quota`
+        或 `capacity`。
     """
+    kept: Dict[str, WatchlistEntry] = {}
+    removed: List[Tuple[str, str]] = []
+
+    for bucket, bucket_entries in group_by_bucket(entries.values()).items():
+        if not bucket_entries:
+            continue
+        bucket_kept, bucket_removed = _expire_one_bucket(
+            bucket_entries,
+            run_date=run_date,
+            ttl_days=limit_for(
+                ttl_days, bucket,
+                default=DEFAULT_TTL_DAYS_BY_BUCKET.get(bucket, DEFAULT_TTL_DAYS),
+            ),
+            max_size=limit_for(
+                max_size, bucket,
+                default=DEFAULT_MAX_SIZE_BY_BUCKET.get(bucket, DEFAULT_MAX_SIZE),
+            ),
+            max_per_industry=limit_for(
+                max_per_industry, bucket,
+                default=DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET.get(bucket, DEFAULT_MAX_PER_INDUSTRY),
+            ),
+        )
+        kept.update(bucket_kept)
+        removed.extend(bucket_removed)
+
+    return kept, removed
+
+
+def _expire_one_bucket(
+    entries: Mapping[str, WatchlistEntry],
+    *,
+    run_date: date,
+    ttl_days: int,
+    max_size: int,
+    max_per_industry: int,
+) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
+    """单个 bucket 内的 TTL → 行业配额 → 容量三步淘汰。"""
     kept: Dict[str, WatchlistEntry] = {}
     removed: List[Tuple[str, str]] = []
 
@@ -489,6 +718,13 @@ def expire_entries(
             removed.append((code, "ttl"))
             continue
         kept[code] = entry
+
+    kept, industry_removed = apply_industry_quota(
+        kept,
+        run_date=run_date,
+        max_per_industry=max_per_industry,
+    )
+    removed.extend(industry_removed)
 
     if max_size > 0:
         survivors: Dict[str, WatchlistEntry] = {}
@@ -540,7 +776,12 @@ def render_report(
     lines.append(f"# 全市场扫描观察名单（{cadence}）")
     lines.append("")
     lines.append(f"- 扫描日期：{format_date(run_date)}")
-    lines.append(f"- 名单规模：{len(entries)}")
+    grouped = group_by_bucket(entries.values())
+    distribution = "｜".join(
+        f"{BUCKET_LABELS.get(bucket, bucket)} {len(grouped[bucket])}"
+        for bucket in SUPPORTED_BUCKETS
+    )
+    lines.append(f"- 名单规模：{len(entries)}（{distribution}）")
     lines.append(f"- 本次新进：{len(added)}｜本次移出：{len(removed)}")
     total_elapsed = sum(item.elapsed_sec for item in summaries)
     lines.append(f"- 策略数：{len(summaries)}｜总耗时：{total_elapsed:.1f}s")
@@ -557,14 +798,15 @@ def render_report(
     if added:
         lines.append("## 新进入观察名单")
         lines.append("")
-        lines.append("| 代码 | 名称 | 行业 | 分数 | 策略 |")
-        lines.append("| --- | --- | --- | --- | --- |")
+        lines.append("| 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
         for code in added:
             entry = entries.get(code)
             if entry is None:
                 continue
             lines.append(
-                f"| {entry.code} | {entry.name} | {entry.industry} | "
+                f"| {BUCKET_LABELS.get(entry.bucket, entry.bucket)} | {entry.code} | "
+                f"{entry.name} | {entry.industry} | "
                 f"{entry.latest_score:.2f} | {', '.join(sorted(entry.strategies))} |"
             )
         lines.append("")
@@ -572,26 +814,47 @@ def render_report(
     if removed:
         lines.append("## 移出观察名单")
         lines.append("")
-        reason_text = {"ttl": "超过留存期", "capacity": "超出名单容量"}
+        reason_text = {
+            "ttl": "超过留存期",
+            "industry_quota": "同行业已满额",
+            "capacity": "超出名单容量",
+        }
         for code, reason in removed:
             lines.append(f"- {code}（{reason_text.get(reason, reason)}）")
         lines.append("")
 
-    lines.append("## 当前名单")
-    lines.append("")
-    lines.append("| # | 代码 | 名称 | 行业 | 最近分 | 命中 | 首次入选 | 最近入选 | 策略 |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-    for index, entry in enumerate(sort_entries(entries.values(), run_date=run_date)[:max_rows], start=1):
-        flag = "📌 " if entry.pinned else ""
-        lines.append(
-            f"| {index} | {flag}{entry.code} | {entry.name} | {entry.industry} | "
-            f"{entry.latest_score:.2f} | {entry.hit_count} | {entry.first_seen} | "
-            f"{entry.last_seen} | {', '.join(sorted(entry.strategies))} |"
-        )
-    if len(entries) > max_rows:
+    # 按桶分段：分数是各策略池内的分位排名，跨桶排在一张表里会误导读者
+    # 以为「进攻票 78 分」不如「防守票 84 分」。
+    for bucket in SUPPORTED_BUCKETS:
+        bucket_entries = grouped.get(bucket) or {}
+        if not bucket_entries:
+            continue
+        label = BUCKET_LABELS.get(bucket, bucket)
+        lines.append(f"## 当前名单 · {label}（{len(bucket_entries)}）")
         lines.append("")
-        lines.append(f"> 仅显示前 {max_rows} 条，完整名单见 `data/watchlist/current.csv`。")
-    lines.append("")
+        lines.append("| # | 代码 | 名称 | 行业 | 最近分 | 命中 | 首次入选 | 最近入选 | 策略 |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        ordered = sort_entries(bucket_entries.values(), run_date=run_date)
+        for index, entry in enumerate(ordered[:max_rows], start=1):
+            flag = "📌 " if entry.pinned else ""
+            lines.append(
+                f"| {index} | {flag}{entry.code} | {entry.name} | {entry.industry} | "
+                f"{entry.latest_score:.2f} | {entry.hit_count} | {entry.first_seen} | "
+                f"{entry.last_seen} | {', '.join(sorted(entry.strategies))} |"
+            )
+        if len(ordered) > max_rows:
+            lines.append("")
+            lines.append(f"> 该桶仅显示前 {max_rows} 条，完整名单见 `data/watchlist/current.csv`。")
+        lines.append("")
+
+    if not entries:
+        lines.append("## 当前名单")
+        lines.append("")
+        lines.append("_本次名单为空。_")
+        lines.append("")
+    else:
+        lines.append("> 分数是各策略硬筛存活池内的分位排名，**不可跨桶比较**。")
+        lines.append("")
 
     lines.append("## 策略耗时")
     lines.append("")

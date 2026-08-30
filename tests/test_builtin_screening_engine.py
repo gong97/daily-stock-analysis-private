@@ -57,14 +57,25 @@ def test_bundled_engine_keeps_source_and_license_notices() -> None:
 
     assert REFERENCE_REVISION in notice
     assert "Apache License" in license_text
+    # DSA 自己新增的策略不是 AlphaSift 衍生物，不能挂来源头（那是错误归因）。
+    # 白名单显式列出，保证新增 DSA 原生文件必须在这里登记，衍生文件的归因约束不被削弱。
+    dsa_native_files = {"theme_momentum.yaml"}
     derived_files = [
-        *SCREENING_ROOT.glob("*.py"),
-        *(SCREENING_ROOT / "strategies").glob("*.yaml"),
+        path
+        for path in (
+            *SCREENING_ROOT.glob("*.py"),
+            *(SCREENING_ROOT / "strategies").glob("*.yaml"),
+        )
+        if path.name not in dsa_native_files
     ]
     assert derived_files
     for path in derived_files:
         source = path.read_text(encoding="utf-8")
         assert f"Derived from AlphaSift revision {REFERENCE_REVISION}." in source
+
+    for name in dsa_native_files:
+        source = (SCREENING_ROOT / "strategies" / name).read_text(encoding="utf-8")
+        assert "Derived from AlphaSift" not in source, f"{name} 是 DSA 原生文件，不应声明 AlphaSift 归因"
 
 
 def test_bundled_strategies_are_loaded_from_the_internal_package() -> None:
@@ -80,9 +91,18 @@ def test_bundled_strategies_are_loaded_from_the_internal_package() -> None:
         "oversold_reversal",
         "quality_value",
         "shrink_pullback",
+        "theme_momentum",
         "volume_breakout",
     }
     assert strategies["dual_low"].screening.factor_weights["value"] < 0.40
+
+    # theme_momentum 是显式的进攻侧补充：不看估值、限定中小市值、依赖板块热度。
+    offensive = strategies["theme_momentum"].screening
+    assert "value" not in offensive.factor_weights
+    assert offensive.factor_weights["theme_heat"] >= 0.25
+    assert offensive.hard_filters.market_cap_max is not None
+    assert offensive.hard_filters.pe_ttm_min is None
+    assert offensive.hard_filters.pe_ttm_max is None
 
 
 def test_list_strategies_preserves_legacy_strategies_dir_override() -> None:

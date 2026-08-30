@@ -39,6 +39,11 @@ on:
         required: false
         default: false
         type: boolean
+      refresh_industry_map:
+        description: '强制重建行业映射缓存（约 162 次 akshare 请求，建议每月一次）'
+        required: false
+        default: false
+        type: boolean
 
 # 同一时间只跑一轮扫描：daily 与 weekly 在周五会同时触发，串行执行避免名单写冲突。
 concurrency:
@@ -93,7 +98,16 @@ jobs:
           pip install -r requirements.txt
 
       - name: 创建必要目录
-        run: mkdir -p data/watchlist logs
+        run: mkdir -p data/watchlist/cache/industry logs
+
+      - name: 按需重建行业映射缓存
+        # 行业映射缓存随仓库版本化，但它的 TTL 判定用的是文件 mtime，而
+        # actions/checkout 每次都会把 mtime 重置成"刚刚"，所以committed 缓存
+        # 在 runner 上永远不会自动过期。删掉缓存文件是唯一的强制刷新方式。
+        if: github.event.inputs.refresh_industry_map == 'true'
+        run: |
+          rm -f data/watchlist/cache/industry/*.json
+          echo "🔄 已清除行业映射缓存，本次运行将重新拉取"
 
       - name: 执行全市场扫描
         env:
@@ -118,14 +132,27 @@ jobs:
           DAILY_FETCH_MAX_WORKERS: ${{ vars.DAILY_FETCH_MAX_WORKERS || '2' }}
           SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS: ${{ vars.SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS || '24' }}
 
-          # ===== 行业/概念（可选，开启后 theme_heat 因子更有信息量）=====
-          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'none' }}
+          # ===== 行业/概念 =====
+          # 必须开启：快照源 em_datacenter 的 sty 参数不请求任何行业字段，
+          # 没有行业数据时策略内的 portfolio_profile（如 balanced_alpha 的
+          # 金融 bucket + max_same_bucket:1）会整个空转，theme_heat 因子也退化成常数。
+          # 代价：首次最多 162 次 akshare 请求（2 个板块列表 + 各 80 个板块成分），
+          # 逐板块 fail-open。缓存目录指向已版本化的 data/watchlist/cache，
+          # 因此该成本只在缓存过期时付一次，而不是每轮扫描。
+          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'akshare' }}
+          INDUSTRY_PROVIDER_MAX_BOARDS: ${{ vars.INDUSTRY_PROVIDER_MAX_BOARDS || '80' }}
+          SCREENING_INDUSTRY_PROVIDER_CACHE_DIR: data/watchlist/cache/industry
+          # 行业归属变化很慢，7 天足够；避免每周都重新打 162 次请求。
+          SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS || '168' }}
 
           # ===== 观察名单 =====
           WATCHLIST_DIR: data/watchlist
           WATCHLIST_CADENCE_MAP: ${{ vars.WATCHLIST_CADENCE_MAP }}
-          WATCHLIST_TTL_DAYS: ${{ vars.WATCHLIST_TTL_DAYS || '30' }}
-          WATCHLIST_MAX_SIZE: ${{ vars.WATCHLIST_MAX_SIZE || '60' }}
+          # 三个限额都按 style.risk_profile 分桶独立结算，留空则用各桶默认值。
+          WATCHLIST_TTL_DAYS: ${{ vars.WATCHLIST_TTL_DAYS || 'defensive:45,balanced:30,aggressive:14' }}
+          WATCHLIST_MAX_SIZE: ${{ vars.WATCHLIST_MAX_SIZE || 'defensive:25,balanced:20,aggressive:15' }}
+          # 跨策略行业配额：7 个策略各选 1 只银行时，名单里只留分最高的 2 只。
+          WATCHLIST_MAX_PER_INDUSTRY: ${{ vars.WATCHLIST_MAX_PER_INDUSTRY || 'defensive:2,balanced:2,aggressive:4' }}
 
           # ===== 通知渠道（仅在 WATCHLIST_NOTIFY=true 时实际发送）=====
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
