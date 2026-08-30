@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] `src/services/screening/config.py` 的 `_resolve_snapshot_source_priority()` 只判断 `SNAPSHOT_SOURCE_PRIORITY` 是否为 `None` 就当作"显式指定"，但 `.github/workflows/10-market-scan.yml` 用 `env: SNAPSHOT_SOURCE_PRIORITY: ${{ vars.SNAPSHOT_SOURCE_PRIORITY }}` 注入该变量时，仓库变量未配置也会得到"已设置但值为空字符串"而非变量整体缺失；两者叠加导致快照数据源候选列表被解析成空列表，全市场扫描的每个策略都会在拿快照这一步直接抛 `RuntimeError: All snapshot sources failed:`，7 个策略全部失败、观察名单不更新、`_notify()` 也不会被调用（不发邮件）。改为按 `strip()` 后是否非空判断，未配置时按原有约定（`docs/data-source-stability.md` 与工作流注释里"留空自动注入"）回退到按 `TUSHARE_TOKEN` 是否存在选择默认源优先级；显式设置非空值时行为不变。
 - [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。同一只票被多个策略同时选中时，`latest_score` / `latest_rank` / `cadence` / `holding_period` 统一取自得分最高的那个策略，与策略跑动顺序无关。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
 - [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact，并推送独立的观察名单报告邮件（`WATCHLIST_NOTIFY`，工作流内默认开启），主题为「📈 全市场扫描报告 - 日期」。
 - [改进] `NotificationService.send()` / `send_with_results()` 新增可选的 `email_subject`，允许非日报类报告指定自己的邮件主题；不传时行为与此前完全一致（邮件渠道仍生成默认的「股票智能分析报告」主题）。
