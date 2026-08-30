@@ -41,6 +41,12 @@ screening:
     reversal: 0.04
     size: 0.06
   scoring_profile:
+    # 行业中性化：value / liquidity / size 三个分位类因子改为行业内排名。
+    # 全市场口径下银行凭行业属性垄断 value 高分（39 只银行 value 均值 89.1），
+    # 分不出"银行里便宜的"和"银行里贵的"——招商银行全市场 87.5、行业内只有 25.7。
+    # 行业内有效样本少于 10 只时回退全市场口径（102 个行业里 29 个不足 10 只）。
+    industry_neutral: true
+    industry_neutral_min_size: 10
     momentum_chase_start_pct: 3.0
     momentum_chase_penalty_slope: 16.0
     activity_ideal_volume_ratio: 1.4

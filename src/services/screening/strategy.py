@@ -109,6 +109,8 @@ _SCORING_PROFILE_KEYS = {
     "theme_heat_cooling_score_penalty_cap",
     "theme_heat_overheat_score",
     "theme_heat_overheat_penalty_slope",
+    "industry_neutral",
+    "industry_neutral_min_size",
 }
 _RISK_PROFILE_KEYS = {
     "chase_change_pct",

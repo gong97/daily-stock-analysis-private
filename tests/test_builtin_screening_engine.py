@@ -19,6 +19,7 @@ from src.services.screening import post_analysis as screening_post_analysis
 from src.services.screening.filter import apply_hard_filters
 from src.services.screening.config import Config as ScreeningRuntimeConfig
 from src.services.screening.models import HardFilterConfig, Pick, ScreeningConfig, Strategy
+from src.services.screening import scorer as screening_scorer
 from src.services.screening.scorer import compute_screen_scores
 from src.services.screening import snapshot as screening_snapshot
 from src.services.screening.strategy import list_strategies, load_all_strategies
@@ -887,3 +888,117 @@ def test_join_label_list_normalizes_concept_shapes() -> None:
     assert join(["a", "", "  ", "b"]) == "a|b"
     assert join(None) == ""
     assert join(float("nan")) == ""
+
+
+def _valuation_frame() -> pd.DataFrame:
+    """两个大行业（各 10 只）+ 一个小行业（2 只）。
+
+    银行整体 PE 远低于科技，全市场口径下会垄断 value 高分。
+    """
+    rows = []
+    for i in range(10):
+        rows.append({"code": f"B{i:02d}", "industry": "银行", "pe_ratio": 4.0 + i * 0.3})
+    for i in range(10):
+        rows.append({"code": f"T{i:02d}", "industry": "半导体", "pe_ratio": 60.0 + i * 3.0})
+    for i in range(2):
+        rows.append({"code": f"S{i:02d}", "industry": "小行业", "pe_ratio": 20.0 + i})
+    return pd.DataFrame(rows)
+
+
+def test_rank_score_ranks_within_industry_when_groups_given() -> None:
+    df = _valuation_frame()
+    pe = df["pe_ratio"]
+
+    glob = screening_scorer._rank_score(pe, lower_is_better=True)
+    within = screening_scorer._rank_score(
+        pe, lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+
+    banks = df["industry"] == "银行"
+    tech = df["industry"] == "半导体"
+
+    # 全市场口径：银行整体碾压科技——差距来自行业属性，不是个股优秀
+    assert glob[banks].mean() - glob[tech].mean() > 40
+    # 行业中性：两个行业的均值收敛到一起，行业不再是打分的来源
+    assert abs(within[banks].mean() - within[tech].mean()) < 1.0
+    # 但组内的区分度必须完整保留（不是把所有票压成同一个分）
+    assert within[banks].max() - within[banks].min() > 50
+    assert within[tech].max() - within[tech].min() > 50
+
+
+def test_rank_score_falls_back_to_global_for_small_industries() -> None:
+    df = _valuation_frame()
+    within = screening_scorer._rank_score(
+        df["pe_ratio"], lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+    glob = screening_scorer._rank_score(df["pe_ratio"], lower_is_better=True)
+
+    small = df["industry"] == "小行业"   # 只有 2 只，低于阈值
+    assert (within[small] == glob[small]).all()
+
+
+def test_rank_score_falls_back_when_industry_is_blank() -> None:
+    df = _valuation_frame()
+    groups = df["industry"].copy()
+    groups.iloc[:5] = ""
+    within = screening_scorer._rank_score(
+        df["pe_ratio"], lower_is_better=True, groups=groups, min_group_size=5
+    )
+    glob = screening_scorer._rank_score(df["pe_ratio"], lower_is_better=True)
+    assert (within.iloc[:5] == glob.iloc[:5]).all()
+
+
+def test_rank_score_group_size_counts_valid_values_only() -> None:
+    """20 只的行业里只有 2 只有 PE，同样是噪声，必须回退。"""
+    df = _valuation_frame()
+    pe = df["pe_ratio"].copy()
+    banks = df.index[df["industry"] == "银行"]
+    pe.loc[banks[2:]] = None          # 银行只剩 2 个有效值
+
+    within = screening_scorer._rank_score(
+        pe, lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+    glob = screening_scorer._rank_score(pe, lower_is_better=True)
+    assert (within.loc[banks[:2]] == glob.loc[banks[:2]]).all()
+
+
+def test_industry_neutral_is_off_by_default() -> None:
+    df = _valuation_frame()
+    default_profile = dict(screening_scorer._DEFAULT_SCORING_PROFILE)
+    assert default_profile["industry_neutral"] == 0.0
+
+    groups, _ = screening_scorer._industry_groups(df, default_profile)
+    assert groups is None
+
+    on = {**default_profile, "industry_neutral": 1.0, "industry_neutral_min_size": 5.0}
+    groups, min_size = screening_scorer._industry_groups(df, on)
+    assert groups is not None and min_size == 5
+
+
+def test_industry_neutral_needs_an_industry_column() -> None:
+    df = _valuation_frame().drop(columns=["industry"])
+    on = {**screening_scorer._DEFAULT_SCORING_PROFILE, "industry_neutral": 1.0}
+    groups, _ = screening_scorer._industry_groups(df, on)
+    assert groups is None
+
+
+def test_value_score_neutralization_demotes_a_whole_cheap_industry() -> None:
+    df = _valuation_frame()
+    off = screening_scorer._compute_value_score(df)
+    on = screening_scorer._compute_value_score(
+        df, {**screening_scorer._DEFAULT_SCORING_PROFILE,
+             "industry_neutral": 1.0, "industry_neutral_min_size": 5.0}
+    )
+    banks = df["industry"] == "银行"
+    assert off[banks].mean() > on[banks].mean() + 15
+
+
+def test_only_the_intended_strategies_opt_into_industry_neutral() -> None:
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+    enabled = {
+        name for name, s in strategies.items()
+        if s.screening.scoring_profile.get("industry_neutral")
+    }
+    # "选好公司"的策略中性化；dual_low 要的就是全市场最便宜，必须保持原口径
+    assert enabled == {"quality_value", "momentum_quality", "balanced_alpha"}
+    assert not strategies["dual_low"].screening.scoring_profile.get("industry_neutral")

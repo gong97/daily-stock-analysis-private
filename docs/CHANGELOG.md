@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 选股评分支持行业中性化：策略 `scoring_profile` 新增 `industry_neutral` 与 `industry_neutral_min_size`（默认关闭 / 10），开启后 `value`、`liquidity`、`size` 三个分位类因子改为行业内排名。此前 `_rank_score()` 做全市场单一分位，分位反映的是「该票所在行业贵不贵」而非「该票在同类里贵不贵」：39 只银行的 value 因子均值 89.1（行业内重排后 51.0），招商银行全市场口径 87.5 但在银行内部只有 25.7。行业内有效样本（按非空值计）少于阈值、或行业为空时回退全市场口径——实测 102 个行业里 29 个不足 10 只。`quality_value` / `momentum_quality` / `balanced_alpha` 启用；`dual_low` 等保持全市场口径，因为它要的就是全市场最便宜的资产。实测同一份快照 Top 8：`quality_value` 银行 1 只、`dual_low` 银行 6 只。
+
 - [新功能] 观察名单新增全局行业上限 `WATCHLIST_MAX_PER_INDUSTRY_TOTAL`（默认 3，跨桶结算，0 关闭），在桶内配额之后执行。桶内配额只保证每个清单不被一个行业占满，管不住跨桶叠加：9 只银行分散在均衡桶与防守桶、每桶各留 2 只，整份名单仍有 4 只。名额不够时按桶优先级轮流取（每轮从各桶取该行业排名最高的一只），避免按分数全局排序——分数是各策略硬筛存活池内的分位排名，跨桶不可比。`pinned` 与行业为空的条目豁免。实测把真实行业回填到 19 条名单：关闭时 19→13（银行 4 只），默认 3 时 19→12（银行 3 只），设 2 时 19→10（银行 2 只）。
 
 - [修复] `em_datacenter` 快照的 `sty` 参数补上 `INDUSTRY` / `CONCEPT`，行业与概念随快照一并取回：零额外请求、不改变返回行数，实测 5147 行行业零缺失、103 个分类。此前行业数据只能由 `INDUSTRY_PROVIDER=akshare` 提供，而 akshare 的板块接口走 `push2.eastmoney.com`，在 GitHub Actions 上连续两轮均为 502 / RemoteDisconnected，导致观察名单行业列全空、跨策略行业配额静默放行（19 条候选里 9 只银行原样入选）；快照使用的 `data.eastmoney.com` 则一直可用。`CONCEPT` 单值返回 str、多值返回 list，统一归一成 `a|b|c` 文本，避免 list 原样进入 DataFrame 破坏下游字符串处理。
