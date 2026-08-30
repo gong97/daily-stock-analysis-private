@@ -24,6 +24,7 @@ from src.services.screening_watchlist import (
     BUCKET_PRIORITY,
     StrategyHit,
     group_by_bucket,
+    industry_quota_diagnostic,
     limit_for,
     parse_bucket_limits,
     resolve_bucket,
@@ -862,3 +863,46 @@ def test_save_writes_current_schema_version(tmp_path):
     entry = payload["entries"][0]
     assert entry["buckets"] == [BUCKET_AGGRESSIVE, BUCKET_DEFENSIVE]
     assert entry["strategies"]["dual_low"]["bucket"] == BUCKET_DEFENSIVE
+
+# ---------------------------------------------------------------------------
+# 行业配额诊断
+# ---------------------------------------------------------------------------
+def test_diagnostic_flags_the_silent_no_industry_case():
+    """回归首次实跑的坑：配置在、逻辑在、数据不在，报告却看起来完全正常。"""
+    entries = {c: _make(c, industry="") for c in ("A", "B", "C")}
+    diag = industry_quota_diagnostic(entries, [])
+    assert diag.effective is False
+    assert diag.missing_industry == 3
+    assert "未生效" in diag.text
+    assert "INDUSTRY_PROVIDER" in diag.text
+
+
+def test_diagnostic_reports_effective_quota_with_trim_count():
+    entries = {"A": _make("A", industry="银行"), "B": _make("B", industry="化工")}
+    diag = industry_quota_diagnostic(entries, [("C", "industry_quota"), ("D", "capacity")])
+    assert diag.effective is True
+    assert diag.trimmed == 1          # capacity 那条不算
+    assert "已生效" in diag.text
+    assert "裁掉 1 条" in diag.text
+
+
+def test_diagnostic_mentions_partial_industry_coverage():
+    entries = {"A": _make("A", industry="银行"), "B": _make("B", industry="")}
+    diag = industry_quota_diagnostic(entries, [])
+    assert diag.effective is True
+    assert "1 条缺少行业数据" in diag.text
+
+
+def test_diagnostic_on_empty_watchlist():
+    diag = industry_quota_diagnostic({}, [])
+    assert diag.effective is False
+    assert "名单为空" in diag.text
+
+
+def test_report_surfaces_the_diagnostic():
+    entries = {c: _make(c, industry="") for c in ("A", "B")}
+    report = render_report(
+        run_date=RUN_DATE, cadence="weekly", entries=entries,
+        added=[], removed=[], summaries=[],
+    )
+    assert "⚠️ 行业配额未生效" in report

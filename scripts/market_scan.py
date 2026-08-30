@@ -51,6 +51,7 @@ from src.services.screening_watchlist import (  # noqa: E402
     format_date,
     load_pinned_codes,
     load_watchlist,
+    industry_quota_diagnostic,
     merge_run,
     parse_bucket_limits,
     parse_cadence_map,
@@ -439,6 +440,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         summaries=summaries,
     )
 
+    diagnostic = industry_quota_diagnostic(entries, removed)
+    # 配额因缺数据而静默放行时必须在 workflow 日志里显眼，否则只能靠人肉发现
+    # "名单里怎么全是银行"。
+    (logger.info if diagnostic.effective else logger.warning)("%s", diagnostic.text)
     logger.info(
         "名单 %s → %s（新进 %s，移出 %s）",
         len(before_codes),
@@ -462,6 +467,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "ttl_days": ttl_limits,
         "max_size": size_limits,
         "max_per_industry": industry_limits,
+        "industry_quota_effective": diagnostic.effective,
+        "industry_missing_count": diagnostic.missing_industry,
         "updated_at": datetime.now(_CN_TZ).isoformat(timespec="seconds"),
     })
     save_watchlist(current_path, entries, meta)

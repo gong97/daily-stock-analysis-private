@@ -689,6 +689,52 @@ def merge_run(
     return merged, added
 
 
+@dataclass
+class IndustryQuotaDiagnostic:
+    """行业配额是否真的起了作用。
+
+    这一层是**静默失效**的重灾区：`industry` 为空时条目一律放行（无法分组，
+    强行淘汰会误伤），于是配置在、逻辑在、数据不在时，报告看起来完全正常，
+    只是名单里挤满同一个行业。首次实跑就踩了这个坑——19 条候选行业全空，
+    9 只银行原样进入名单，而 `max_per_industry` 早已配好。
+    """
+
+    effective: bool
+    total: int
+    missing_industry: int
+    trimmed: int
+
+    @property
+    def text(self) -> str:
+        if not self.total:
+            return "行业配额：名单为空，未参与判定"
+        if self.missing_industry == self.total:
+            return (
+                f"⚠️ 行业配额未生效：{self.total} 条候选全部缺少行业数据，"
+                "配额无从分组（检查 INDUSTRY_PROVIDER 与板块缓存）"
+            )
+        note = f"行业配额：已生效，本次裁掉 {self.trimmed} 条"
+        if self.missing_industry:
+            note += f"；另有 {self.missing_industry} 条缺少行业数据未参与分组"
+        return note
+
+
+def industry_quota_diagnostic(
+    entries: Mapping[str, WatchlistEntry],
+    removed: Sequence[Tuple[str, str]],
+) -> IndustryQuotaDiagnostic:
+    """判断行业配额这一层是生效了还是因为缺数据而静默放行。"""
+    total = len(entries)
+    missing = sum(1 for entry in entries.values() if not normalize_industry(entry.industry))
+    trimmed = sum(1 for _code, reason in removed if reason == "industry_quota")
+    return IndustryQuotaDiagnostic(
+        effective=bool(total) and missing < total,
+        total=total,
+        missing_industry=missing,
+        trimmed=trimmed,
+    )
+
+
 def normalize_industry(value: str) -> str:
     """行业名归一化，仅用于配额分组。空值返回空串（不参与配额）。"""
     return str(value or "").strip().lower()
@@ -888,6 +934,7 @@ def render_report(
     lines.append(f"- 本次新进：{len(added)}｜本次移出：{len(removed)}")
     total_elapsed = sum(item.elapsed_sec for item in summaries)
     lines.append(f"- 策略数：{len(summaries)}｜总耗时：{total_elapsed:.1f}s")
+    lines.append(f"- {industry_quota_diagnostic(entries, removed).text}")
     lines.append("")
 
     failed = [item for item in summaries if item.error]

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 观察名单报告新增行业配额诊断行，`meta` 记 `industry_quota_effective` 与 `industry_missing_count`，配额因缺少行业数据而空转时脚本额外打 warning。行业配额对 `industry` 为空的条目一律放行（无法分组，强行淘汰会误伤），因此「配置在、逻辑在、数据不在」时报告看起来完全正常，只是名单里挤满同一个行业——首次实跑正是如此：19 条候选行业全空、9 只银行原样入选，而 `max_per_industry` 早已配好。
+
 - [修复] 观察名单改为保存逐策略背书（`strategies: {策略名: {score, last_seen, bucket}}`），`bucket` / `buckets` 变成派生属性。此前 `bucket` 是存储字段，跨运行会被最后一轮无条件覆盖：周一 daily 跑成 aggressive、周五 weekly 跑成 defensive，连带 TTL（14↔45 天）与行业配额（4↔2）一起漂移。主桶按 `aggressive > balanced > defensive` 取，让衰减最快的桶治理时效；TTL 改为按每条背书自身所属桶结算，条目只要还剩任一条有效背书就保留，全部失效才算 ttl 出局（此前 `strategies` 只存分数且从不清理）。同时符合多个桶的票只在主桶列一行、只占一个名额，报告标注「兼 X」。名单 schema 升到 v2，`load_watchlist` 兼容名字列表 / `{名: 分数}` 两种旧格式并在 meta 记 `migrated_from_schema_version`；旧快照没有逐策略信息，回填成条目级取值，等各策略重新背书后 `buckets` 才准确。
 
 - [修复] 行业 provider 的板块缓存拆成成分（慢）与热度（快）两级，并改用缓存 JSON 里的 `created_at` 判过期而非文件 mtime。此前单一缓存把每天变化的板块热度和月度才变的成分绑在同一个 TTL 上：取短 TTL 则每轮重打约 162 次 akshare 请求，取长 TTL 则 `theme_heat` 因子会吃上一周前的热度；而 `actions/checkout` 会重置 mtime，使随仓库版本化的缓存按 mtime 判断永不过期。拆分后成分命中缓存时，日度热度刷新只需 2 个请求。部分板块拉取失败时本轮仍可用但不写成分缓存，避免残缺映射被固化。
