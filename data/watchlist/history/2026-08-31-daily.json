@@ -1,0 +1,563 @@
+{
+  "run_date": "2026-08-31",
+  "cadence": "daily",
+  "summaries": [
+    {
+      "strategy": "capital_heat",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 133.37,
+      "snapshot_count": 5147,
+      "after_filter_count": 133,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "em_datacenter",
+      "run_id": "0bbcba4cb156",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0",
+        "Snapshot source fallback: sina: snapshot source sina timed out after 60s",
+        "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+        "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+      ]
+    },
+    {
+      "strategy": "oversold_reversal",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 31.44,
+      "snapshot_count": 5147,
+      "after_filter_count": 367,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "331891f80f1d",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0"
+      ]
+    },
+    {
+      "strategy": "theme_momentum",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 34.84,
+      "snapshot_count": 5147,
+      "after_filter_count": 207,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "d9574290f44f",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0"
+      ]
+    },
+    {
+      "strategy": "volume_breakout",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 81.23,
+      "snapshot_count": 5147,
+      "after_filter_count": 20,
+      "pick_count": 5,
+      "daily_enriched": true,
+      "snapshot_source": "last_good_cache",
+      "run_id": "be1d18942336",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0",
+        "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 109 snapshot-filtered candidates",
+        "Daily K-line sources: tencent=100",
+        "Daily K-line quality flags: short_history_lt30=1",
+        "Daily hard-filter rejections: require_price_above_ma20 removed 15 (100->85); signal_score_min removed 9 (85->76); breakout_20d_pct_min removed 32 (76->44); range_20d_pct_max removed 11 (44->33); body_pct_min removed 2 (33->31); consolidation_days_20d_min removed 11 (31->20)"
+      ]
+    }
+  ],
+  "picks": {
+    "capital_heat": [
+      {
+        "rank": 1,
+        "code": "002466",
+        "name": "天齐锂业",
+        "final_score": 73.8807,
+        "screen_score": 71.48071597744362,
+        "industry": "稀有金属",
+        "price": 50.1,
+        "change_pct": 3.88,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 76.1224,
+          "liquidity": 90.9774,
+          "momentum": 69.11,
+          "reversal": 5.0,
+          "activity": 82.0469,
+          "stability": 66.36,
+          "size": 95.4887,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "601233",
+        "name": "桐昆股份",
+        "final_score": 72.6804,
+        "screen_score": 70.28042146616542,
+        "industry": "合成纤维及树脂",
+        "price": 27.45,
+        "change_pct": 5.58,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 81.1996,
+          "liquidity": 86.4662,
+          "momentum": 74.635,
+          "reversal": 5.0,
+          "activity": 75.8451,
+          "stability": 61.26,
+          "size": 93.2331,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "002430",
+        "name": "杭氧股份",
+        "final_score": 72.3387,
+        "screen_score": 69.93872642857144,
+        "industry": "环保",
+        "price": 26.11,
+        "change_pct": 5.92,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 63.2043,
+          "liquidity": 71.4286,
+          "momentum": 75.74,
+          "reversal": 5.0,
+          "activity": 82.3191,
+          "stability": 60.24,
+          "size": 79.6992,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "301297",
+        "name": "富乐德",
+        "final_score": 72.2581,
+        "screen_score": 69.85812718045113,
+        "industry": "专业服务",
+        "price": 40.78,
+        "change_pct": 6.75,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 36.7556,
+          "liquidity": 72.1805,
+          "momentum": 76.4875,
+          "reversal": 5.0,
+          "activity": 81.6366,
+          "stability": 57.75,
+          "size": 81.203,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601360",
+        "name": "三六零",
+        "final_score": 71.6733,
+        "screen_score": 69.27328120300753,
+        "industry": "计算机软件",
+        "price": 9.3,
+        "change_pct": 6.65,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 49.0757,
+          "liquidity": 81.203,
+          "momentum": 76.9425,
+          "reversal": 5.0,
+          "activity": 73.765,
+          "stability": 58.05,
+          "size": 92.4812,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "oversold_reversal": [
+      {
+        "rank": 1,
+        "code": "601166",
+        "name": "兴业银行",
+        "final_score": 93.2244,
+        "screen_score": 88.82436075613079,
+        "industry": "银行",
+        "price": 17.43,
+        "change_pct": -3.22,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 90.2524,
+          "liquidity": 97.2752,
+          "momentum": 46.035,
+          "reversal": 96.36,
+          "activity": 77.7074,
+          "stability": 68.34,
+          "size": 99.455,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000157",
+        "name": "中联重科",
+        "final_score": 88.2785,
+        "screen_score": 83.87850283378746,
+        "industry": "专用设备",
+        "price": 6.82,
+        "change_pct": -3.81,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.2006,
+          "liquidity": 75.2044,
+          "momentum": 44.1175,
+          "reversal": 95.97,
+          "activity": 78.127,
+          "stability": 66.57,
+          "size": 90.7357,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "600875",
+        "name": "东方电气",
+        "final_score": 88.055,
+        "screen_score": 83.65504149182561,
+        "industry": "电源设备",
+        "price": 25.25,
+        "change_pct": -2.7,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 79.0242,
+          "liquidity": 89.6458,
+          "momentum": 47.725,
+          "reversal": 89.6,
+          "activity": 84.2489,
+          "stability": 69.9,
+          "size": 94.0054,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "002432",
+        "name": "九安医疗",
+        "final_score": 87.1119,
+        "screen_score": 82.71193235013624,
+        "industry": "医疗器械",
+        "price": 67.86,
+        "change_pct": -2.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.533,
+          "liquidity": 90.4632,
+          "momentum": 49.2525,
+          "reversal": 83.49,
+          "activity": 79.4211,
+          "stability": 71.31,
+          "size": 81.1989,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "000951",
+        "name": "中国重汽",
+        "final_score": 86.0864,
+        "screen_score": 81.68638707765668,
+        "industry": "汽车",
+        "price": 21.88,
+        "change_pct": -2.28,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 84.9901,
+          "liquidity": 85.5586,
+          "momentum": 49.09,
+          "reversal": 84.14,
+          "activity": 79.9904,
+          "stability": 71.16,
+          "size": 76.8392,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "theme_momentum": [
+      {
+        "rank": 1,
+        "code": "002129",
+        "name": "TCL中环",
+        "final_score": 69.7212,
+        "screen_score": 67.62116388888889,
+        "industry": "电源设备",
+        "price": 9.82,
+        "change_pct": 6.86,
+        "risk_level": "low",
+        "risk_flags": [
+          "negative_or_invalid_pe"
+        ],
+        "factor_scores": {
+          "value": 52.5869,
+          "liquidity": 88.8889,
+          "momentum": 78.795,
+          "reversal": 5.0,
+          "activity": 81.3126,
+          "stability": 55.42,
+          "size": 93.7198,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "603596",
+        "name": "伯特利",
+        "final_score": 68.5745,
+        "screen_score": 65.97445785024155,
+        "industry": "汽车",
+        "price": 28.0,
+        "change_pct": 8.11,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 64.3345,
+          "liquidity": 80.6763,
+          "momentum": 78.5285,
+          "reversal": 5.0,
+          "activity": 77.956,
+          "stability": 53.67,
+          "size": 87.9227,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "301297",
+        "name": "富乐德",
+        "final_score": 68.4454,
+        "screen_score": 65.84540531400967,
+        "industry": "专业服务",
+        "price": 40.78,
+        "change_pct": 6.75,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 39.6609,
+          "liquidity": 79.2271,
+          "momentum": 78.4375,
+          "reversal": 5.0,
+          "activity": 77.1291,
+          "stability": 57.75,
+          "size": 88.8889,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601360",
+        "name": "三六零",
+        "final_score": 68.1823,
+        "screen_score": 65.58232306763286,
+        "industry": "计算机软件",
+        "price": 9.3,
+        "change_pct": 6.65,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 52.8754,
+          "liquidity": 89.372,
+          "momentum": 78.1125,
+          "reversal": 5.0,
+          "activity": 71.0725,
+          "stability": 58.05,
+          "size": 99.0338,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002430",
+        "name": "杭氧股份",
+        "final_score": 68.1714,
+        "screen_score": 65.57136195652174,
+        "industry": "环保",
+        "price": 26.11,
+        "change_pct": 5.92,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 67.163,
+          "liquidity": 78.2609,
+          "momentum": 75.74,
+          "reversal": 5.0,
+          "activity": 78.9914,
+          "stability": 60.24,
+          "size": 88.4058,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "volume_breakout": [
+      {
+        "rank": 1,
+        "code": "600316",
+        "name": "洪都航空",
+        "final_score": 79.7217,
+        "screen_score": 77.52166147599999,
+        "industry": "航空航天装备",
+        "price": 30.78,
+        "change_pct": 5.3,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 14.2583,
+          "liquidity": 90.0,
+          "momentum": 81.9303,
+          "reversal": 5.0,
+          "activity": 74.5941,
+          "stability": 66.1761,
+          "size": 90.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "603596",
+        "name": "伯特利",
+        "final_score": 77.3978,
+        "screen_score": 77.39778924800001,
+        "industry": "汽车",
+        "price": 28.0,
+        "change_pct": 8.11,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 54.2417,
+          "liquidity": 100.0,
+          "momentum": 71.6597,
+          "reversal": 5.0,
+          "activity": 81.556,
+          "stability": 56.31,
+          "size": 95.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "002430",
+        "name": "杭氧股份",
+        "final_score": 75.6026,
+        "screen_score": 75.602621592,
+        "industry": "环保",
+        "price": 26.11,
+        "change_pct": 5.92,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 49.3417,
+          "liquidity": 95.0,
+          "momentum": 66.9156,
+          "reversal": 5.0,
+          "activity": 82.5914,
+          "stability": 61.6406,
+          "size": 100.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "002042",
+        "name": "华孚时尚",
+        "final_score": 72.6553,
+        "screen_score": 70.455276752,
+        "industry": "纺织",
+        "price": 4.01,
+        "change_pct": 2.3,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 69.1917,
+          "liquidity": 55.0,
+          "momentum": 75.6597,
+          "reversal": 20.7,
+          "activity": 80.6553,
+          "stability": 75.6071,
+          "size": 55.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002092",
+        "name": "中泰化学",
+        "final_score": 72.6414,
+        "screen_score": 73.441396512,
+        "industry": "化学原料",
+        "price": 4.8,
+        "change_pct": 5.26,
+        "risk_level": "low",
+        "risk_flags": [
+          "negative_or_invalid_pe"
+        ],
+        "factor_scores": {
+          "value": 63.5625,
+          "liquidity": 80.0,
+          "momentum": 80.8314,
+          "reversal": 5.0,
+          "activity": 75.319,
+          "stability": 48.8602,
+          "size": 80.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ]
+  }
+}

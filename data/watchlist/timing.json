@@ -1234,6 +1234,97 @@
           ]
         }
       ]
+    },
+    {
+      "run_date": "2026-08-31",
+      "recorded_at": "2026-08-30T21:41:50",
+      "cadence": "daily",
+      "total_elapsed_sec": 280.88,
+      "strategies": [
+        {
+          "strategy": "capital_heat",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 133.37,
+          "snapshot_count": 5147,
+          "after_filter_count": 133,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "em_datacenter",
+          "run_id": "0bbcba4cb156",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0",
+            "Snapshot source fallback: sina: snapshot source sina timed out after 60s",
+            "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+            "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+          ]
+        },
+        {
+          "strategy": "oversold_reversal",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 31.44,
+          "snapshot_count": 5147,
+          "after_filter_count": 367,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "331891f80f1d",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0"
+          ]
+        },
+        {
+          "strategy": "theme_momentum",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 34.84,
+          "snapshot_count": 5147,
+          "after_filter_count": 207,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "d9574290f44f",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0"
+          ]
+        },
+        {
+          "strategy": "volume_breakout",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 81.23,
+          "snapshot_count": 5147,
+          "after_filter_count": 20,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "be1d18942336",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+            "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=0, heat=0",
+            "Daily K-line enrichment attempted 100 candidates, succeeded 100 of 109 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=100",
+            "Daily K-line quality flags: short_history_lt30=1",
+            "Daily hard-filter rejections: require_price_above_ma20 removed 15 (100->85); signal_score_min removed 9 (85->76); breakout_20d_pct_min removed 32 (76->44); range_20d_pct_max removed 11 (44->33); body_pct_min removed 2 (33->31); consolidation_days_20d_min removed 11 (31->20)"
+          ]
+        }
+      ]
     }
   ]
 }
