@@ -1,16 +1,40 @@
 # 全市场扫描观察名单（daily）
 
-- 扫描日期：2026-08-31
-- 名单规模：33（防守 5｜均衡 18｜进攻 10）
-- 本次新进：0｜本次移出：0
-- 策略数：4｜总耗时：341.8s
+- 扫描日期：2026-09-01
+- 名单规模：40（防守 5｜均衡 20｜进攻 15）
+- 本次新进：13｜本次移出：9
+- 策略数：4｜总耗时：256.7s
 - 行业配额：已生效，本次裁掉 0 条
 
-## 失败策略
+## 新进入观察名单
 
-- `capital_heat`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data
-- `theme_momentum`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio
-- `volume_breakout`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio
+| 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
+| --- | --- | --- | --- | --- | --- |
+| 进攻 | 600547 | 山东黄金 | 贵金属 | 76.33 | capital_heat |
+| 进攻 | 300347 | 泰格医药 | 医疗服务 | 73.83 | capital_heat |
+| 进攻 | 300747 | 锐科激光 | 光电子器件 | 73.50 | capital_heat |
+| 进攻 | 688372 | 伟测科技 | 半导体 | 73.41 | capital_heat, theme_momentum |
+| 进攻 | 688268 | 华特气体 | 化学原料 | 73.19 | capital_heat, theme_momentum |
+| 均衡 | 600585 | 海螺水泥 | 水泥 | 89.20 | oversold_reversal |
+| 均衡 | 600352 | 浙江龙盛 | 化学制品 | 86.17 | oversold_reversal |
+| 均衡 | 603345 | 安井食品 | 食品 | 85.93 | oversold_reversal |
+| 均衡 | 601117 | 中国化学 | 建筑施工 | 84.67 | oversold_reversal |
+| 进攻 | 688018 | 乐鑫科技 | 半导体 | 79.23 | volume_breakout |
+| 进攻 | 002292 | 奥飞娱乐 | 影视动漫 | 78.19 | volume_breakout |
+| 进攻 | 300079 | 数码视讯 | 通信设备 | 74.92 | volume_breakout |
+| 进攻 | 001298 | 好上好 | 电子元件 | 74.28 | volume_breakout |
+
+## 移出观察名单
+
+- 000651（超出名单容量）
+- 000100（超出名单容量）
+- 002042（超出名单容量）
+- 301297（超出名单容量）
+- 601360（超出名单容量）
+- 300395（超出名单容量）
+- 300657（超出名单容量）
+- 300418（超出名单容量）
+- 002129（超出名单容量）
 
 ## 当前名单 · 防守（5）
 
@@ -22,43 +46,50 @@
 | 4 | 601390 | 中国中铁 | 基础建设 | 81.71 | 1 | 2026-08-31 | 2026-08-31 | dual_low, quality_value |
 | 5 | 600028 | 中国石化 | 石油天然气 | 70.20 | 1 | 2026-08-31 | 2026-08-31 | low_volatility_quality |
 
-## 当前名单 · 均衡（18）
+## 当前名单 · 均衡（20）
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal, quality_value |
-| 2 | 601919（兼 防守） | 中远海控 | 港口航运 | 84.64 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, quality_value, shrink_pullback |
-| 3 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 83.88 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
+| 2 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 7 | 2026-08-30 | 2026-09-01 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
+| 3 | 601919（兼 防守） | 中远海控 | 港口航运 | 84.64 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, quality_value, shrink_pullback |
 | 4 | 601229（兼 防守） | 上海银行 | 银行 | 81.47 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
 | 5 | 601318（兼 防守） | 中国平安 | 非银行金融 | 80.85 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality, shrink_pullback |
-| 6 | 000157 | 中联重科 | 专用设备 | 87.99 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 7 | 600875 | 东方电气 | 电源设备 | 86.96 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 8 | 002432 | 九安医疗 | 医疗器械 | 86.45 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal |
-| 9 | 000783 | 长江证券 | 非银行金融 | 76.16 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 10 | 600309 | 万华化学 | 化学原料 | 75.62 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 11 | 000951 | 中国重汽 | 汽车 | 85.50 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 12 | 000807 | 云铝股份 | 基本金属 | 75.00 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 13 | 600887 | 伊利股份 | 食品 | 73.12 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 14 | 601600 | 中国铝业 | 基本金属 | 71.72 | 5 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 15 | 000425 | 徐工机械 | 专用设备 | 78.51 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality |
-| 16 | 002241 | 歌尔股份 | 电子设备制造 | 78.05 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, shrink_pullback |
-| 17 | 000651（兼 防守） | 格力电器 | 白色家电 | 76.63 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, shrink_pullback |
-| 18 | 000100 | TCL科技 | 电子元件 | 73.55 | 1 | 2026-08-31 | 2026-08-31 | momentum_quality |
+| 6 | 600585 | 海螺水泥 | 水泥 | 89.20 | 1 | 2026-09-01 | 2026-09-01 | oversold_reversal |
+| 7 | 000157 | 中联重科 | 专用设备 | 87.99 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
+| 8 | 600875 | 东方电气 | 电源设备 | 86.96 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
+| 9 | 600352 | 浙江龙盛 | 化学制品 | 86.17 | 1 | 2026-09-01 | 2026-09-01 | oversold_reversal |
+| 10 | 002432 | 九安医疗 | 医疗器械 | 86.45 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal |
+| 11 | 603345 | 安井食品 | 食品 | 85.93 | 1 | 2026-09-01 | 2026-09-01 | oversold_reversal |
+| 12 | 000783 | 长江证券 | 非银行金融 | 76.16 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 13 | 600309 | 万华化学 | 化学原料 | 75.62 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 14 | 000951 | 中国重汽 | 汽车 | 85.50 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
+| 15 | 601117 | 中国化学 | 建筑施工 | 84.67 | 1 | 2026-09-01 | 2026-09-01 | oversold_reversal |
+| 16 | 000807 | 云铝股份 | 基本金属 | 75.00 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 17 | 600887 | 伊利股份 | 食品 | 73.12 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 18 | 601600 | 中国铝业 | 基本金属 | 71.72 | 5 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 19 | 000425 | 徐工机械 | 专用设备 | 78.51 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality |
+| 20 | 002241 | 歌尔股份 | 电子设备制造 | 78.05 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, shrink_pullback |
 
-## 当前名单 · 进攻（10）
+## 当前名单 · 进攻（15）
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 600316 | 洪都航空 | 航空航天装备 | 79.72 | 1 | 2026-08-31 | 2026-08-31 | volume_breakout |
-| 2 | 603596 | 伯特利 | 汽车 | 77.40 | 1 | 2026-08-31 | 2026-08-31 | theme_momentum, volume_breakout |
-| 3 | 002430 | 杭氧股份 | 环保 | 75.60 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, theme_momentum, volume_breakout |
-| 4 | 002466（兼 均衡） | 天齐锂业 | 稀有金属 | 73.88 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, momentum_quality |
-| 5 | 601233（兼 均衡） | 桐昆股份 | 合成纤维及树脂 | 72.68 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, momentum_quality |
-| 6 | 002042 | 华孚时尚 | 纺织 | 72.66 | 1 | 2026-08-31 | 2026-08-31 | volume_breakout |
-| 7 | 002092 | 中泰化学 | 化学原料 | 72.64 | 1 | 2026-08-31 | 2026-08-31 | volume_breakout |
-| 8 | 301297 | 富乐德 | 专业服务 | 72.26 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, theme_momentum |
-| 9 | 601360 | 三六零 | 计算机软件 | 71.67 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, theme_momentum |
-| 10 | 002129 | TCL中环 | 电源设备 | 69.72 | 1 | 2026-08-31 | 2026-08-31 | theme_momentum |
+| 1 | 688018 | 乐鑫科技 | 半导体 | 79.23 | 1 | 2026-09-01 | 2026-09-01 | volume_breakout |
+| 2 | 600316 | 洪都航空 | 航空航天装备 | 79.72 | 1 | 2026-08-31 | 2026-08-31 | volume_breakout |
+| 3 | 002092 | 中泰化学 | 化学原料 | 77.06 | 2 | 2026-08-31 | 2026-09-01 | volume_breakout |
+| 4 | 002292 | 奥飞娱乐 | 影视动漫 | 78.19 | 1 | 2026-09-01 | 2026-09-01 | volume_breakout |
+| 5 | 603596 | 伯特利 | 汽车 | 77.40 | 1 | 2026-08-31 | 2026-08-31 | theme_momentum, volume_breakout |
+| 6 | 600547 | 山东黄金 | 贵金属 | 76.33 | 1 | 2026-09-01 | 2026-09-01 | capital_heat |
+| 7 | 002430 | 杭氧股份 | 环保 | 75.60 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, theme_momentum, volume_breakout |
+| 8 | 300079 | 数码视讯 | 通信设备 | 74.92 | 1 | 2026-09-01 | 2026-09-01 | volume_breakout |
+| 9 | 001298 | 好上好 | 电子元件 | 74.28 | 1 | 2026-09-01 | 2026-09-01 | volume_breakout |
+| 10 | 300347 | 泰格医药 | 医疗服务 | 73.83 | 1 | 2026-09-01 | 2026-09-01 | capital_heat |
+| 11 | 300747 | 锐科激光 | 光电子器件 | 73.50 | 1 | 2026-09-01 | 2026-09-01 | capital_heat |
+| 12 | 688372 | 伟测科技 | 半导体 | 73.41 | 1 | 2026-09-01 | 2026-09-01 | capital_heat, theme_momentum |
+| 13 | 002466（兼 均衡） | 天齐锂业 | 稀有金属 | 73.88 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, momentum_quality |
+| 14 | 688268 | 华特气体 | 化学原料 | 73.19 | 1 | 2026-09-01 | 2026-09-01 | capital_heat, theme_momentum |
+| 15 | 601233（兼 均衡） | 桐昆股份 | 合成纤维及树脂 | 72.68 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, momentum_quality |
 
 > 分数是各策略硬筛存活池内的分位排名，**不可跨桶比较**。标「兼 X」的票同时符合多个桶，只在主桶计一个名额。
 
@@ -66,7 +97,7 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| capital_heat | short_term | 88.8 | 0 | 0 | 0 | 否 |
-| oversold_reversal | short_term | 74.3 | 5546 | 367 | 5 | 否 |
-| theme_momentum | short_term | 88.5 | 0 | 0 | 0 | 否 |
-| volume_breakout | short_term | 90.3 | 0 | 0 | 0 | 否 |
+| capital_heat | short_term | 125.3 | 5147 | 155 | 5 | 否 |
+| oversold_reversal | short_term | 30.1 | 5147 | 392 | 5 | 否 |
+| theme_momentum | short_term | 31.4 | 5147 | 221 | 5 | 否 |
+| volume_breakout | short_term | 69.9 | 5147 | 31 | 5 | 是 |
