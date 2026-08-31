@@ -2,25 +2,15 @@
 
 - 扫描日期：2026-08-31
 - 名单规模：33（防守 5｜均衡 18｜进攻 10）
-- 本次新进：11｜本次移出：0
-- 策略数：4｜总耗时：280.9s
+- 本次新进：0｜本次移出：0
+- 策略数：4｜总耗时：341.8s
 - 行业配额：已生效，本次裁掉 0 条
 
-## 新进入观察名单
+## 失败策略
 
-| 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
-| --- | --- | --- | --- | --- | --- |
-| 进攻 | 002430 | 杭氧股份 | 环保 | 75.60 | capital_heat, theme_momentum, volume_breakout |
-| 进攻 | 301297 | 富乐德 | 专业服务 | 72.26 | capital_heat, theme_momentum |
-| 进攻 | 601360 | 三六零 | 计算机软件 | 71.67 | capital_heat, theme_momentum |
-| 均衡 | 000157 | 中联重科 | 专用设备 | 88.28 | oversold_reversal |
-| 均衡 | 600875 | 东方电气 | 电源设备 | 88.06 | oversold_reversal |
-| 均衡 | 000951 | 中国重汽 | 汽车 | 86.09 | oversold_reversal |
-| 进攻 | 002129 | TCL中环 | 电源设备 | 69.72 | theme_momentum |
-| 进攻 | 603596 | 伯特利 | 汽车 | 77.40 | theme_momentum, volume_breakout |
-| 进攻 | 600316 | 洪都航空 | 航空航天装备 | 79.72 | volume_breakout |
-| 进攻 | 002042 | 华孚时尚 | 纺织 | 72.66 | volume_breakout |
-| 进攻 | 002092 | 中泰化学 | 化学原料 | 72.64 | volume_breakout |
+- `capital_heat`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data
+- `theme_momentum`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio
+- `volume_breakout`：RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio
 
 ## 当前名单 · 防守（5）
 
@@ -36,17 +26,17 @@
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 601166（兼 防守） | 兴业银行 | 银行 | 93.22 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal, quality_value |
+| 1 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal, quality_value |
 | 2 | 601919（兼 防守） | 中远海控 | 港口航运 | 84.64 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, quality_value, shrink_pullback |
 | 3 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 83.88 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
 | 4 | 601229（兼 防守） | 上海银行 | 银行 | 81.47 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, blue_chip_income, dual_low, quality_value |
 | 5 | 601318（兼 防守） | 中国平安 | 非银行金融 | 80.85 | 6 | 2026-08-30 | 2026-08-31 | balanced_alpha, low_volatility_quality, momentum_quality, shrink_pullback |
-| 6 | 000157 | 中联重科 | 专用设备 | 88.28 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 7 | 600875 | 东方电气 | 电源设备 | 88.06 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 8 | 002432 | 九安医疗 | 医疗器械 | 87.11 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal |
+| 6 | 000157 | 中联重科 | 专用设备 | 87.99 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
+| 7 | 600875 | 东方电气 | 电源设备 | 86.96 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
+| 8 | 002432 | 九安医疗 | 医疗器械 | 86.45 | 1 | 2026-08-31 | 2026-08-31 | balanced_alpha, momentum_quality, oversold_reversal |
 | 9 | 000783 | 长江证券 | 非银行金融 | 76.16 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
-| 10 | 000951 | 中国重汽 | 汽车 | 86.09 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
-| 11 | 600309 | 万华化学 | 化学原料 | 75.62 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 10 | 600309 | 万华化学 | 化学原料 | 75.62 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
+| 11 | 000951 | 中国重汽 | 汽车 | 85.50 | 1 | 2026-08-31 | 2026-08-31 | oversold_reversal |
 | 12 | 000807 | 云铝股份 | 基本金属 | 75.00 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
 | 13 | 600887 | 伊利股份 | 食品 | 73.12 | 6 | 2026-08-30 | 2026-08-31 | shrink_pullback |
 | 14 | 601600 | 中国铝业 | 基本金属 | 71.72 | 5 | 2026-08-30 | 2026-08-31 | shrink_pullback |
@@ -76,7 +66,7 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| capital_heat | short_term | 133.4 | 5147 | 133 | 5 | 否 |
-| oversold_reversal | short_term | 31.4 | 5147 | 367 | 5 | 否 |
-| theme_momentum | short_term | 34.8 | 5147 | 207 | 5 | 否 |
-| volume_breakout | short_term | 81.2 | 5147 | 20 | 5 | 是 |
+| capital_heat | short_term | 88.8 | 0 | 0 | 0 | 否 |
+| oversold_reversal | short_term | 74.3 | 5546 | 367 | 5 | 否 |
+| theme_momentum | short_term | 88.5 | 0 | 0 | 0 | 否 |
+| volume_breakout | short_term | 90.3 | 0 | 0 | 0 | 否 |

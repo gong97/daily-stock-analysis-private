@@ -10,7 +10,11 @@
       "theme_momentum",
       "volume_breakout"
     ],
-    "last_run_failed_strategies": [],
+    "last_run_failed_strategies": [
+      "capital_heat",
+      "theme_momentum",
+      "volume_breakout"
+    ],
     "llm_ranked": false,
     "ttl_days": {
       "defensive": 45,
@@ -22,7 +26,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-08-31T05:41:50+08:00",
+    "updated_at": "2026-08-31T09:02:01+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -49,7 +53,7 @@
       "first_seen": "2026-08-30",
       "last_seen": "2026-08-31",
       "hit_count": 6,
-      "latest_score": 93.2244,
+      "latest_score": 92.5922,
       "best_score": 93.2244,
       "latest_rank": 1,
       "price": 17.43,
@@ -73,7 +77,7 @@
           "bucket": "defensive"
         },
         "oversold_reversal": {
-          "score": 93.2244,
+          "score": 92.5922,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -350,16 +354,16 @@
       "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
       "hit_count": 1,
-      "latest_score": 88.2785,
+      "latest_score": 87.9888,
       "best_score": 88.2785,
       "latest_rank": 2,
       "price": 6.82,
-      "change_pct": -3.81,
+      "change_pct": -3.808,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "oversold_reversal": {
-          "score": 88.2785,
+          "score": 87.9888,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -379,16 +383,16 @@
       "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
       "hit_count": 1,
-      "latest_score": 88.055,
+      "latest_score": 86.9556,
       "best_score": 88.055,
       "latest_rank": 3,
       "price": 25.25,
-      "change_pct": -2.7,
+      "change_pct": -2.697,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "oversold_reversal": {
-          "score": 88.055,
+          "score": 86.9556,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -408,11 +412,11 @@
       "first_seen": "2026-08-31",
       "last_seen": "2026-08-31",
       "hit_count": 1,
-      "latest_score": 87.1119,
+      "latest_score": 86.4527,
       "best_score": 87.1119,
       "latest_rank": 4,
       "price": 67.86,
-      "change_pct": -2.23,
+      "change_pct": -2.233,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
@@ -427,7 +431,7 @@
           "bucket": "balanced"
         },
         "oversold_reversal": {
-          "score": 87.1119,
+          "score": 86.4527,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
@@ -464,35 +468,6 @@
       "pinned": false
     },
     {
-      "code": "000951",
-      "name": "中国重汽",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "汽车",
-      "first_seen": "2026-08-31",
-      "last_seen": "2026-08-31",
-      "hit_count": 1,
-      "latest_score": 86.0864,
-      "best_score": 86.0864,
-      "latest_rank": 5,
-      "price": 21.88,
-      "change_pct": -2.28,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "oversold_reversal": {
-          "score": 86.0864,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "600309",
       "name": "万华化学",
       "holding_period": "swing",
@@ -515,6 +490,35 @@
       "strategies": {
         "shrink_pullback": {
           "score": 75.6207,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "000951",
+      "name": "中国重汽",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "汽车",
+      "first_seen": "2026-08-31",
+      "last_seen": "2026-08-31",
+      "hit_count": 1,
+      "latest_score": 85.495,
+      "best_score": 86.0864,
+      "latest_rank": 5,
+      "price": 21.88,
+      "change_pct": -2.278,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "oversold_reversal": {
+          "score": 85.495,
           "last_seen": "2026-08-31",
           "bucket": "balanced"
         }
