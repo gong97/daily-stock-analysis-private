@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 全市场快照按字段能力排序数据源：`_order_sources_by_capability()` 把「已声明缺少所需字段」的源排到链尾（如 `sina` 的 Market_Center 接口结构性不返回量比），避免需要 `volume_ratio` 的策略每次都先抓完 5000+ 行再在验收时失败。这是偏好排序而非硬性准入——缺字段的源不会被剔除，只有它可用时不需要该字段的策略仍正常运行。同时把原本内嵌在 `_normalize()` 里的字段映射提取为模块级 `_SOURCE_COLUMN_MAP`，作为「源能提供哪些字段」的唯一真源，避免改名表与能力表各自维护而漂移。
 - [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。同一只票被多个策略同时选中时，`latest_score` / `latest_rank` / `cadence` / `holding_period` 统一取自得分最高的那个策略，与策略跑动顺序无关。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
 - [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact，并推送独立的观察名单报告邮件（`WATCHLIST_NOTIFY`，工作流内默认开启），主题为「📈 全市场扫描报告 - 日期」。
 - [改进] `NotificationService.send()` / `send_with_results()` 新增可选的 `email_subject`，允许非日报类报告指定自己的邮件主题；不传时行为与此前完全一致（邮件渠道仍生成默认的「股票智能分析报告」主题）。

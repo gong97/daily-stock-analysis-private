@@ -62,6 +62,44 @@ def fetch_cn_snapshot(source: str = "efinance") -> pd.DataFrame:
         raise ValueError(f"Unknown snapshot source: {source}")
 
 
+def _source_supported_columns(source: str) -> set[str] | None:
+    """该源能产出的标准列；未知源返回 None（视为"能力未知，不做判断"）。"""
+    mapping = _SOURCE_COLUMN_MAP.get(source)
+    if not mapping:
+        return None
+    return set(mapping)
+
+
+def _order_sources_by_capability(
+    sources: list[str], required_columns: list[str]
+) -> tuple[list[str], list[str]]:
+    """把确定缺列的源排到最后，但**不**剔除它们。
+
+    背景：sina 的 Market_Center 接口结构性不返回量比，需要 ``volume_ratio``
+    的策略每次都要等它抓完 5000+ 行、再在验收时失败，然后才试下一个源——
+    一个失败策略白烧数十秒，且这个失败是可预知的。
+
+    这里只调整顺序而不做硬性准入：某天只有 sina 活着时，不需要量比的策略
+    仍然应该跑完，硬过滤会把「部分失败」放大成「全线失败」。
+
+    Returns:
+        ``(重排后的源, 被降级的源)``；能力未知的源保持原位。
+    """
+    required = set(required_columns or [])
+    if not required:
+        return list(sources), []
+
+    preferred: list[str] = []
+    deferred: list[str] = []
+    for source in sources:
+        supported = _source_supported_columns(source)
+        if supported is not None and not required.issubset(supported):
+            deferred.append(source)
+        else:
+            preferred.append(source)
+    return preferred + deferred, deferred
+
+
 def fetch_snapshot_with_fallback(
     sources: list[str],
     *,
@@ -89,7 +127,15 @@ def fetch_snapshot_with_fallback(
         if cached is not None:
             return cached
 
-    for source in sources:
+    ordered_sources, deferred_sources = _order_sources_by_capability(sources, required)
+    for source in deferred_sources:
+        logger.info(
+            "Snapshot source %s lacks required columns %s; trying it only after the others",
+            source,
+            ",".join(sorted(set(required) - (_source_supported_columns(source) or set()))),
+        )
+
+    for source in ordered_sources:
         disabled_reason = _source_disabled_reason(source)
         if disabled_reason:
             errors.append(f"{source}: {disabled_reason}")
@@ -681,6 +727,87 @@ def _prepare_tushare_snapshot(
     return _normalize(merged, source="tushare")
 
 
+# 各快照源 -> 标准列名的候选原始列名。
+# 这张表同时是「该源能提供哪些标准字段」的唯一真源：
+# _normalize() 用它改名，_source_supported_columns() 用它判断字段能力，
+# 二者不会各自维护一份而漂移。sina 没有 volume_ratio 键，因为它的
+# Market_Center 接口结构性不返回量比（只有 turnoverratio 换手率）。
+_SOURCE_COLUMN_MAP: dict[str, dict[str, list[str]]] = {
+    "efinance": {
+        "code": ["股票代码", "代码"],
+        "name": ["股票名称", "名称"],
+        "price": ["最新价"],
+        "change_pct": ["涨跌幅"],
+        "amount": ["成交额"],
+        "total_mv": ["总市值"],
+        "circ_mv": ["流通市值"],
+        "pe_ratio": ["动态市盈率", "市盈率(动)"],
+        "pb_ratio": ["市净率"],
+        "volume_ratio": ["量比"],
+        "turnover_rate": ["换手率"],
+        "industry": ["行业", "所属行业", "行业板块"],
+        "concepts": ["概念", "概念题材", "题材"],
+    },
+    "akshare_em": {
+        "code": ["代码"],
+        "name": ["名称"],
+        "price": ["最新价"],
+        "change_pct": ["涨跌幅"],
+        "amount": ["成交额"],
+        "total_mv": ["总市值"],
+        "circ_mv": ["流通市值"],
+        "pe_ratio": ["市盈率-动态", "市盈率(动)"],
+        "pb_ratio": ["市净率"],
+        "volume_ratio": ["量比"],
+        "turnover_rate": ["换手率"],
+        "industry": ["行业", "所属行业", "行业板块"],
+        "concepts": ["概念", "概念题材", "题材"],
+    },
+    "sina": {
+        "code": ["code"],
+        "name": ["name"],
+        "price": ["trade"],
+        "change_pct": ["changepercent"],
+        "amount": ["amount"],
+        "total_mv": ["mktcap"],
+        "circ_mv": ["nmc"],
+        "pe_ratio": ["per"],
+        "pb_ratio": ["pb"],
+        "turnover_rate": ["turnoverratio"],
+    },
+    "em_datacenter": {
+        "code": ["SECURITY_CODE"],
+        "name": ["SECURITY_NAME_ABBR"],
+        "price": ["NEW_PRICE"],
+        "change_pct": ["CHANGE_RATE"],
+        "amount": ["DEAL_AMOUNT"],
+        "total_mv": ["TOTAL_MARKET_CAP"],
+        "circ_mv": ["CIRCULATION_MARKET_CAP"],
+        "pe_ratio": ["PE9"],
+        "pb_ratio": ["PBNEWMRQ"],
+        "volume_ratio": ["VOLUME_RATIO"],
+        "turnover_rate": ["TURNOVERRATE"],
+        "industry": ["INDUSTRY", "INDUSTRY_NAME", "BOARD_NAME"],
+        "concepts": ["CONCEPT", "CONCEPT_NAME", "THEME_NAME"],
+    },
+    "tushare": {
+        "code": ["symbol", "code"],
+        "name": ["name"],
+        "price": ["close"],
+        "change_pct": ["pct_chg"],
+        "amount": ["amount"],
+        "total_mv": ["total_mv"],
+        "circ_mv": ["circ_mv"],
+        "pe_ratio": ["pe"],
+        "pb_ratio": ["pb"],
+        "volume_ratio": ["volume_ratio"],
+        "turnover_rate": ["turnover_rate"],
+        "industry": ["industry"],
+        "concepts": ["concepts"],
+    },
+}
+
+
 def _normalize(df: pd.DataFrame, source: str) -> pd.DataFrame:
     """Normalize column names to a standard schema.
 
@@ -689,85 +816,7 @@ def _normalize(df: pd.DataFrame, source: str) -> pd.DataFrame:
     """
     df = df.copy()
 
-    if source == "efinance":
-        standard_cols = {
-            "code": ["股票代码", "代码"],
-            "name": ["股票名称", "名称"],
-            "price": ["最新价"],
-            "change_pct": ["涨跌幅"],
-            "amount": ["成交额"],
-            "total_mv": ["总市值"],
-            "circ_mv": ["流通市值"],
-            "pe_ratio": ["动态市盈率", "市盈率(动)"],
-            "pb_ratio": ["市净率"],
-            "volume_ratio": ["量比"],
-            "turnover_rate": ["换手率"],
-            "industry": ["行业", "所属行业", "行业板块"],
-            "concepts": ["概念", "概念题材", "题材"],
-        }
-    elif source == "akshare_em":
-        standard_cols = {
-            "code": ["代码"],
-            "name": ["名称"],
-            "price": ["最新价"],
-            "change_pct": ["涨跌幅"],
-            "amount": ["成交额"],
-            "total_mv": ["总市值"],
-            "circ_mv": ["流通市值"],
-            "pe_ratio": ["市盈率-动态", "市盈率(动)"],
-            "pb_ratio": ["市净率"],
-            "volume_ratio": ["量比"],
-            "turnover_rate": ["换手率"],
-            "industry": ["行业", "所属行业", "行业板块"],
-            "concepts": ["概念", "概念题材", "题材"],
-        }
-    elif source == "sina":
-        standard_cols = {
-            "code": ["code"],
-            "name": ["name"],
-            "price": ["trade"],
-            "change_pct": ["changepercent"],
-            "amount": ["amount"],
-            "total_mv": ["mktcap"],
-            "circ_mv": ["nmc"],
-            "pe_ratio": ["per"],
-            "pb_ratio": ["pb"],
-            "turnover_rate": ["turnoverratio"],
-        }
-    elif source == "em_datacenter":
-        standard_cols = {
-            "code": ["SECURITY_CODE"],
-            "name": ["SECURITY_NAME_ABBR"],
-            "price": ["NEW_PRICE"],
-            "change_pct": ["CHANGE_RATE"],
-            "amount": ["DEAL_AMOUNT"],
-            "total_mv": ["TOTAL_MARKET_CAP"],
-            "circ_mv": ["CIRCULATION_MARKET_CAP"],
-            "pe_ratio": ["PE9"],
-            "pb_ratio": ["PBNEWMRQ"],
-            "volume_ratio": ["VOLUME_RATIO"],
-            "turnover_rate": ["TURNOVERRATE"],
-            "industry": ["INDUSTRY", "INDUSTRY_NAME", "BOARD_NAME"],
-            "concepts": ["CONCEPT", "CONCEPT_NAME", "THEME_NAME"],
-        }
-    elif source == "tushare":
-        standard_cols = {
-            "code": ["symbol", "code"],
-            "name": ["name"],
-            "price": ["close"],
-            "change_pct": ["pct_chg"],
-            "amount": ["amount"],
-            "total_mv": ["total_mv"],
-            "circ_mv": ["circ_mv"],
-            "pe_ratio": ["pe"],
-            "pb_ratio": ["pb"],
-            "volume_ratio": ["volume_ratio"],
-            "turnover_rate": ["turnover_rate"],
-            "industry": ["industry"],
-            "concepts": ["concepts"],
-        }
-    else:
-        standard_cols = {}
+    standard_cols = _SOURCE_COLUMN_MAP.get(source, {})
 
     df = _rename_standard_columns(df, standard_cols)
 

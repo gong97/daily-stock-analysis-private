@@ -573,6 +573,13 @@ def test_hard_filter_and_factor_scoring_keep_core_semantics() -> None:
 def test_snapshot_schema_mismatch_counts_toward_source_circuit_breaker(
     monkeypatch,
 ) -> None:
+    """字段不达标的源反复失败时应触发熔断。
+
+    用一个 ``_SOURCE_COLUMN_MAP`` 里没有声明能力的源（unknown_source）来测，
+    因为已声明缺列的源（如 sina 没有 volume_ratio）会被
+    ``_order_sources_by_capability`` 提前降级、根本不会被调用——那条路径由
+    ``test_known_incapable_source_is_tried_last`` 覆盖。
+    """
     bad_snapshot = pd.DataFrame([{"code": "000001", "name": "Ping An", "price": 10.0}])
     good_snapshot = pd.DataFrame(
         [{"code": "000001", "name": "Ping An", "price": 10.0, "volume_ratio": 1.5}]
@@ -582,7 +589,7 @@ def test_snapshot_schema_mismatch_counts_toward_source_circuit_breaker(
 
     def fake_fetch(source: str) -> pd.DataFrame:
         calls.append(source)
-        if source == "sina":
+        if source == "unknown_source":
             return bad_snapshot
         if source == "efinance":
             return good_snapshot.copy()
@@ -593,24 +600,85 @@ def test_snapshot_schema_mismatch_counts_toward_source_circuit_breaker(
 
     for _ in range(3):
         result = screening_snapshot.fetch_snapshot_with_fallback(
-            ["sina", "efinance"],
+            ["unknown_source", "efinance"],
             required_columns=["volume_ratio"],
         )
         assert result.attrs["snapshot_source"] == "efinance"
 
-    health = screening_snapshot.snapshot_source_health_snapshot(["sina"])
-    assert health["sina"]["failures"] == 3
-    assert health["sina"]["disabled"] is True
+    health = screening_snapshot.snapshot_source_health_snapshot(["unknown_source"])
+    assert health["unknown_source"]["failures"] == 3
+    assert health["unknown_source"]["disabled"] is True
 
     calls.clear()
     result = screening_snapshot.fetch_snapshot_with_fallback(
-        ["sina", "efinance"],
+        ["unknown_source", "efinance"],
         required_columns=["volume_ratio"],
     )
 
     assert calls == ["efinance"]
     assert result.attrs["snapshot_source"] == "efinance"
     assert "temporarily disabled" in result.attrs["source_errors"][0]
+
+
+def test_known_incapable_source_is_tried_last(monkeypatch) -> None:
+    """已知缺列的源排到最后，但不被剔除。
+
+    sina 的 Market_Center 接口结构性不返回量比。需要 ``volume_ratio`` 的策略
+    不该每次都先抓完 sina 的 5000+ 行再在验收时失败。
+    """
+    sina_snapshot = pd.DataFrame([{"code": "000001", "name": "Ping An", "price": 10.0}])
+    good_snapshot = pd.DataFrame(
+        [{"code": "000001", "name": "Ping An", "price": 10.0, "volume_ratio": 1.5}]
+    )
+    calls: list[str] = []
+
+    def fake_fetch(source: str) -> pd.DataFrame:
+        calls.append(source)
+        return sina_snapshot.copy() if source == "sina" else good_snapshot.copy()
+
+    monkeypatch.setattr(screening_snapshot, "_SOURCE_HEALTH", {})
+    monkeypatch.setattr(screening_snapshot, "fetch_cn_snapshot", fake_fetch)
+
+    result = screening_snapshot.fetch_snapshot_with_fallback(
+        ["sina", "efinance"],
+        required_columns=["volume_ratio"],
+    )
+    assert result.attrs["snapshot_source"] == "efinance"
+    assert calls == ["efinance"], "sina 声明缺量比，不该在 efinance 之前被调用"
+
+    # 不需要量比时顺序不变，sina 仍是首选。
+    calls.clear()
+    result = screening_snapshot.fetch_snapshot_with_fallback(
+        ["sina", "efinance"],
+        required_columns=["price"],
+    )
+    assert calls == ["sina"]
+    assert result.attrs["snapshot_source"] == "sina"
+
+
+def test_incapable_source_still_used_when_it_is_the_only_one_alive(monkeypatch) -> None:
+    """降级是偏好而不是硬门槛：只有 sina 活着时仍要尝试它。
+
+    否则某天只剩 sina 可用，会把「3 个策略失败」放大成「全部策略失败」。
+    """
+    sina_snapshot = pd.DataFrame([{"code": "000001", "name": "Ping An", "price": 10.0}])
+    calls: list[str] = []
+
+    def fake_fetch(source: str) -> pd.DataFrame:
+        calls.append(source)
+        if source == "sina":
+            return sina_snapshot.copy()
+        raise RuntimeError(f"{source} down")
+
+    monkeypatch.setattr(screening_snapshot, "_SOURCE_HEALTH", {})
+    monkeypatch.setattr(screening_snapshot, "fetch_cn_snapshot", fake_fetch)
+
+    result = screening_snapshot.fetch_snapshot_with_fallback(
+        ["sina", "efinance"],
+        required_columns=["price"],
+    )
+    assert result.attrs["snapshot_source"] == "sina"
+    assert "sina" in calls
 
 
 def test_sina_snapshot_uses_timeout_wrapper(monkeypatch) -> None:

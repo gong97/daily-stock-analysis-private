@@ -107,6 +107,46 @@ Web 会在浏览器本地生成一个不含用户信息的匿名种子，并随�
 
 候选上下文模块也支持 24 小时文件缓存，但 DSA 集成默认关闭其独立新闻/公告抓取，改用 DSA 自己的资讯、基本面和实时行情链路，避免同一候选重复请求两套数据源。
 
+## 快照源的字段能力
+
+各快照源返回的字段并不相同，这直接决定了哪些策略能跑。字段能力的**唯一真源**是
+`src/services/screening/snapshot.py` 的 `_SOURCE_COLUMN_MAP` —— `_normalize()` 用它
+把原始列改名成标准列，`_source_supported_columns()` 用它判断该源能提供什么，二者
+读同一张表，不会各自维护一份而漂移。
+
+| 源 | `volume_ratio`（量比） | 说明 |
+| --- | --- | --- |
+| `tushare` | ✅ | 取自 `daily_basic` 接口，**需要 2000 积分**（官方门槛，约 200 元） |
+| `efinance` | ✅ | |
+| `akshare_em` | ✅ | |
+| `em_datacenter` | ✅ | 实测中最稳定的免费源 |
+| `sina` | ❌ | `Market_Center` 接口结构性不返回量比，只有 `turnoverratio`（换手率） |
+
+`blue_chip_income`、`capital_heat`、`volume_breakout` 把 `volume_ratio_min` 用作
+**硬过滤**，因此快照缺这一列时它们会直接失败，而不是降级运行。
+
+### 按字段能力排序源
+
+`_order_sources_by_capability()` 在抓取前把「已声明缺少所需字段」的源排到最后：
+
+- 需要 `volume_ratio` 时，`sina` 被排到链尾，其余源先试；
+- 不需要 `volume_ratio` 时，顺序不变，`sina` 仍是首选。
+
+这样可以避免一个可预知的浪费：`sina` 抓回 5000+ 行、再在字段验收时被拒、然后才试
+下一个源——每个受影响的策略要为此白等数十秒。
+
+**这是偏好排序，不是硬性准入。** 缺字段的源只是被排到最后，不会被剔除。某天只有
+`sina` 可用时，不需要量比的策略仍然应该正常跑完；做成硬门槛会把「部分策略失败」
+放大成「全部策略失败」。
+
+对应测试见 `tests/test_builtin_screening_engine.py`：
+`test_known_incapable_source_is_tried_last` 与
+`test_incapable_source_still_used_when_it_is_the_only_one_alive`。
+
+> 注意：本节只解决「不再为可预知的失败浪费时间」。当 `sina` 是**唯一**可用源时，
+> 需要量比的策略仍然会失败。要真正消除这类失败，需要配置 `TUSHARE_TOKEN`（2000
+> 积分档），或把 `volume_ratio_min` 从硬过滤降级为软打分因子。
+
 ## 两类策略的边界
 
 DSA 中存在两类用途不同的策略文件：
