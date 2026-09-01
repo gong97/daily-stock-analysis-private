@@ -19,8 +19,10 @@ from src.services.screening import post_analysis as screening_post_analysis
 from src.services.screening.filter import apply_hard_filters
 from src.services.screening.config import Config as ScreeningRuntimeConfig
 from src.services.screening.models import HardFilterConfig, Pick, ScreeningConfig, Strategy
+from src.services.screening import scorer as screening_scorer
 from src.services.screening.scorer import compute_screen_scores
 from src.services.screening import snapshot as screening_snapshot
+from src.services.screening.industry import enrich_industry_concepts, load_industry_map
 from src.services.screening.strategy import list_strategies, load_all_strategies
 
 
@@ -57,14 +59,25 @@ def test_bundled_engine_keeps_source_and_license_notices() -> None:
 
     assert REFERENCE_REVISION in notice
     assert "Apache License" in license_text
+    # DSA 自己新增的策略不是 AlphaSift 衍生物，不能挂来源头（那是错误归因）。
+    # 白名单显式列出，保证新增 DSA 原生文件必须在这里登记，衍生文件的归因约束不被削弱。
+    dsa_native_files = {"theme_momentum.yaml"}
     derived_files = [
-        *SCREENING_ROOT.glob("*.py"),
-        *(SCREENING_ROOT / "strategies").glob("*.yaml"),
+        path
+        for path in (
+            *SCREENING_ROOT.glob("*.py"),
+            *(SCREENING_ROOT / "strategies").glob("*.yaml"),
+        )
+        if path.name not in dsa_native_files
     ]
     assert derived_files
     for path in derived_files:
         source = path.read_text(encoding="utf-8")
         assert f"Derived from AlphaSift revision {REFERENCE_REVISION}." in source
+
+    for name in dsa_native_files:
+        source = (SCREENING_ROOT / "strategies" / name).read_text(encoding="utf-8")
+        assert "Derived from AlphaSift" not in source, f"{name} 是 DSA 原生文件，不应声明 AlphaSift 归因"
 
 
 def test_bundled_strategies_are_loaded_from_the_internal_package() -> None:
@@ -80,9 +93,18 @@ def test_bundled_strategies_are_loaded_from_the_internal_package() -> None:
         "oversold_reversal",
         "quality_value",
         "shrink_pullback",
+        "theme_momentum",
         "volume_breakout",
     }
     assert strategies["dual_low"].screening.factor_weights["value"] < 0.40
+
+    # theme_momentum 是显式的进攻侧补充：不看估值、限定中小市值、依赖板块热度。
+    offensive = strategies["theme_momentum"].screening
+    assert "value" not in offensive.factor_weights
+    assert offensive.factor_weights["theme_heat"] >= 0.25
+    assert offensive.hard_filters.market_cap_max is not None
+    assert offensive.hard_filters.pe_ttm_min is None
+    assert offensive.hard_filters.pe_ttm_max is None
 
 
 def test_list_strategies_preserves_legacy_strategies_dir_override() -> None:
@@ -883,3 +905,262 @@ def test_fresh_snapshot_cache_reuses_fallback_from_same_source_chain(tmp_path, m
     assert second.attrs["snapshot_source"] == "last_good_cache"
     assert second.attrs["last_good_snapshot_source"] == "sina"
     assert second.attrs["fallback_used"] is False
+
+
+def test_em_datacenter_requests_industry_and_concept(monkeypatch) -> None:
+    """em_datacenter 必须随快照一并取回行业/概念。
+
+    这两个字段不额外增加请求也不改变返回行数，却是行业配额、策略内
+    portfolio_profile 和 theme_heat 的唯一可靠来源：akshare 的板块接口走
+    push2.eastmoney.com，在 GitHub Actions 上稳定 502 / RemoteDisconnected。
+    """
+    captured: dict = {}
+
+    class _Resp:
+        @staticmethod
+        def json():
+            return {
+                "success": True,
+                "result": {
+                    "count": 2,
+                    "data": [
+                        {"SECURITY_CODE": "000001", "SECURITY_NAME_ABBR": "平安银行",
+                         "NEW_PRICE": 11.0, "INDUSTRY": "银行",
+                         "CONCEPT": ["深圳特区", "跨境支付"]},
+                        {"SECURITY_CODE": "000007", "SECURITY_NAME_ABBR": "全新好",
+                         "NEW_PRICE": 5.0, "INDUSTRY": "汽车",
+                         "CONCEPT": "深圳特区"},
+                    ],
+                },
+            }
+
+    def _fake_get(url, **kwargs):
+        captured["params"] = kwargs.get("params", {})
+        return _Resp()
+
+    monkeypatch.setattr(screening_snapshot, "_eastmoney_get", _fake_get)
+    df = screening_snapshot._fetch_em_datacenter()
+
+    assert "INDUSTRY" in captured["params"]["sty"]
+    assert "CONCEPT" in captured["params"]["sty"]
+    assert list(df["industry"]) == ["银行", "汽车"]
+    # CONCEPT 单个时是 str、多个时是 list，都要归一成 `a|b` 文本，
+    # 否则 list 会原样进 DataFrame 并炸掉下游的字符串处理。
+    assert list(df["concepts"]) == ["深圳特区|跨境支付", "深圳特区"]
+    assert df["concepts"].map(type).eq(str).all()
+
+
+def test_join_label_list_normalizes_concept_shapes() -> None:
+    join = screening_snapshot._join_label_list
+    assert join(["a", "b"]) == "a|b"
+    assert join("a") == "a"
+    assert join(["a", "", "  ", "b"]) == "a|b"
+    assert join(None) == ""
+    assert join(float("nan")) == ""
+
+
+def _valuation_frame() -> pd.DataFrame:
+    """两个大行业（各 10 只）+ 一个小行业（2 只）。
+
+    银行整体 PE 远低于科技，全市场口径下会垄断 value 高分。
+    """
+    rows = []
+    for i in range(10):
+        rows.append({"code": f"B{i:02d}", "industry": "银行", "pe_ratio": 4.0 + i * 0.3})
+    for i in range(10):
+        rows.append({"code": f"T{i:02d}", "industry": "半导体", "pe_ratio": 60.0 + i * 3.0})
+    for i in range(2):
+        rows.append({"code": f"S{i:02d}", "industry": "小行业", "pe_ratio": 20.0 + i})
+    return pd.DataFrame(rows)
+
+
+def test_rank_score_ranks_within_industry_when_groups_given() -> None:
+    df = _valuation_frame()
+    pe = df["pe_ratio"]
+
+    glob = screening_scorer._rank_score(pe, lower_is_better=True)
+    within = screening_scorer._rank_score(
+        pe, lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+
+    banks = df["industry"] == "银行"
+    tech = df["industry"] == "半导体"
+
+    # 全市场口径：银行整体碾压科技——差距来自行业属性，不是个股优秀
+    assert glob[banks].mean() - glob[tech].mean() > 40
+    # 行业中性：两个行业的均值收敛到一起，行业不再是打分的来源
+    assert abs(within[banks].mean() - within[tech].mean()) < 1.0
+    # 但组内的区分度必须完整保留（不是把所有票压成同一个分）
+    assert within[banks].max() - within[banks].min() > 50
+    assert within[tech].max() - within[tech].min() > 50
+
+
+def test_rank_score_falls_back_to_global_for_small_industries() -> None:
+    df = _valuation_frame()
+    within = screening_scorer._rank_score(
+        df["pe_ratio"], lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+    glob = screening_scorer._rank_score(df["pe_ratio"], lower_is_better=True)
+
+    small = df["industry"] == "小行业"   # 只有 2 只，低于阈值
+    assert (within[small] == glob[small]).all()
+
+
+def test_rank_score_falls_back_when_industry_is_blank() -> None:
+    df = _valuation_frame()
+    groups = df["industry"].copy()
+    groups.iloc[:5] = ""
+    within = screening_scorer._rank_score(
+        df["pe_ratio"], lower_is_better=True, groups=groups, min_group_size=5
+    )
+    glob = screening_scorer._rank_score(df["pe_ratio"], lower_is_better=True)
+    assert (within.iloc[:5] == glob.iloc[:5]).all()
+
+
+def test_rank_score_group_size_counts_valid_values_only() -> None:
+    """20 只的行业里只有 2 只有 PE，同样是噪声，必须回退。"""
+    df = _valuation_frame()
+    pe = df["pe_ratio"].copy()
+    banks = df.index[df["industry"] == "银行"]
+    pe.loc[banks[2:]] = None          # 银行只剩 2 个有效值
+
+    within = screening_scorer._rank_score(
+        pe, lower_is_better=True, groups=df["industry"], min_group_size=5
+    )
+    glob = screening_scorer._rank_score(pe, lower_is_better=True)
+    assert (within.loc[banks[:2]] == glob.loc[banks[:2]]).all()
+
+
+def test_industry_neutral_is_off_by_default() -> None:
+    df = _valuation_frame()
+    default_profile = dict(screening_scorer._DEFAULT_SCORING_PROFILE)
+    assert default_profile["industry_neutral"] == 0.0
+
+    groups, _ = screening_scorer._industry_groups(df, default_profile)
+    assert groups is None
+
+    on = {**default_profile, "industry_neutral": 1.0, "industry_neutral_min_size": 5.0}
+    groups, min_size = screening_scorer._industry_groups(df, on)
+    assert groups is not None and min_size == 5
+
+
+def test_industry_neutral_needs_an_industry_column() -> None:
+    df = _valuation_frame().drop(columns=["industry"])
+    on = {**screening_scorer._DEFAULT_SCORING_PROFILE, "industry_neutral": 1.0}
+    groups, _ = screening_scorer._industry_groups(df, on)
+    assert groups is None
+
+
+def test_value_score_neutralization_demotes_a_whole_cheap_industry() -> None:
+    df = _valuation_frame()
+    off = screening_scorer._compute_value_score(df)
+    on = screening_scorer._compute_value_score(
+        df, {**screening_scorer._DEFAULT_SCORING_PROFILE,
+             "industry_neutral": 1.0, "industry_neutral_min_size": 5.0}
+    )
+    banks = df["industry"] == "银行"
+    assert off[banks].mean() > on[banks].mean() + 15
+
+
+def test_only_the_intended_strategies_opt_into_industry_neutral() -> None:
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+    enabled = {
+        name for name, s in strategies.items()
+        if s.screening.scoring_profile.get("industry_neutral")
+    }
+    # "选好公司"的策略中性化；dual_low 要的就是全市场最便宜，必须保持原口径
+    assert enabled == {
+        "quality_value",
+        "momentum_quality",
+        "balanced_alpha",
+        "blue_chip_income",
+        "low_volatility_quality",
+    }
+    assert not strategies["dual_low"].screening.scoring_profile.get("industry_neutral")
+
+
+def test_industry_map_fills_gaps_without_overwriting(tmp_path) -> None:
+    """静态行业表只补空值，不覆盖快照自带的更新鲜的行业。
+
+    快照源之间行业口径不一致：sina 没有行业列，em_datacenter 有，哪个源胜出取决于
+    当轮可用性——实测同一轮里 balanced_alpha 走 sina（候选行业全空）而其余策略走
+    em_datacenter。静态表抹平这个差异，但不能反过来用陈旧数据污染新鲜快照。
+    """
+    map_path = tmp_path / "industry_map.csv"
+    map_path.write_text(
+        "code,industry,concepts\n"
+        "600016,银行,过时概念\n"
+        "600030,非银行金融,\n",
+        encoding="utf-8",
+    )
+
+    snapshot = pd.DataFrame([
+        # 快照已有行业：必须保留，不能被表里的值改写
+        {"code": "600016", "name": "民生银行", "price": 5.0, "industry": "股份制银行"},
+        # 快照缺行业：由表补上
+        {"code": "600030", "name": "中信证券", "price": 25.0, "industry": ""},
+        # 表里没有：保持为空，不报错
+        {"code": "999999", "name": "新股", "price": 10.0, "industry": ""},
+    ])
+
+    out, notes = enrich_industry_concepts(snapshot, map_files=[map_path], provider="none")
+    by_code = out.set_index("code")["industry"].to_dict()
+
+    assert by_code["600016"] == "股份制银行", "快照自带的行业不能被静态表覆盖"
+    assert by_code["600030"] == "非银行金融", "快照缺失的行业应由静态表补上"
+    assert by_code["999999"] == ""
+    assert any("industry map loaded" in note for note in notes)
+
+
+def test_industry_map_round_trips_through_load(tmp_path) -> None:
+    path = tmp_path / "m.csv"
+    path.write_text(
+        "code,industry,concepts\n000001,银行,深圳特区|跨境支付\n", encoding="utf-8"
+    )
+    mapping = load_industry_map(path)
+    assert mapping["000001"]["industry"] == "银行"
+    assert mapping["000001"]["concepts"] == "深圳特区|跨境支付"
+
+
+def test_shipped_industry_map_is_membership_only() -> None:
+    """随仓库版本化的映射表不得包含热度字段——那些每天都变，静态化就是错的。"""
+    path = REPO_ROOT / "data" / "watchlist" / "industry_map.csv"
+    if not path.is_file():
+        return   # 尚未生成时跳过，不阻断
+    mapping = load_industry_map(path)
+    assert len(mapping) > 3000, "映射表条目过少，可能是抓取异常时被覆盖"
+    assert len({item.get("industry") for item in mapping.values()}) > 50
+    for item in mapping.values():
+        for key in item:
+            assert key in {"industry", "concepts"}, f"静态表不应包含时变字段 {key}"
+
+
+def test_no_strategy_caps_price() -> None:
+    """price_max 不承载流动性信息，全库不应再使用它。
+
+    实测 220 元以上的 74 只票全部通过各策略的 amount_min，而该上限会挡掉 49 只
+    500 亿以上的大盘股（宁德时代、贵州茅台、中际旭创、寒武纪、北方华创……）。
+    流动性由 amount_min + market_cap_min 表达。
+    """
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+    offenders = {
+        name for name, s in strategies.items()
+        if s.screening.hard_filters.price_max is not None
+    }
+    assert offenders == set(), f"这些策略仍在用 price_max: {sorted(offenders)}"
+
+
+def test_blue_chip_strategies_do_not_require_high_turnover() -> None:
+    """大盘蓝筹的低换手率来自巨大流通盘，不是流动性差。
+
+    长江电力 0.28%、中国神华 0.14%、工商银行 0.09%，但成交额都在 10-21 亿。
+    要求 ≥1% 等于把最典型的红利防守股排除在外。
+    """
+    strategies = load_all_strategies(SCREENING_ROOT / "strategies")
+
+    assert strategies["blue_chip_income"].screening.hard_filters.turnover_rate_min is None
+    assert strategies["shrink_pullback"].screening.hard_filters.turnover_rate_min <= 0.5
+
+    # 动量/热度类策略的高换手是信号本身，不能一并放宽
+    for name in ("capital_heat", "theme_momentum", "volume_breakout"):
+        assert strategies[name].screening.hard_filters.turnover_rate_min >= 2.0

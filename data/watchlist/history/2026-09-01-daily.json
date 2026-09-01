@@ -1,0 +1,568 @@
+{
+  "run_date": "2026-09-01",
+  "cadence": "daily",
+  "summaries": [
+    {
+      "strategy": "capital_heat",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 139.57,
+      "snapshot_count": 5149,
+      "after_filter_count": 154,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "em_datacenter",
+      "run_id": "0966bfa31ba4",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=285, heat=0",
+        "Snapshot source fallback: sina: snapshot source sina timed out after 60s",
+        "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+        "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+      ]
+    },
+    {
+      "strategy": "oversold_reversal",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 36.75,
+      "snapshot_count": 5149,
+      "after_filter_count": 447,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "11b4fc567269",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=285, heat=0"
+      ]
+    },
+    {
+      "strategy": "theme_momentum",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 33.1,
+      "snapshot_count": 5149,
+      "after_filter_count": 200,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "5f3289621385",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=285, heat=0"
+      ]
+    },
+    {
+      "strategy": "volume_breakout",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 74.52,
+      "snapshot_count": 5149,
+      "after_filter_count": 30,
+      "pick_count": 5,
+      "daily_enriched": true,
+      "snapshot_source": "last_good_cache",
+      "run_id": "f510a1738475",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=285, heat=0",
+        "Daily K-line enrichment attempted 125 candidates, succeeded 125 of 125 snapshot-filtered candidates",
+        "Daily K-line sources: tencent=125",
+        "Daily hard-filter rejections: require_price_above_ma20 removed 6 (125->119); signal_score_min removed 5 (119->114); breakout_20d_pct_min removed 56 (114->58); range_20d_pct_max removed 11 (58->47); consolidation_days_20d_min removed 17 (47->30)"
+      ]
+    }
+  ],
+  "picks": {
+    "capital_heat": [
+      {
+        "rank": 1,
+        "code": "603596",
+        "name": "伯特利",
+        "final_score": 73.8382,
+        "screen_score": 71.4382124025974,
+        "industry": "汽车",
+        "price": 29.84,
+        "change_pct": 6.31,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 61.4776,
+          "liquidity": 83.7662,
+          "momentum": 77.0075,
+          "reversal": 5.0,
+          "activity": 79.5936,
+          "stability": 59.07,
+          "size": 87.6623,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000425",
+        "name": "徐工机械",
+        "final_score": 70.7956,
+        "screen_score": 70.79558785714286,
+        "industry": "专用设备",
+        "price": 8.24,
+        "change_pct": 4.44,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 78.3776,
+          "liquidity": 92.8571,
+          "momentum": 70.93,
+          "reversal": 5.0,
+          "activity": 77.0459,
+          "stability": 64.68,
+          "size": 98.7013,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "603236",
+        "name": "移远通信",
+        "final_score": 70.6361,
+        "screen_score": 70.63609181818181,
+        "industry": "通信设备",
+        "price": 62.59,
+        "change_pct": 1.54,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 55.4263,
+          "liquidity": 86.3636,
+          "momentum": 61.505,
+          "reversal": 36.66,
+          "activity": 83.3283,
+          "stability": 73.38,
+          "size": 86.3636,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "300604",
+        "name": "长川科技",
+        "final_score": 70.4671,
+        "screen_score": 72.46712500000002,
+        "industry": "半导体",
+        "price": 284.27,
+        "change_pct": 1.88,
+        "risk_level": "low",
+        "risk_flags": [
+          "high_pb"
+        ],
+        "factor_scores": {
+          "value": 18.4961,
+          "liquidity": 100.0,
+          "momentum": 62.61,
+          "reversal": 29.52,
+          "activity": 82.1969,
+          "stability": 72.36,
+          "size": 100.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002245",
+        "name": "蔚蓝锂芯",
+        "final_score": 70.4553,
+        "screen_score": 70.45529902597404,
+        "industry": "其他电气设备",
+        "price": 17.9,
+        "change_pct": 1.88,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 48.6224,
+          "liquidity": 87.6623,
+          "momentum": 62.61,
+          "reversal": 29.52,
+          "activity": 82.0619,
+          "stability": 72.36,
+          "size": 92.8571,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "oversold_reversal": [
+      {
+        "rank": 1,
+        "code": "603588",
+        "name": "高能环境",
+        "final_score": 89.4392,
+        "screen_score": 85.0391649049217,
+        "industry": "环保",
+        "price": 14.81,
+        "change_pct": -3.46,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 77.9527,
+          "liquidity": 79.8658,
+          "momentum": 45.255,
+          "reversal": 99.48,
+          "activity": 81.2481,
+          "stability": 67.62,
+          "size": 71.3647,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000703",
+        "name": "恒逸石化",
+        "final_score": 89.0136,
+        "screen_score": 84.6135844407159,
+        "industry": "合成纤维及树脂",
+        "price": 18.98,
+        "change_pct": -2.77,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 77.5154,
+          "liquidity": 94.4072,
+          "momentum": 47.4975,
+          "reversal": 90.51,
+          "activity": 84.5972,
+          "stability": 69.69,
+          "size": 92.17,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "000887",
+        "name": "中鼎股份",
+        "final_score": 87.7393,
+        "screen_score": 83.3392582885906,
+        "industry": "汽车",
+        "price": 20.66,
+        "change_pct": -3.32,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 79.5126,
+          "liquidity": 72.4832,
+          "momentum": 45.71,
+          "reversal": 97.66,
+          "activity": 81.6378,
+          "stability": 68.04,
+          "size": 75.8389,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601699",
+        "name": "潞安环能",
+        "final_score": 87.2102,
+        "screen_score": 85.21018211409397,
+        "industry": "煤炭",
+        "price": 17.32,
+        "change_pct": -3.51,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 74.6938,
+          "liquidity": 82.5503,
+          "momentum": 45.0925,
+          "reversal": 99.87,
+          "activity": 82.6353,
+          "stability": 67.47,
+          "size": 89.038,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002738",
+        "name": "中矿资源",
+        "final_score": 86.3605,
+        "screen_score": 84.36054986577182,
+        "industry": "稀有金属",
+        "price": 52.05,
+        "change_pct": -3.5,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 62.7576,
+          "liquidity": 88.1432,
+          "momentum": 45.125,
+          "reversal": 100.0,
+          "activity": 82.5595,
+          "stability": 67.5,
+          "size": 84.1163,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "theme_momentum": [
+      {
+        "rank": 1,
+        "code": "600598",
+        "name": "北大荒",
+        "final_score": 69.3971,
+        "screen_score": 67.297125,
+        "industry": "农业",
+        "price": 13.86,
+        "change_pct": 7.44,
+        "risk_level": "low",
+        "risk_flags": [
+          "negative_or_invalid_pe"
+        ],
+        "factor_scores": {
+          "value": 37.9471,
+          "liquidity": 90.5,
+          "momentum": 78.964,
+          "reversal": 5.0,
+          "activity": 79.1106,
+          "stability": 53.68,
+          "size": 93.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "603596",
+        "name": "伯特利",
+        "final_score": 68.5726,
+        "screen_score": 65.9726,
+        "industry": "汽车",
+        "price": 29.84,
+        "change_pct": 6.31,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 63.3448,
+          "liquidity": 87.5,
+          "momentum": 77.0075,
+          "reversal": 5.0,
+          "activity": 75.0861,
+          "stability": 59.07,
+          "size": 94.5,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "603115",
+        "name": "海星股份",
+        "final_score": 68.2211,
+        "screen_score": 65.621125,
+        "industry": "电子元件",
+        "price": 78.4,
+        "change_pct": 3.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 27.1861,
+          "liquidity": 87.0,
+          "momentum": 66.9975,
+          "reversal": 5.0,
+          "activity": 83.7813,
+          "stability": 68.31,
+          "size": 89.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601606",
+        "name": "长城军工",
+        "final_score": 68.1866,
+        "screen_score": 66.0866,
+        "industry": "地面装备",
+        "price": 33.29,
+        "change_pct": 4.46,
+        "risk_level": "low",
+        "risk_flags": [
+          "negative_or_invalid_pe"
+        ],
+        "factor_scores": {
+          "value": 21.7933,
+          "liquidity": 92.0,
+          "momentum": 70.995,
+          "reversal": 5.0,
+          "activity": 80.0343,
+          "stability": 62.62,
+          "size": 92.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002827",
+        "name": "高争民爆",
+        "final_score": 67.976,
+        "screen_score": 65.376,
+        "industry": "化学制品",
+        "price": 61.77,
+        "change_pct": 6.32,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 19.7523,
+          "liquidity": 81.5,
+          "momentum": 77.04,
+          "reversal": 5.0,
+          "activity": 75.07,
+          "stability": 59.04,
+          "size": 87.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "volume_breakout": [
+      {
+        "rank": 1,
+        "code": "002332",
+        "name": "仙琚制药",
+        "final_score": 82.2231,
+        "screen_score": 77.62311717866666,
+        "industry": "化学制药",
+        "price": 9.04,
+        "change_pct": 3.67,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 75.4664,
+          "liquidity": 86.6667,
+          "momentum": 79.3581,
+          "reversal": 5.0,
+          "activity": 78.538,
+          "stability": 71.7122,
+          "size": 83.3333,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "688543",
+        "name": "国科军工",
+        "final_score": 77.0411,
+        "screen_score": 74.84107738666667,
+        "industry": "航空航天装备",
+        "price": 41.38,
+        "change_pct": 4.18,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 31.4478,
+          "liquidity": 76.6667,
+          "momentum": 78.1371,
+          "reversal": 5.0,
+          "activity": 78.4818,
+          "stability": 69.9566,
+          "size": 90.0,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "002385",
+        "name": "大北农",
+        "final_score": 75.4621,
+        "screen_score": 76.26214250000001,
+        "industry": "畜牧业",
+        "price": 3.53,
+        "change_pct": 7.62,
+        "risk_level": "low",
+        "risk_flags": [
+          "negative_or_invalid_pe"
+        ],
+        "factor_scores": {
+          "value": 43.3901,
+          "liquidity": 100.0,
+          "momentum": 83.151,
+          "reversal": 5.0,
+          "activity": 72.4878,
+          "stability": 33.5725,
+          "size": 96.6667,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "002632",
+        "name": "道明光学",
+        "final_score": 74.1554,
+        "screen_score": 71.955422048,
+        "industry": "化学制品",
+        "price": 8.98,
+        "change_pct": 5.77,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 51.2474,
+          "liquidity": 70.0,
+          "momentum": 72.3105,
+          "reversal": 5.0,
+          "activity": 82.4395,
+          "stability": 63.33,
+          "size": 66.6667,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601900",
+        "name": "南方传媒",
+        "final_score": 73.9818,
+        "screen_score": 73.28183454933335,
+        "industry": "平面媒体",
+        "price": 12.56,
+        "change_pct": 6.35,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 85.4841,
+          "liquidity": 83.3333,
+          "momentum": 82.3484,
+          "reversal": 5.0,
+          "activity": 66.916,
+          "stability": 58.6054,
+          "size": 93.3333,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ]
+  }
+}

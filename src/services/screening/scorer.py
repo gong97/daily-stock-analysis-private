@@ -86,6 +86,13 @@ _DEFAULT_SCORING_PROFILE = {
     "topic_alignment_match_bonus": 25.0,
     "topic_alignment_heat_weight": 0.25,
     "topic_alignment_unmatched_penalty": 12.0,
+    # 行业中性化开关（YAML 里写 true，_scoring_profile 会转成 1.0）。
+    # 开启后 value / liquidity / size 这三个分位类因子改为**行业内**排名。
+    # 默认关闭：dual_low 这类策略要的就是"全市场最便宜"，中性化会改变其语义。
+    "industry_neutral": 0.0,
+    # 行业内有效样本少于该数时回退到全市场口径。实测 102 个行业里 29 个不足 10 只，
+    # 最小的只有 1 只——3 只成员的行业分位只能取 33/67/100，没有区分度。
+    "industry_neutral_min_size": 10.0,
 }
 
 
@@ -139,13 +146,15 @@ def _compute_factor_scores(df: pd.DataFrame, config: ScreeningConfig | None = No
     config = config or ScreeningConfig()
     profile = _scoring_profile(config)
     return {
-        "value": _compute_value_score(df),
-        "liquidity": _compute_liquidity_score(df),
+        # value / liquidity / size 是仅有的三个分位类因子，因此也是行业中性化
+        # 唯一作用的地方；momentum / stability / activity 走绝对公式，不受影响。
+        "value": _compute_value_score(df, profile),
+        "liquidity": _compute_liquidity_score(df, profile),
         "momentum": _compute_momentum_score(df, profile),
         "reversal": _compute_reversal_score(df, profile),
         "activity": _compute_activity_score(df, profile),
         "stability": _compute_stability_score(df, profile),
-        "size": _compute_size_score(df),
+        "size": _compute_size_score(df, profile),
         "theme_heat": _compute_theme_heat_score(df, profile),
         "topic_alignment": _compute_topic_alignment_score(df, profile),
     }
@@ -188,31 +197,44 @@ def _compute_tech_score(df: pd.DataFrame) -> pd.Series:
     return (factors["momentum"] * 0.55 + factors["activity"] * 0.45).clip(0, 100)
 
 
-def _compute_value_score(df: pd.DataFrame) -> pd.Series:
+def _compute_value_score(df: pd.DataFrame, profile: dict[str, float] | None = None) -> pd.Series:
+    profile = profile if profile is not None else dict(_DEFAULT_SCORING_PROFILE)
+    groups, min_size = _industry_groups(df, profile)
     score = pd.Series(50.0, index=df.index)
 
     if "pe_ratio" in df.columns:
         pe = pd.to_numeric(df["pe_ratio"], errors="coerce")
-        pe_score = _rank_score(pe.where((pe > 0) & (pe < 500)), lower_is_better=True, na_score=25)
+        pe_score = _rank_score(
+            pe.where((pe > 0) & (pe < 500)), lower_is_better=True, na_score=25,
+            groups=groups, min_group_size=min_size,
+        )
         score = score * 0.35 + pe_score * 0.65
 
     if "pb_ratio" in df.columns:
         pb = pd.to_numeric(df["pb_ratio"], errors="coerce")
-        pb_score = _rank_score(pb.where((pb > 0) & (pb < 50)), lower_is_better=True, na_score=25)
+        pb_score = _rank_score(
+            pb.where((pb > 0) & (pb < 50)), lower_is_better=True, na_score=25,
+            groups=groups, min_group_size=min_size,
+        )
         score = score * 0.55 + pb_score * 0.45
 
     return score.clip(0, 100)
 
 
-def _compute_liquidity_score(df: pd.DataFrame) -> pd.Series:
+def _compute_liquidity_score(df: pd.DataFrame, profile: dict[str, float] | None = None) -> pd.Series:
     if "amount" not in df.columns:
         return pd.Series(50.0, index=df.index)
 
     import numpy as np
 
+    profile = profile if profile is not None else dict(_DEFAULT_SCORING_PROFILE)
+    groups, min_size = _industry_groups(df, profile)
     amount = pd.to_numeric(df["amount"], errors="coerce")
     log_amount = np.log10(amount.clip(lower=1))
-    return _rank_score(log_amount.where(amount > 0), lower_is_better=False, na_score=20)
+    return _rank_score(
+        log_amount.where(amount > 0), lower_is_better=False, na_score=20,
+        groups=groups, min_group_size=min_size,
+    )
 
 
 def _compute_momentum_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.Series:
@@ -373,15 +395,20 @@ def _compute_stability_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.
     return score.clip(0, 100)
 
 
-def _compute_size_score(df: pd.DataFrame) -> pd.Series:
+def _compute_size_score(df: pd.DataFrame, profile: dict[str, float] | None = None) -> pd.Series:
     if "total_mv" not in df.columns:
         return pd.Series(50.0, index=df.index)
 
     import numpy as np
 
+    profile = profile if profile is not None else dict(_DEFAULT_SCORING_PROFILE)
+    groups, min_size = _industry_groups(df, profile)
     mv = pd.to_numeric(df["total_mv"], errors="coerce")
     log_mv = np.log10(mv.clip(lower=1))
-    return _rank_score(log_mv.where(mv > 0), lower_is_better=False, na_score=35)
+    return _rank_score(
+        log_mv.where(mv > 0), lower_is_better=False, na_score=35,
+        groups=groups, min_group_size=min_size,
+    )
 
 
 def _compute_theme_heat_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.Series:
@@ -492,7 +519,16 @@ def _rank_score(
     *,
     lower_is_better: bool,
     na_score: float = 50.0,
+    groups: pd.Series | None = None,
+    min_group_size: int = 0,
 ) -> pd.Series:
+    """把一列数值转成 0-100 的分位得分。
+
+    传入 ``groups`` 时改为**组内**分位（行业中性化）：全市场口径下银行凭借行业属性
+    垄断 value 因子高分（39 只银行的 value 均值 89.1，行业内重排后回到 51.0），
+    分不出"银行里便宜的"和"银行里贵的"。有效样本少于 ``min_group_size`` 的组
+    回退到全市场口径，避免 3 只成员的行业只能给出 33/67/100 这种无区分度的分位。
+    """
     numeric = pd.to_numeric(series, errors="coerce")
     if numeric.notna().sum() == 0:
         return pd.Series(float(na_score), index=series.index)
@@ -502,4 +538,29 @@ def _rank_score(
         na_option="keep",
         pct=True,
     ) * 100
+
+    if groups is not None:
+        labels = groups.reindex(numeric.index).astype("string").fillna("").str.strip()
+        # 组大小按**有效值**计数：一个 20 只的行业里只有 2 只有 PE，同样是噪声。
+        valid_per_group = numeric.notna().groupby(labels).transform("sum")
+        within = numeric.groupby(labels).rank(
+            ascending=not lower_is_better,
+            na_option="keep",
+            pct=True,
+        ) * 100
+        use_within = (labels != "") & (valid_per_group >= max(int(min_group_size), 0))
+        ranks = ranks.where(~use_within, within)
+
     return ranks.fillna(float(na_score)).clip(0, 100)
+
+
+def _industry_groups(
+    df: pd.DataFrame,
+    profile: dict[str, float],
+) -> tuple[pd.Series | None, int]:
+    """按 scoring_profile 决定是否做行业中性化，以及小行业回退阈值。"""
+    if float(profile.get("industry_neutral", 0.0)) < 1:
+        return None, 0
+    if "industry" not in df.columns:
+        return None, 0
+    return df["industry"], int(profile.get("industry_neutral_min_size", 10))

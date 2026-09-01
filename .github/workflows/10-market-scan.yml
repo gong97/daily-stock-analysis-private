@@ -39,6 +39,11 @@ on:
         required: false
         default: false
         type: boolean
+      refresh_industry_map:
+        description: '强制重建行业成分映射（约 162 次 akshare 请求；日常无需勾选，TTL 会自然过期）'
+        required: false
+        default: false
+        type: boolean
 
 # 同一时间只跑一轮扫描：daily 与 weekly 在周五会同时触发，串行执行避免名单写冲突。
 concurrency:
@@ -81,6 +86,16 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v5
 
+      - name: 同步最新观察名单
+        # 必须在扫描之前同步：扫描读的是 checkout 时的 current.json，而提交步骤
+        # 直到最后才 rebase。任何在这期间落地的改动都会被静默合并进产物，
+        # 产出「行业数据与名单成员来自不同输入」的文件——实测发生过：
+        # 配额在 5 条空行业条目上放行（4 只银行越过上限 2），随后回填提交被
+        # rebase 合入，文件看起来正常但结论是错的。
+        run: |
+          git pull --ff-only origin "${GITHUB_REF_NAME}"
+          echo "📥 已同步到 $(git rev-parse --short HEAD)"
+
       - name: 设置 Python 环境
         uses: actions/setup-python@v6
         with:
@@ -93,7 +108,16 @@ jobs:
           pip install -r requirements.txt
 
       - name: 创建必要目录
-        run: mkdir -p data/watchlist logs
+        run: mkdir -p data/watchlist/cache/industry logs
+
+      - name: 按需重建行业成分映射
+        # 过期判定已改用缓存 JSON 里的 created_at（不再依赖会被 checkout 重置的 mtime），
+        # 所以两级缓存都会自然过期。这一步只用于在 720 小时 TTL 到期前手动重建成分映射，
+        # 例如板块成分发生了较大调整。只删 *.json，保留 *.history.jsonl 的热度历史。
+        if: github.event.inputs.refresh_industry_map == 'true'
+        run: |
+          rm -f data/watchlist/cache/industry/*.json
+          echo "🔄 已清除行业缓存（保留热度历史），本次运行将重新拉取成分与热度"
 
       - name: 执行全市场扫描
         env:
@@ -114,18 +138,48 @@ jobs:
           # 也各自拉最多 DAILY_ENRICH_MAX_CANDIDATES 条历史。逐只拉取是本工作流最主要的耗时来源，
           # 日 K 缓存跨策略复用。设为 true 可让所有策略的评分都带上日线特征，代价是耗时数倍增长。
           DAILY_ENRICH_ENABLED: ${{ vars.DAILY_ENRICH_ENABLED || 'false' }}
-          DAILY_ENRICH_MAX_CANDIDATES: ${{ vars.DAILY_ENRICH_MAX_CANDIDATES || '100' }}
+          # 300 而不是 100：日线硬筛只在这个子集上判定，其余候选直接出局。
+          # shrink_pullback 快照层存活 3123 只，取 100 时只有 3.2% 的候选被真正判定过。
+          # 实测每轮总耗时 weekly ~380s / daily ~280s，而 job 超时 60 分钟，余量充足；
+          # 日 K 有 24 小时文件缓存，同一天多个策略取到同一只票时复用。
+          # 若 timing.json 显示耗时逼近超时，或 degradation 里 daily 行错误变多，先回调这个值。
+          DAILY_ENRICH_MAX_CANDIDATES: ${{ vars.DAILY_ENRICH_MAX_CANDIDATES || '300' }}
           DAILY_FETCH_MAX_WORKERS: ${{ vars.DAILY_FETCH_MAX_WORKERS || '2' }}
           SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS: ${{ vars.SCREENING_DAILY_HISTORY_CACHE_TTL_HOURS || '24' }}
 
-          # ===== 行业/概念（可选，开启后 theme_heat 因子更有信息量）=====
-          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'none' }}
+          # ===== 行业/概念 =====
+          # 行业与概念现在随 em_datacenter 快照一并取回（sty 里的 INDUSTRY/CONCEPT），
+          # 零额外请求、零额外缓存，行业配额与 portfolio_profile 不再依赖 akshare。
+          #
+          # 下面的 akshare provider 只剩一个用途：board_heat 的趋势/持续性，
+          # 供 theme_momentum 使用。它走 push2.eastmoney.com，在 Actions 上稳定
+          # 502 / RemoteDisconnected（已实测两轮），因此保持开启但**不可依赖**——
+          # 它是 fail-open 的，失败只在 degradation 留记录，不影响扫描与名单。
+          # 静态行业映射表（scripts/refresh_industry_map.py 生成，随仓库版本化）。
+          # 它在 enrich_industry_concepts() 里生效，而该函数在**硬筛和评分之前**执行，
+          # 因此行业配额、策略内 portfolio_profile、theme_heat / topic_alignment 都能拿到数据。
+          # 关键收益：快照源之间行业口径不一致——sina 没有行业列，em_datacenter 有，
+          # 哪个源胜出取决于当轮可用性。静态表把这个差异抹平，且只填空值、
+          # 永不覆盖快照自带的更新鲜的行业（_apply_industry_column 的 current.eq("") 条件）。
+          # 行业归属月度量级才变，建议每月跑一次刷新脚本并提交。
+          INDUSTRY_MAP_FILES: ${{ vars.INDUSTRY_MAP_FILES || 'data/watchlist/industry_map.csv' }}
+          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'akshare' }}
+          INDUSTRY_PROVIDER_MAX_BOARDS: ${{ vars.INDUSTRY_PROVIDER_MAX_BOARDS || '80' }}
+          SCREENING_INDUSTRY_PROVIDER_CACHE_DIR: data/watchlist/cache/industry
+          SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS || '20' }}
+          SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_CONSTITUENTS_CACHE_TTL_HOURS || '720' }}
 
           # ===== 观察名单 =====
           WATCHLIST_DIR: data/watchlist
           WATCHLIST_CADENCE_MAP: ${{ vars.WATCHLIST_CADENCE_MAP }}
-          WATCHLIST_TTL_DAYS: ${{ vars.WATCHLIST_TTL_DAYS || '30' }}
-          WATCHLIST_MAX_SIZE: ${{ vars.WATCHLIST_MAX_SIZE || '60' }}
+          # 三个限额都按 style.risk_profile 分桶独立结算，留空则用各桶默认值。
+          WATCHLIST_TTL_DAYS: ${{ vars.WATCHLIST_TTL_DAYS || 'defensive:45,balanced:30,aggressive:14' }}
+          WATCHLIST_MAX_SIZE: ${{ vars.WATCHLIST_MAX_SIZE || 'defensive:25,balanced:20,aggressive:15' }}
+          # 跨策略行业配额：7 个策略各选 1 只银行时，名单里只留分最高的 2 只。
+          WATCHLIST_MAX_PER_INDUSTRY: ${{ vars.WATCHLIST_MAX_PER_INDUSTRY || 'defensive:2,balanced:2,aggressive:4' }}
+          # 全局行业上限（跨桶结算）：桶内配额管不住跨桶叠加，
+          # 9 只银行分散在两个桶、每桶留 2 只，整体仍有 4 只。设 2 可严格每行业 2 只。
+          WATCHLIST_MAX_PER_INDUSTRY_TOTAL: ${{ vars.WATCHLIST_MAX_PER_INDUSTRY_TOTAL || '3' }}
 
           # ===== 通知渠道（仅在 WATCHLIST_NOTIFY=true 时实际发送）=====
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
@@ -198,8 +252,14 @@ jobs:
           fi
           RUN_DATE="$(TZ='Asia/Shanghai' date '+%Y-%m-%d')"
           git commit -m "chore: refresh ${CADENCE} market scan watchlist (${RUN_DATE})"
-          # 并发的 daily/weekly 运行可能已经推过一次，rebase 后重试一次再放弃。
-          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          # 扫描前已经同步过，这里的 rebase 只用于覆盖「扫描期间又有新提交」的窄窗口。
+          # 不再吞掉失败：冲突意味着产物与远端数据不一致，宁可让这次运行失败，
+          # 也不要推上一份自相矛盾的名单。
+          if ! git pull --rebase origin "${GITHUB_REF_NAME}"; then
+            git rebase --abort || true
+            echo "::error::观察名单与远端冲突——扫描期间远端有新提交，本次结果已作废"
+            exit 1
+          fi
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: 上传扫描产物

@@ -1,0 +1,186 @@
+{
+  "run_date": "2026-08-31",
+  "cadence": "daily",
+  "summaries": [
+    {
+      "strategy": "capital_heat",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 88.81,
+      "snapshot_count": 0,
+      "after_filter_count": 0,
+      "pick_count": 0,
+      "daily_enriched": false,
+      "snapshot_source": "",
+      "run_id": "",
+      "error": "RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data",
+      "degradation": []
+    },
+    {
+      "strategy": "oversold_reversal",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 74.26,
+      "snapshot_count": 5546,
+      "after_filter_count": 367,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "sina",
+      "run_id": "5f392e3f27cc",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: akshare industry board list failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+        "Industry/concepts enrichment: akshare concepts board list failed: 502 Server Error: Bad Gateway for url: https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f12&fs=m%3A90+t%3A3+f%3A%2150&fields=f2%2Cf3%2Cf4%2Cf8%2Cf12%2Cf14%2Cf15%2Cf16%2Cf17%2Cf18%2Cf20%2Cf21%2Cf24%2Cf25%2Cf22%2Cf33%2Cf11%2Cf62%2Cf128%2Cf124%2Cf107%2Cf104%2Cf105%2Cf136",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=5146, concepts=5146, heat=0"
+      ]
+    },
+    {
+      "strategy": "theme_momentum",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 88.45,
+      "snapshot_count": 0,
+      "after_filter_count": 0,
+      "pick_count": 0,
+      "daily_enriched": false,
+      "snapshot_source": "",
+      "run_id": "",
+      "error": "RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio",
+      "degradation": []
+    },
+    {
+      "strategy": "volume_breakout",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 90.31,
+      "snapshot_count": 0,
+      "after_filter_count": 0,
+      "pick_count": 0,
+      "daily_enriched": false,
+      "snapshot_source": "",
+      "run_id": "",
+      "error": "RuntimeError: All snapshot sources failed: sina: missing required columns volume_ratio; efinance: Expecting value: line 1 column 1 (char 0); akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')); em_datacenter: returned empty data; last_good_cache: missing required columns volume_ratio",
+      "degradation": []
+    }
+  ],
+  "picks": {
+    "oversold_reversal": [
+      {
+        "rank": 1,
+        "code": "601166",
+        "name": "兴业银行",
+        "final_score": 92.5922,
+        "screen_score": 88.19222542630585,
+        "industry": "银行",
+        "price": 17.43,
+        "change_pct": -3.22,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 90.1544,
+          "liquidity": 97.8202,
+          "momentum": 46.035,
+          "reversal": 96.36,
+          "activity": 65.7981,
+          "stability": 68.34,
+          "size": 99.455,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000157",
+        "name": "中联重科",
+        "final_score": 87.9888,
+        "screen_score": 83.5887549567601,
+        "industry": "专用设备",
+        "price": 6.82,
+        "change_pct": -3.808,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 88.0961,
+          "liquidity": 76.5668,
+          "momentum": 44.124,
+          "reversal": 95.996,
+          "activity": 66.6293,
+          "stability": 66.576,
+          "size": 91.5531,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "600875",
+        "name": "东方电气",
+        "final_score": 86.9556,
+        "screen_score": 82.55555458883654,
+        "industry": "电源设备",
+        "price": 25.25,
+        "change_pct": -2.697,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 76.6277,
+          "liquidity": 90.7357,
+          "momentum": 47.7348,
+          "reversal": 89.561,
+          "activity": 69.275,
+          "stability": 69.909,
+          "size": 94.5504,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "002432",
+        "name": "九安医疗",
+        "final_score": 86.4527,
+        "screen_score": 82.05265024730096,
+        "industry": "医疗器械",
+        "price": 67.86,
+        "change_pct": -2.233,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 86.6741,
+          "liquidity": 91.2807,
+          "momentum": 49.2428,
+          "reversal": 83.529,
+          "activity": 68.0414,
+          "stability": 71.301,
+          "size": 82.8338,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "000951",
+        "name": "中国重汽",
+        "final_score": 85.495,
+        "screen_score": 81.09497231200926,
+        "industry": "汽车",
+        "price": 21.88,
+        "change_pct": -2.278,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 83.6356,
+          "liquidity": 86.6485,
+          "momentum": 49.0965,
+          "reversal": 84.114,
+          "activity": 70.6292,
+          "stability": 71.166,
+          "size": 79.2916,
+          "theme_heat": 50.0,
+          "topic_alignment": 50.0
+        }
+      }
+    ]
+  }
+}

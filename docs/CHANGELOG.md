@@ -10,6 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [改进] 全市场快照按字段能力排序数据源：`_order_sources_by_capability()` 把「已声明缺少所需字段」的源排到链尾（如 `sina` 的 Market_Center 接口结构性不返回量比），避免需要 `volume_ratio` 的策略每次都先抓完 5000+ 行再在验收时失败。这是偏好排序而非硬性准入——缺字段的源不会被剔除，只有它可用时不需要该字段的策略仍正常运行。同时把原本内嵌在 `_normalize()` 里的字段映射提取为模块级 `_SOURCE_COLUMN_MAP`，作为「源能提供哪些字段」的唯一真源，避免改名表与能力表各自维护而漂移。
+- [改进] 全市场扫描的 `DAILY_ENRICH_MAX_CANDIDATES` 从 100 提到 300。需要日 K 的三个策略（`low_volatility_quality`、`shrink_pullback`、`volume_breakout`）的日线硬筛只在这个 Top-N 子集上判定，其余候选连判都没判就出局——实测 `shrink_pullback` 快照层存活 3123 只，取 100 时仅 3.2% 的候选被真正判定过。子集按快照层因子分预排，而快照因子与形态判据基本无关，因此提高该值实质性扩大了覆盖面。当前每轮总耗时 weekly 约 380 秒、daily 约 280 秒，job 超时 60 分钟，余量充足；日 K 保留 24 小时文件缓存。
+
+- [修复] 移除全部策略的 `price_max` 硬过滤：股价水平不承载流动性信息。实测 220 元以上的 74 只票全部通过各策略的 `amount_min`（仅 1 只成交额低于 2 亿），而该上限挡掉了 49 只 500 亿以上的大盘股（宁德时代、贵州茅台、中际旭创、寒武纪、北方华创等）。流动性改由 `amount_min` + `market_cap_min` 表达；一手成本属于仓位约束，不应放在选股硬筛里。
+- [修复] `blue_chip_income` 去掉 `turnover_rate_min`、`shrink_pullback` 从 1.0% 降到 0.3%：大盘蓝筹的低换手率来自巨大流通盘而非流动性差——长江电力 0.28%、中国神华 0.14%、工商银行 0.09%，但成交额都在 10-21 亿。原阈值把最典型的红利防守股排除在外，与 `blue_chip_income` 的定位矛盾。动量/热度类策略（`capital_heat`、`theme_momentum`、`volume_breakout`）的高换手是信号本身，保持不变。
+- [改进] `blue_chip_income` 与 `low_volatility_quality` 同步启用行业中性化：放宽换手率门槛后超大盘银行全部进入候选池，全市场口径下它们凭低 PE 垄断 value 因子，实测 Top 8 中 7 只为银行；行业内重排后降至 0-1 只，分布回到保险/建筑/电力设备/家电等多个行业。
+- [修复] 全市场扫描工作流改为**扫描之前**同步远端观察名单，并在提交阶段 rebase 冲突时明确失败。此前扫描读的是 checkout 时的 `current.json`，直到提交才 rebase，期间落地的改动会被静默合并进产物——实测产生过「行业数据与名单成员来自不同输入」的文件：配额在 5 条空行业条目上放行（4 只银行越过上限 2），随后回填提交被 rebase 合入，文件看似正常但结论是错的。
+
+- [新功能] 新增 `scripts/refresh_industry_map.py` 与随仓库版本化的静态行业映射表 `data/watchlist/industry_map.csv`（5147 只、103 个行业），通过 `INDUSTRY_MAP_FILES` 在硬筛与评分之前套用。此前行业数据只能来自快照，而快照源之间口径不一致：`sina` 没有行业列、`em_datacenter` 有，哪个源胜出取决于当轮可用性——实测同一轮里 `balanced_alpha` 走 sina 导致 5 条候选行业全空，而行业为空的条目会被行业配额豁免，从而绕过限制留在名单里。静态表只填空值、不覆盖快照自带的更新鲜行业，也不包含任何热度字段（热度每天变，静态化即错误）；脚本在有效行数低于 `--min-rows` 时拒绝覆盖，避免抓取异常清空映射表。
+
+- [修复] 观察名单的 `hit_count` 改为按**扫描日**去重，不再按 `merge_run` 调用次数累计：同一天重复手动运行同一个 cadence 时该值会一路增长，而它通过名单排序的命中加分（每多一次 +2 分、上限 +10）参与行业配额与容量裁剪，等于让工作流运行次数参与选股。同时 `last_seen` 改为只前进不后退，用更早的日期补跑一轮不再把时间基准拉回去（那会凭空延长 TTL）；补跑仍然照常记录策略背书与 `best_score`。
+
+- [新功能] 选股评分支持行业中性化：策略 `scoring_profile` 新增 `industry_neutral` 与 `industry_neutral_min_size`（默认关闭 / 10），开启后 `value`、`liquidity`、`size` 三个分位类因子改为行业内排名。此前 `_rank_score()` 做全市场单一分位，分位反映的是「该票所在行业贵不贵」而非「该票在同类里贵不贵」：39 只银行的 value 因子均值 89.1（行业内重排后 51.0），招商银行全市场口径 87.5 但在银行内部只有 25.7。行业内有效样本（按非空值计）少于阈值、或行业为空时回退全市场口径——实测 102 个行业里 29 个不足 10 只。`quality_value` / `momentum_quality` / `balanced_alpha` 启用；`dual_low` 等保持全市场口径，因为它要的就是全市场最便宜的资产。实测同一份快照 Top 8：`quality_value` 银行 1 只、`dual_low` 银行 6 只。
+
+- [新功能] 观察名单新增全局行业上限 `WATCHLIST_MAX_PER_INDUSTRY_TOTAL`（默认 3，跨桶结算，0 关闭），在桶内配额之后执行。桶内配额只保证每个清单不被一个行业占满，管不住跨桶叠加：9 只银行分散在均衡桶与防守桶、每桶各留 2 只，整份名单仍有 4 只。名额不够时按桶优先级轮流取（每轮从各桶取该行业排名最高的一只），避免按分数全局排序——分数是各策略硬筛存活池内的分位排名，跨桶不可比。`pinned` 与行业为空的条目豁免。实测把真实行业回填到 19 条名单：关闭时 19→13（银行 4 只），默认 3 时 19→12（银行 3 只），设 2 时 19→10（银行 2 只）。
+
+- [修复] `em_datacenter` 快照的 `sty` 参数补上 `INDUSTRY` / `CONCEPT`，行业与概念随快照一并取回：零额外请求、不改变返回行数，实测 5147 行行业零缺失、103 个分类。此前行业数据只能由 `INDUSTRY_PROVIDER=akshare` 提供，而 akshare 的板块接口走 `push2.eastmoney.com`，在 GitHub Actions 上连续两轮均为 502 / RemoteDisconnected，导致观察名单行业列全空、跨策略行业配额静默放行（19 条候选里 9 只银行原样入选）；快照使用的 `data.eastmoney.com` 则一直可用。`CONCEPT` 单值返回 str、多值返回 list，统一归一成 `a|b|c` 文本，避免 list 原样进入 DataFrame 破坏下游字符串处理。
+
+- [改进] 观察名单报告新增行业配额诊断行，`meta` 记 `industry_quota_effective` 与 `industry_missing_count`，配额因缺少行业数据而空转时脚本额外打 warning。行业配额对 `industry` 为空的条目一律放行（无法分组，强行淘汰会误伤），因此「配置在、逻辑在、数据不在」时报告看起来完全正常，只是名单里挤满同一个行业——首次实跑正是如此：19 条候选行业全空、9 只银行原样入选，而 `max_per_industry` 早已配好。
+
+- [修复] 观察名单改为保存逐策略背书（`strategies: {策略名: {score, last_seen, bucket}}`），`bucket` / `buckets` 变成派生属性。此前 `bucket` 是存储字段，跨运行会被最后一轮无条件覆盖：周一 daily 跑成 aggressive、周五 weekly 跑成 defensive，连带 TTL（14↔45 天）与行业配额（4↔2）一起漂移。主桶按 `aggressive > balanced > defensive` 取，让衰减最快的桶治理时效；TTL 改为按每条背书自身所属桶结算，条目只要还剩任一条有效背书就保留，全部失效才算 ttl 出局（此前 `strategies` 只存分数且从不清理）。同时符合多个桶的票只在主桶列一行、只占一个名额，报告标注「兼 X」。名单 schema 升到 v2，`load_watchlist` 兼容名字列表 / `{名: 分数}` 两种旧格式并在 meta 记 `migrated_from_schema_version`；旧快照没有逐策略信息，回填成条目级取值，等各策略重新背书后 `buckets` 才准确。
+
+- [修复] 行业 provider 的板块缓存拆成成分（慢）与热度（快）两级，并改用缓存 JSON 里的 `created_at` 判过期而非文件 mtime。此前单一缓存把每天变化的板块热度和月度才变的成分绑在同一个 TTL 上：取短 TTL 则每轮重打约 162 次 akshare 请求，取长 TTL 则 `theme_heat` 因子会吃上一周前的热度；而 `actions/checkout` 会重置 mtime，使随仓库版本化的缓存按 mtime 判断永不过期。拆分后成分命中缓存时，日度热度刷新只需 2 个请求。部分板块拉取失败时本轮仍可用但不写成分缓存，避免残缺映射被固化。
+- [修复] akshare provider 路径现在也会加载并应用板块热度趋势：每次热度刷新向 `*.history.jsonl` 追加一行/板块（同一天只记一次），经 `load_board_heat_trends()` 产出 `board_heat_trend_score` / `persistence` / `cooling` / `observations`。此前这些字段只在 `INDUSTRY_MAP_FILES` 分支加载且仓库内没有任何写入方，导致依赖它们调参的策略（`theme_momentum` 的退潮惩罚）实际未生效。
+- [测试] 新增 `tests/test_screening_industry_cache.py`，以假 akshare 断言请求次数：成分缓存命中时热度刷新只发 2 个列表请求、双缓存命中时零请求，并覆盖 created_at 过期、mtime 兜底、历史按天去重与部分失败不落缓存。
+
+- [新功能] 观察名单按策略 YAML 的 `style.risk_profile` 分成 defensive / balanced / aggressive 三桶，TTL、行业配额与容量改为**按桶独立结算**：`latest_score` 是各策略硬筛存活池内的分位排名，跨桶不可比，此前的全局裁剪会让数量占优的防守策略把进攻票系统性挤出名单。`bucket` 与 `cadence` 是两根不同的轴（`oversold_reversal` 是 balanced 但跑 daily），跟随最高分策略确定，与策略跑动顺序无关。默认限额 defensive 45 天/25 只/同行业 2、balanced 30 天/20 只/2、aggressive 14 天/15 只/4；`WATCHLIST_TTL_DAYS` / `WATCHLIST_MAX_SIZE` / `WATCHLIST_MAX_PER_INDUSTRY` 支持留空、统一标量、`默认值,bucket:覆盖值` 与逐桶四种写法，逐桶配置总是覆盖统一默认值且与书写顺序无关。报告与 `current.csv` 按桶分段并标注分数不可跨桶比较；名单仍是一份数据，保留同一只票被防守与进攻策略同时命中的交集信号。
+
+- [新功能] 新增 DSA 原生进攻侧选股策略 `theme_momentum`（主题动能，short_term → 每交易日扫描）：以 `theme_heat` 0.27 + `momentum` 0.25 + `activity` 0.20 为主导，并首次启用 `topic_alignment` 因子；用 `market_cap_max`（策略库首处使用）限定中小市值，刻意不配 `pe_ttm_*` / `pb_*` 且不给 `value` 权重，避免亏损成长股被硬过滤的 NaN 淘汰规则和 `value` 因子的 `na_score=25` 系统性压制；追高容忍度在硬筛、momentum 评分、stability 权重、风险叠加、L3 scorecard 五层同步放宽，退潮惩罚（`theme_heat_cooling_*`）强于升温加分。依赖 `INDUSTRY_PROVIDER` 的板块数据，`data_requirements` 标记 `industry_context`。
+- [测试] `test_bundled_engine_keeps_source_and_license_notices` 改为按白名单区分 AlphaSift 衍生文件与 DSA 原生策略文件，并断言原生文件不得错误声明 AlphaSift 归因，避免为通过归因检查而伪造来源头。
+
+- [新功能] 观察名单新增跨策略行业配额 `WATCHLIST_MAX_PER_INDUSTRY`（默认 2）：选股引擎的 `apply_portfolio_overlay` 只在单个策略内部生效，7 个策略各选 1 只银行时名单仍会高度集中（首次实跑 19 只候选里 9 只银行）；淘汰顺序为 TTL → 行业配额 → 容量上限，使行业配额腾出的名额让给其他行业，`pinned` 条目与行业为空的条目不参与配额。
+- [修复] 全市场扫描工作流把 `INDUSTRY_PROVIDER` 默认设为 `akshare`：默认快照源 `em_datacenter` 的 `sty` 参数不返回任何行业字段，导致策略内 `portfolio_profile` 整个空转、`theme_heat` 因子退化成对所有候选相同的常数、观察名单也拿不到行业分组。板块映射缓存改写到已版本化的 `data/watchlist/cache/industry` 并将 TTL 提到 168 小时，避免每轮重打约 162 次 akshare 请求；新增 workflow_dispatch 输入 `refresh_industry_map` 用于强制重建（`actions/checkout` 会重置 mtime，committed 缓存不会自行过期）。
+
+- [修复] `src/services/screening/config.py` 的 `_resolve_snapshot_source_priority()` 只判断 `SNAPSHOT_SOURCE_PRIORITY` 是否为 `None` 就当作"显式指定"，但 `.github/workflows/10-market-scan.yml` 用 `env: SNAPSHOT_SOURCE_PRIORITY: ${{ vars.SNAPSHOT_SOURCE_PRIORITY }}` 注入该变量时，仓库变量未配置也会得到"已设置但值为空字符串"而非变量整体缺失；两者叠加导致快照数据源候选列表被解析成空列表，全市场扫描的每个策略都会在拿快照这一步直接抛 `RuntimeError: All snapshot sources failed:`，7 个策略全部失败、观察名单不更新、`_notify()` 也不会被调用（不发邮件）。改为按 `strip()` 后是否非空判断，未配置时按原有约定（`docs/data-source-stability.md` 与工作流注释里"留空自动注入"）回退到按 `TUSHARE_TOKEN` 是否存在选择默认源优先级；显式设置非空值时行为不变。
 - [新功能] 新增全市场扫描观察名单：`scripts/market_scan.py` 按策略 YAML 的 `style.holding_period` 分层调用内置选股引擎（`short_term` → 每交易日，`swing` / `watchlist` → 每周），把候选合并进 `data/watchlist/current.json` 并导出 `current.csv`、`history/<日期>-<频率>.json` 与 `timing.json`；名单按 TTL 和容量上限淘汰，`pinned.txt` 中手工固定的代码不占名额也不会被裁掉。同一只票被多个策略同时选中时，`latest_score` / `latest_rank` / `cadence` / `holding_period` 统一取自得分最高的那个策略，与策略跑动顺序无关。扫描默认关闭 LLM 重排，单个策略失败不中断整轮，全部失败才返回非零退出码并保持名单不变。
 - [新功能] 新增 `.github/workflows/10-market-scan.yml`：daily（每交易日 17:30 北京时间）与 weekly（每周五 18:30 北京时间）两条 cron 分别扫描对应分层，产物提交回仓库并上传 artifact，并推送独立的观察名单报告邮件（`WATCHLIST_NOTIFY`，工作流内默认开启），主题为「📈 全市场扫描报告 - 日期」。
 - [改进] `NotificationService.send()` / `send_with_results()` 新增可选的 `email_subject`，允许非日报类报告指定自己的邮件主题；不传时行为与此前完全一致（邮件渠道仍生成默认的「股票智能分析报告」主题）。

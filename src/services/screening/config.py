@@ -124,8 +124,13 @@ def _has_tushare_token() -> bool:
 
 
 def _resolve_snapshot_source_priority() -> list[str]:
-    explicit = os.getenv("SNAPSHOT_SOURCE_PRIORITY")
-    if explicit is not None:
+    # CI 通过 `env: SNAPSHOT_SOURCE_PRIORITY: ${{ vars.SNAPSHOT_SOURCE_PRIORITY }}` 注入，
+    # 未配置该仓库变量时取到的是"已设置但值为空字符串"，而不是环境变量整体缺失；
+    # 因此必须用 strip 后是否非空来判定"是否显式指定"，否则会把它当成显式指定的空列表，
+    # 导致 fetch_snapshot_with_fallback 的候选源列表为空、直接报错，
+    # 也和 docs/data-source-stability.md、10-market-scan.yml 里"留空自动注入"的约定不一致。
+    explicit = os.getenv("SNAPSHOT_SOURCE_PRIORITY", "").strip()
+    if explicit:
         return [s.strip() for s in explicit.split(",") if s.strip()]
     if _has_tushare_token():
         return list(TUSHARE_FIRST_SOURCE_PRIORITY)

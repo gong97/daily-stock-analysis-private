@@ -30,7 +30,12 @@ screening:
     change_pct_min: -4.0
     change_pct_max: 8.5
     price_min: 3
-    price_max: 220
+    # 刻意不设 price_max：股价水平不承载流动性信息。实测 220 元以上的 74 只票
+    # 全部通过各策略的 amount_min，而该上限会挡掉 49 只 500 亿以上的大盘股
+    # （宁德时代、贵州茅台、中际旭创、寒武纪、北方华创……）。流动性由
+    # amount_min + market_cap_min 表达。
+    # 注意：A 股 100 股/手，贵州茅台一手约 13 万元——这是仓位约束，
+    # 属于组合层面，不该塞进选股硬筛。
   tech_weight: 0.35
   factor_weights:
     value: 0.22
@@ -42,6 +47,12 @@ screening:
     theme_heat: 0.05
     size: 0.03
   scoring_profile:
+    # 行业中性化：value / liquidity / size 三个分位类因子改为行业内排名。
+    # 全市场口径下银行凭行业属性垄断 value 高分（39 只银行 value 均值 89.1），
+    # 分不出"银行里便宜的"和"银行里贵的"——招商银行全市场 87.5、行业内只有 25.7。
+    # 行业内有效样本少于 10 只时回退全市场口径（102 个行业里 29 个不足 10 只）。
+    industry_neutral: true
+    industry_neutral_min_size: 10
     momentum_chase_start_pct: 5.5
     momentum_chase_penalty_slope: 12.0
     activity_ideal_volume_ratio: 2.0

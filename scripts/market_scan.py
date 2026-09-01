@@ -39,15 +39,22 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.services.screening_watchlist import (  # noqa: E402
+    DEFAULT_MAX_PER_INDUSTRY,
+    DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET,
+    DEFAULT_MAX_PER_INDUSTRY_TOTAL,
     DEFAULT_MAX_SIZE,
+    DEFAULT_MAX_SIZE_BY_BUCKET,
     DEFAULT_TTL_DAYS,
+    DEFAULT_TTL_DAYS_BY_BUCKET,
     RunSummary,
     apply_pinned,
     expire_entries,
     format_date,
     load_pinned_codes,
     load_watchlist,
+    industry_quota_diagnostic,
     merge_run,
+    parse_bucket_limits,
     parse_cadence_map,
     render_report,
     resolve_cadence,
@@ -117,15 +124,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ttl-days",
-        type=int,
-        default=_env_int("WATCHLIST_TTL_DAYS", DEFAULT_TTL_DAYS),
-        help="超过该天数没有再被任何策略选中就移出名单；0 表示不淘汰",
+        default=_env_text("WATCHLIST_TTL_DAYS"),
+        help=(
+            "超过该天数没有再被任何策略选中就移出名单；0 表示不淘汰。"
+            "支持按桶配置，如 'defensive:45,balanced:30,aggressive:14'；"
+            "留空使用各桶默认值"
+        ),
     )
     parser.add_argument(
         "--max-size",
+        default=_env_text("WATCHLIST_MAX_SIZE"),
+        help=(
+            "每个桶的容量上限；0 表示不限制。pinned 条目不占用也不会被裁掉。"
+            "支持按桶配置，如 'defensive:25,balanced:20,aggressive:15'"
+        ),
+    )
+    parser.add_argument(
+        "--max-per-industry",
+        default=_env_text("WATCHLIST_MAX_PER_INDUSTRY"),
+        help=(
+            "同一行业在单个桶内最多保留几只；0 表示不限制。"
+            "这是跨策略的集中度控制，选股引擎的组合分散只在单个策略内生效。"
+            "支持按桶配置，如 'defensive:2,aggressive:4'"
+        ),
+    )
+    parser.add_argument(
+        "--max-per-industry-total",
         type=int,
-        default=_env_int("WATCHLIST_MAX_SIZE", DEFAULT_MAX_SIZE),
-        help="名单容量上限；0 表示不限制。pinned 条目不占用也不会被裁掉",
+        default=_env_int("WATCHLIST_MAX_PER_INDUSTRY_TOTAL", DEFAULT_MAX_PER_INDUSTRY_TOTAL),
+        help=(
+            "同一行业在整份名单里的总数上限（跨桶结算）；0 表示不限制。"
+            "桶内配额管不住跨桶叠加：9 只银行分散在两个桶、每桶留 2 只，整体仍有 4 只"
+        ),
     )
     parser.add_argument("--use-llm", action="store_true", help="开启 L2 LLM 重排（默认关闭）")
     parser.add_argument(
@@ -332,6 +362,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         logger.warning("没有匹配 cadence=%s market=%s 的策略，本次不执行", args.cadence, args.market)
         return 0
 
+    # 名单分桶取自策略 YAML 的 style.risk_profile，与 cadence 是两根不同的轴：
+    # oversold_reversal 是 balanced 但跑 daily，所以不能拿 cadence 代替。
+    risk_profiles: Dict[str, str] = {}
+    for info in infos:
+        style = getattr(info, "style", None) or {}
+        risk_profiles[str(getattr(info, "name", ""))] = str(
+            style.get("risk_profile", "") if isinstance(style, dict) else ""
+        )
+
     logger.info(
         "本次扫描 cadence=%s market=%s 策略=%s",
         args.cadence,
@@ -377,14 +416,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         picks_by_strategy,
         run_date=run_date,
         holding_periods=holding_periods,
+        risk_profiles=risk_profiles,
         cadence_map=cadence_map,
     )
     entries = apply_pinned(entries, load_pinned_codes(out_dir / "pinned.txt"))
+    ttl_limits = parse_bucket_limits(
+        args.ttl_days, defaults=DEFAULT_TTL_DAYS_BY_BUCKET, scalar_default=DEFAULT_TTL_DAYS
+    )
+    size_limits = parse_bucket_limits(
+        args.max_size, defaults=DEFAULT_MAX_SIZE_BY_BUCKET, scalar_default=DEFAULT_MAX_SIZE
+    )
+    industry_limits = parse_bucket_limits(
+        args.max_per_industry,
+        defaults=DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET,
+        scalar_default=DEFAULT_MAX_PER_INDUSTRY,
+    )
     entries, removed = expire_entries(
         entries,
         run_date=run_date,
-        ttl_days=args.ttl_days,
-        max_size=args.max_size,
+        ttl_days=ttl_limits,
+        max_size=size_limits,
+        max_per_industry=industry_limits,
+        max_per_industry_total=args.max_per_industry_total,
     )
     # 本次刚进来又立刻被容量裁掉的，不算"新进"。
     added = [code for code in added if code in entries]
@@ -398,6 +451,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         summaries=summaries,
     )
 
+    diagnostic = industry_quota_diagnostic(entries, removed)
+    # 配额因缺数据而静默放行时必须在 workflow 日志里显眼，否则只能靠人肉发现
+    # "名单里怎么全是银行"。
+    (logger.info if diagnostic.effective else logger.warning)("%s", diagnostic.text)
     logger.info(
         "名单 %s → %s（新进 %s，移出 %s）",
         len(before_codes),
@@ -418,8 +475,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "last_run_strategies": [name for name, _ in planned],
         "last_run_failed_strategies": [item.strategy for item in summaries if item.error],
         "llm_ranked": bool(args.use_llm),
-        "ttl_days": args.ttl_days,
-        "max_size": args.max_size,
+        "ttl_days": ttl_limits,
+        "max_size": size_limits,
+        "max_per_industry": industry_limits,
+        "max_per_industry_total": args.max_per_industry_total,
+        "industry_quota_effective": diagnostic.effective,
+        "industry_missing_count": diagnostic.missing_industry,
         "updated_at": datetime.now(_CN_TZ).isoformat(timespec="seconds"),
     })
     save_watchlist(current_path, entries, meta)
