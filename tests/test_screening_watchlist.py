@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date
 from types import SimpleNamespace
 
 import pytest
 
 from src.services.screening_watchlist import (
+    _primary_strategy,
+    _trim_to_capacity_round_robin,
     BUCKET_AGGRESSIVE,
     BUCKET_BALANCED,
     BUCKET_DEFENSIVE,
@@ -294,6 +297,96 @@ def test_expire_entries_enforces_capacity_by_rank():
     )
     assert set(kept) == {"000002", "000003"}
     assert removed == [("000001", "capacity")]
+
+
+def test_capacity_round_robin_gives_each_strategy_equal_seats():
+    """分数不可比的两个策略应各占一半名额，而不是高分池通吃。
+
+    `latest_score` 是策略硬筛存活池内的分位排名：19 只池子里排第 3 得 84 分，
+    128 只池子里排第 3 只得 68 分。按分数排序会让小池子策略通吃。
+    """
+    entries = {}
+    for i in range(10):
+        # 小池子策略：分数区间 77.5~82
+        entries[f"A{i}"] = _make(f"A{i}", bucket=BUCKET_AGGRESSIVE,
+                                 score=82.0 - i * 0.5, strategy="small_pool",
+                                 industry=f"行业{i}")
+    for i in range(10):
+        # 大池子策略：分数区间 68.1~69，全部低于小池子的最低分
+        entries[f"B{i}"] = _make(f"B{i}", bucket=BUCKET_AGGRESSIVE,
+                                 score=69.0 - i * 0.1, strategy="big_pool",
+                                 industry=f"行业{i}")
+
+    kept, _ = _trim_to_capacity_round_robin(entries, run_date=RUN_DATE, max_size=10)
+
+    counts = Counter(_primary_strategy(entry) for entry in kept.values())
+    assert counts["small_pool"] == 5
+    assert counts["big_pool"] == 5, "大池子策略的最高分低于小池子最低分，按分数排会颗粒无收"
+
+
+def test_capacity_round_robin_reallocates_unused_seats():
+    """某策略候选不足时，剩余名额流向其他策略而不是空置。"""
+    entries = {
+        "A0": _make("A0", bucket=BUCKET_AGGRESSIVE, score=80.0, strategy="a", industry="甲"),
+        "A1": _make("A1", bucket=BUCKET_AGGRESSIVE, score=79.0, strategy="a", industry="乙"),
+        "A2": _make("A2", bucket=BUCKET_AGGRESSIVE, score=78.0, strategy="a", industry="丙"),
+        "B0": _make("B0", bucket=BUCKET_AGGRESSIVE, score=70.0, strategy="b", industry="丁"),
+    }
+    kept, removed = _trim_to_capacity_round_robin(entries, run_date=RUN_DATE, max_size=4)
+    assert len(kept) == 4, "b 只有 1 只候选，剩下的名额应让给 a"
+    assert removed == []
+
+
+def test_capacity_round_robin_prefers_multi_strategy_hits():
+    """多策略共同背书的票优先入选，即使它在各策略内排名靠后。"""
+    solo = _make("SOLO", bucket=BUCKET_AGGRESSIVE, score=99.0, strategy="a", industry="甲")
+    multi = WatchlistEntry(
+        code="MULTI",
+        industry="乙",
+        last_seen="2026-08-28",
+        latest_score=62.0,
+        hit_count=1,
+        strategies={
+            "a": _hit(60.0, BUCKET_AGGRESSIVE),
+            "b": _hit(61.0, BUCKET_AGGRESSIVE),
+            "c": _hit(62.0, BUCKET_AGGRESSIVE),
+        },
+    )
+    kept, _ = _trim_to_capacity_round_robin(
+        {"SOLO": solo, "MULTI": multi}, run_date=RUN_DATE, max_size=1
+    )
+    assert set(kept) == {"MULTI"}
+
+
+def test_capacity_round_robin_is_order_independent():
+    """同一份输入无论字典顺序如何，得到同一份名单。"""
+    entries = {}
+    for i in range(6):
+        entries[f"A{i}"] = _make(f"A{i}", bucket=BUCKET_AGGRESSIVE, score=82.0 - i,
+                                 strategy="a", industry=f"行业A{i}")
+        entries[f"B{i}"] = _make(f"B{i}", bucket=BUCKET_AGGRESSIVE, score=69.0 - i,
+                                 strategy="b", industry=f"行业B{i}")
+
+    forward, _ = _trim_to_capacity_round_robin(entries, run_date=RUN_DATE, max_size=7)
+    backward, _ = _trim_to_capacity_round_robin(
+        dict(reversed(list(entries.items()))), run_date=RUN_DATE, max_size=7
+    )
+    assert sorted(forward) == sorted(backward)
+
+
+def test_capacity_round_robin_keeps_pinned_outside_the_quota():
+    """pinned 条目永不淘汰，也不占用轮转名额。"""
+    entries = {
+        f"X{i}": _make(f"X{i}", bucket=BUCKET_AGGRESSIVE, score=80.0 - i,
+                       strategy="a", industry=f"行业{i}")
+        for i in range(8)
+    }
+    entries["PIN"] = _make("PIN", bucket=BUCKET_AGGRESSIVE, score=1.0,
+                           strategy="a", industry="固定", pinned=True)
+
+    kept, _ = _trim_to_capacity_round_robin(entries, run_date=RUN_DATE, max_size=3)
+    assert "PIN" in kept
+    assert sum(1 for entry in kept.values() if not entry.pinned) == 3
 
 
 def test_expire_entries_never_drops_pinned_and_pinned_does_not_consume_quota():

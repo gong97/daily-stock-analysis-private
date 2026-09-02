@@ -976,20 +976,107 @@ def _expire_one_bucket(
     )
 
     if max_size > 0:
-        survivors: Dict[str, WatchlistEntry] = {}
-        non_pinned_kept = 0
-        for entry in sort_entries(kept.values(), run_date=run_date):
-            if entry.pinned:
-                survivors[entry.code] = entry
-                continue
-            if non_pinned_kept < max_size:
-                survivors[entry.code] = entry
-                non_pinned_kept += 1
-            else:
-                removed.append((entry.code, "capacity"))
-        kept = survivors
+        kept, capacity_removed = _trim_to_capacity_round_robin(
+            kept, run_date=run_date, max_size=max_size
+        )
+        removed.extend(capacity_removed)
 
     return kept, removed
+
+
+def _trim_to_capacity_round_robin(
+    entries: Mapping[str, WatchlistEntry],
+    *,
+    run_date: date,
+    max_size: int,
+) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
+    """按策略轮流取票填满容量，而不是按 `latest_score` 全桶排序。
+
+    为什么不能直接按分数排：`latest_score` 是**该策略硬筛存活池内的分位排名**，
+    池子大小差一个数量级时分数完全不可比。实测同一桶内——
+
+        volume_breakout  存活池  19 只  分数 70.13 ~ 82.22
+        capital_heat     存活池  93 只  分数 68.93 ~ 73.84
+        theme_momentum   存活池 128 只  分数 67.98 ~ 69.40
+
+    `theme_momentum` 的**最高分低于 volume_breakout 的最低分**，按分数排序时
+    它在 15 个名额里一个独立席位都拿不到（实测 13/15 是 volume_breakout）。
+    这不是它选的票差，是 19 只池子里排第 3 和 128 只池子里排第 3 拿到的分位
+    本就不同。分桶解决了跨桶不可比，这里解决桶内跨策略不可比。
+
+    轮转规则：各策略按自己的分数排好队，然后轮流取第 1、第 2……直到填满。
+    等价于均分席位，但策略数变化时自动适配，且某策略候选不足时名额自然流向
+    其他策略而不是空置。**全程不跨策略比较分数**，只比较组内次序。
+
+    多策略共同命中的票优先入选：三个独立策略同时背书是名单里最强的信号，
+    不该因为在某一策略内排名靠后而被轮空。它只占一个名额，记在主策略名下。
+
+    `pinned` 条目永不淘汰且不占名额。
+    """
+    survivors: Dict[str, WatchlistEntry] = {}
+    pool: List[WatchlistEntry] = []
+    for entry in sort_entries(entries.values(), run_date=run_date):
+        if entry.pinned:
+            survivors[entry.code] = entry
+        else:
+            pool.append(entry)
+
+    # 多策略命中的先落座，再轮转分配剩下的名额。
+    chosen: List[str] = []
+    multi = [e for e in pool if len(e.strategies) > 1]
+    for entry in sorted(multi, key=lambda e: (-len(e.strategies), -e.latest_score, e.code)):
+        if len(chosen) >= max_size:
+            break
+        survivors[entry.code] = entry
+        chosen.append(entry.code)
+
+    # 每个策略一条按自身分数排序的队列；同一只票只会出现在它主策略的队列里，
+    # 避免一只多策略票占掉多个策略的轮次。
+    queues: Dict[str, List[WatchlistEntry]] = {}
+    for entry in pool:
+        if entry.code in survivors:
+            continue
+        primary = _primary_strategy(entry)
+        queues.setdefault(primary, []).append(entry)
+    for name, queue in queues.items():
+        queue.sort(key=lambda e: (-_score_in_strategy(e, name), e.code))
+
+    # 轮转顺序按策略名固定，保证同一份输入得到同一份名单。
+    order = sorted(queues)
+    cursor = {name: 0 for name in order}
+    while len(chosen) < max_size:
+        progressed = False
+        for name in order:
+            if len(chosen) >= max_size:
+                break
+            index = cursor[name]
+            queue = queues[name]
+            if index >= len(queue):
+                continue
+            entry = queue[index]
+            cursor[name] = index + 1
+            survivors[entry.code] = entry
+            chosen.append(entry.code)
+            progressed = True
+        if not progressed:
+            break
+
+    removed = [
+        (entry.code, "capacity") for entry in pool if entry.code not in survivors
+    ]
+    return survivors, removed
+
+
+def _primary_strategy(entry: WatchlistEntry) -> str:
+    """条目归属的策略：取分数最高的那条背书，平手按名字定序。"""
+    if not entry.strategies:
+        return ""
+    return min(entry.strategies.items(), key=lambda kv: (-kv[1].score, kv[0]))[0]
+
+
+def _score_in_strategy(entry: WatchlistEntry, strategy: str) -> float:
+    hit = entry.strategies.get(strategy)
+    return hit.score if hit is not None else entry.latest_score
 
 
 def apply_pinned(entries: Mapping[str, WatchlistEntry], pinned_codes: Sequence[str]) -> Dict[str, WatchlistEntry]:
