@@ -1144,10 +1144,109 @@ class TushareFetcher(BaseFetcher):
         
         # 获取为空或者接口调用失败，返回 None
         return None
-    
-    
 
-    
+    def get_capital_flow(self, stock_code: str, top_n: int = 5) -> Optional[Dict[str, Any]]:
+        """
+        获取个股 + 板块资金流 (Tushare Pro)
+
+        数据来源：ts.pro_api().moneyflow() / moneyflow_ind_ths / moneyflow_ind_dc
+
+        存在的意义：akshare 的资金流接口走 push2*.eastmoney.com，在 GitHub
+        Actions 上稳定 502 / RemoteDisconnected（与板块热度接口同一个 host，
+        已实测）。Tushare 走 api.tushare.pro + token 鉴权，不受该封锁影响，
+        因此作为 CI 环境下的主路。
+
+        主力净额口径：large + extra-large 的买卖差额，即
+        (buy_lg_amount + buy_elg_amount) - (sell_lg_amount + sell_elg_amount)。
+        Tushare 该组字段单位是「万元」，统一乘 1e4 换算成元，与 akshare 口径对齐。
+
+        返回 None 表示不可用（未配置 token / 无权限 / 接口失败），由调用方决定降级。
+        """
+        if self._api is None:
+            return None
+
+        result: Dict[str, Any] = {
+            "status": "not_supported",
+            "stock_flow": {},
+            "sector_rankings": {"top": [], "bottom": []},
+            "source_chain": [],
+            "errors": [],
+        }
+
+        # ---- 个股资金流 ----
+        try:
+            ts_code = self._convert_stock_code(stock_code)
+        except Exception as e:
+            ts_code = None
+            result["errors"].append(f"tushare_convert_code:{type(e).__name__}")
+
+        if ts_code:
+            try:
+                df = self._call_api_with_rate_limit("moneyflow", ts_code=ts_code)
+                if df is not None and not df.empty:
+                    # moneyflow 按 trade_date 倒序返回，取最新一行。
+                    df = df.sort_values("trade_date", ascending=False) if "trade_date" in df.columns else df
+                    row = df.iloc[0]
+
+                    def _amt(col: str) -> float:
+                        return float(pd.to_numeric(row.get(col), errors="coerce") or 0.0)
+
+                    main_net_wan = (
+                        _amt("buy_lg_amount") + _amt("buy_elg_amount")
+                        - _amt("sell_lg_amount") - _amt("sell_elg_amount")
+                    )
+                    result["stock_flow"] = {
+                        "main_net_inflow": main_net_wan * 1e4,
+                        "inflow_5d": None,
+                        "inflow_10d": None,
+                    }
+                    result["source_chain"].append("capital_stock:tushare_moneyflow")
+            except Exception as e:
+                logger.warning(f"[Tushare] moneyflow 获取个股资金流失败: {e}")
+                result["errors"].append(f"tushare_moneyflow:{type(e).__name__}")
+
+        # ---- 板块资金流排行 ----
+        start_date = self.get_trade_time(early_time='00:00', late_time='15:30')
+        if start_date:
+            for api_name, name_col, flow_col in (
+                ("moneyflow_ind_ths", "industry", "net_amount"),
+                ("moneyflow_ind_dc", "name", "net_amount"),
+            ):
+                try:
+                    df = self._call_api_with_rate_limit(api_name, trade_date=start_date)
+                    if df is None or df.empty:
+                        continue
+                    if api_name == "moneyflow_ind_dc" and "content_type" in df.columns:
+                        df = df[df["content_type"] == "行业"]
+                    if name_col not in df.columns or flow_col not in df.columns:
+                        continue
+                    work = df[[name_col, flow_col]].copy()
+                    work[flow_col] = pd.to_numeric(work[flow_col], errors="coerce")
+                    work = work.dropna(subset=[flow_col])
+                    if work.empty:
+                        continue
+                    top = work.nlargest(top_n, flow_col)
+                    bottom = work.nsmallest(top_n, flow_col)
+                    result["sector_rankings"] = {
+                        "top": [{"name": str(r[name_col]), "net_inflow": float(r[flow_col])} for _, r in top.iterrows()],
+                        "bottom": [{"name": str(r[name_col]), "net_inflow": float(r[flow_col])} for _, r in bottom.iterrows()],
+                    }
+                    result["source_chain"].append(f"capital_sector:tushare_{api_name}")
+                    break
+                except Exception as e:
+                    logger.warning(f"[Tushare] {api_name} 获取板块资金流失败: {e}")
+                    result["errors"].append(f"tushare_{api_name}:{type(e).__name__}")
+
+        has_content = bool(
+            result["stock_flow"]
+            or result["sector_rankings"]["top"]
+            or result["sector_rankings"]["bottom"]
+        )
+        if not has_content:
+            return None
+        result["status"] = "partial"
+        return result
+
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:
         """
         获取筹码分布数据

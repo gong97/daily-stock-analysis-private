@@ -91,6 +91,30 @@ def _normalize_code(raw: Any) -> str:
     return s
 
 
+def _infer_ak_market(stock_code: Any) -> Optional[str]:
+    """
+    Infer AkShare's ``market`` argument ('sh'/'sz'/'bj') from an A-share code.
+
+    ``normalize_stock_code()`` strips exchange prefixes/suffixes before the code
+    reaches this adapter, so the exchange has to be recovered from the numeric
+    prefix. AkShare defaults to ``market='sh'``; without this the Shenzhen and
+    Beijing codes silently query the wrong exchange instead of failing loudly.
+
+    Returns None for anything that is not a 6-digit A-share code.
+    """
+    code = _normalize_code(stock_code)
+    if not re.fullmatch(r"\d{6}", code):
+        return None
+    # 60/68 -> SSE main board & STAR; 000/001/002/003/30 -> SZSE; 43/83/87/92 -> BSE.
+    if code.startswith(("60", "68")):
+        return "sh"
+    if code.startswith(("000", "001", "002", "003", "30")):
+        return "sz"
+    if code.startswith(("43", "83", "87", "92")):
+        return "bj"
+    return None
+
+
 def _pick_by_keywords(row: pd.Series, keywords: List[str]) -> Optional[Any]:
     """
     Return first non-empty row value whose column name contains any keyword.
@@ -425,13 +449,19 @@ class AkshareFundamentalAdapter:
             "errors": [],
         }
 
-        stock_df, stock_source, stock_errors = self._call_df_candidates([
-            ("stock_individual_fund_flow", {"stock": stock_code}),
-            ("stock_individual_fund_flow", {"symbol": stock_code}),
-            ("stock_individual_fund_flow", {}),
-            ("stock_main_fund_flow", {"symbol": stock_code}),
-            ("stock_main_fund_flow", {}),
-        ])
+        # AkShare signature is stock_individual_fund_flow(stock, market='sh').
+        # `market` is required for correctness, not just availability: omitting it
+        # makes every SZ/BJ code silently return Shanghai data. Candidates that
+        # take no code at all are deliberately absent -- they return AkShare's
+        # built-in default stock, i.e. another company's flow.
+        market = _infer_ak_market(stock_code)
+        if market is None:
+            result["errors"].append(f"unsupported_code:{_safe_str(stock_code)}")
+            stock_df, stock_source, stock_errors = None, None, []
+        else:
+            stock_df, stock_source, stock_errors = self._call_df_candidates([
+                ("stock_individual_fund_flow", {"stock": _normalize_code(stock_code), "market": market}),
+            ])
         result["errors"].extend(stock_errors)
         if stock_df is not None:
             row = _extract_latest_row(stock_df, stock_code)
@@ -446,9 +476,11 @@ class AkshareFundamentalAdapter:
                 }
                 result["source_chain"].append(f"capital_stock:{stock_source}")
 
+        # stock_sector_fund_flow_rank(indicator, sector_type) -- pass both
+        # explicitly so the ranking window and board type are pinned rather than
+        # inherited from AkShare's defaults.
         sector_df, sector_source, sector_errors = self._call_df_candidates([
-            ("stock_sector_fund_flow_rank", {}),
-            ("stock_sector_fund_flow_summary", {}),
+            ("stock_sector_fund_flow_rank", {"indicator": "今日", "sector_type": "行业资金流"}),
         ])
         result["errors"].extend(sector_errors)
         if sector_df is not None:
@@ -467,7 +499,15 @@ class AkshareFundamentalAdapter:
                 result["source_chain"].append(f"capital_sector:{sector_source}")
 
         has_content = bool(result["stock_flow"] or result["sector_rankings"]["top"] or result["sector_rankings"]["bottom"])
-        result["status"] = "partial" if has_content else "not_supported"
+        if has_content:
+            result["status"] = "partial"
+        elif result["errors"]:
+            # Every candidate raised (import error, network block, bad params).
+            # This is a failure, not an unsupported instrument -- reporting it as
+            # "not_supported" is what kept this outage invisible in the report.
+            result["status"] = "failed"
+        else:
+            result["status"] = "not_supported"
         return result
 
     def get_dragon_tiger_flag(self, stock_code: str, lookback_days: int = 20) -> Dict[str, Any]:

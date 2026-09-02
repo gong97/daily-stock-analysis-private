@@ -3416,6 +3416,35 @@ class DataFetcherManager:
             self._prune_fundamental_cache(cache_ttl, cache_max_entries)
         return result_ctx
 
+    def _find_tushare_fetcher(self) -> Optional[Any]:
+        """返回已启用的 TushareFetcher 实例，没有则 None。"""
+        for fetcher in self._get_fetchers_snapshot():
+            if type(fetcher).__name__ == "TushareFetcher":
+                try:
+                    return fetcher if fetcher.is_available() else None
+                except Exception:
+                    return None
+        return None
+
+    def _get_capital_flow_payload(self, stock_code: str) -> Dict[str, Any]:
+        """
+        资金流取数：Tushare 优先，AkShare 兜底。
+
+        两个源的返回结构一致（status / stock_flow / sector_rankings /
+        source_chain / errors），因此上层无需区分来源。Tushare 返回 None
+        表示不可用（无 token / 无权限 / 接口失败），此时才回落到 AkShare。
+        """
+        tushare = self._find_tushare_fetcher()
+        if tushare is not None:
+            try:
+                payload = tushare.get_capital_flow(stock_code)
+                if isinstance(payload, dict):
+                    return payload
+            except Exception as exc:
+                logger.warning("[CapitalFlow] Tushare 取数失败，回落 AkShare: %s", exc)
+
+        return self._fundamental_adapter.get_capital_flow(stock_code)
+
     def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
         """资金流向块（fail-open）。"""
         from src.config import get_config
@@ -3438,8 +3467,13 @@ class DataFetcherManager:
                 [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
                 ["fundamental stage timeout"],
             )
+        # Tushare first: AkShare's flow endpoints go through push2*.eastmoney.com,
+        # which is reliably 502/RemoteDisconnected from GitHub Actions (same host
+        # the board-heat provider already had to abandon). Tushare uses
+        # token-authenticated api.tushare.pro and is unaffected. AkShare stays as
+        # the fallback so local runs still work without a Tushare token.
         payload, err, cost_ms = self._run_with_retry(
-            lambda: self._fundamental_adapter.get_capital_flow(stock_code),
+            lambda: self._get_capital_flow_payload(stock_code),
             timeout,
             "capital_flow",
         )
@@ -3462,6 +3496,10 @@ class DataFetcherManager:
             capital_flow_status = "ok"
         elif adapter_status == "not_supported":
             capital_flow_status = "not_supported"
+        elif adapter_status == "failed":
+            # Preserve the adapter's failure verdict; collapsing it into
+            # "not_supported" hides real outages behind an "A-share only" note.
+            capital_flow_status = "failed"
         else:
             capital_flow_status = "partial"
 

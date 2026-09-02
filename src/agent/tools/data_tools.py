@@ -687,6 +687,17 @@ def _handle_get_capital_flow(stock_code: str) -> dict:
             "note": "Capital flow data is only available for A-share stocks (not ETFs/indices).",
         }
 
+    if status == "failed":
+        # A real fetch failure on a supported instrument. Surface the upstream
+        # errors instead of claiming the instrument is unsupported.
+        errors = ctx.get("errors") or []
+        return {
+            "stock_code": stock_code,
+            "status": "failed",
+            "note": "Capital flow fetch failed upstream; data is unavailable for this run.",
+            "errors": errors,
+        }
+
     data = ctx.get("data", {})
     stock_flow = data.get("stock_flow") or {}
     sector_rankings = data.get("sector_rankings") or {}
