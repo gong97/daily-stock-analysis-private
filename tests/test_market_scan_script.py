@@ -256,6 +256,19 @@ def test_industry_quota_trims_crowded_industry(market_scan, stub_engine, monkeyp
     assert "同行业在该桶已满额" in (tmp_path / "latest_report.md").read_text(encoding="utf-8")
 
 
+def test_removed_section_shows_stock_names(market_scan, stub_engine, monkeypatch, tmp_path):
+    """移出段落要带股票名称：被移出的条目已不在名单里，只报代码看不出移走了什么。"""
+    import src.services.screening.pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module, "screen", _banks_only)
+    assert market_scan.main(_args(tmp_path, "--cadence", "all", "--max-per-industry", "2")) == 0
+
+    report = (tmp_path / "latest_report.md").read_text(encoding="utf-8")
+    removed_section = report.split("## 移出观察名单")[1].split("##")[0]
+    assert "股票000003" in removed_section, "移出条目应显示名称而不只是代码"
+    assert "银行" in removed_section
+
+
 def test_max_per_industry_zero_keeps_everything(market_scan, stub_engine, monkeypatch, tmp_path):
     import src.services.screening.pipeline as pipeline_module
 

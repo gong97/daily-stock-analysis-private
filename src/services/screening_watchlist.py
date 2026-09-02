@@ -1106,8 +1106,16 @@ def render_report(
     removed: Sequence[Tuple[str, str]],
     summaries: Sequence[RunSummary],
     max_rows: int = 30,
+    known_entries: Mapping[str, WatchlistEntry] | None = None,
 ) -> str:
-    """渲染 Markdown 周报/日报正文。"""
+    """渲染 Markdown 周报/日报正文。
+
+    Args:
+        entries: 淘汰之后**留下**的名单。
+        known_entries: 淘汰**之前**的名单，用来给已移出的条目查名称/行业——
+            它们已经不在 `entries` 里了，只报代码看不出移走的是什么。
+            省略时移出段落只显示代码。
+    """
     lines: List[str] = []
     lines.append(f"# 全市场扫描观察名单（{cadence}）")
     lines.append("")
@@ -1157,8 +1165,12 @@ def render_report(
             "industry_quota_global": "同行业已达全局上限",
             "capacity": "超出名单容量",
         }
+        lookup: Mapping[str, WatchlistEntry] = known_entries or entries
         for code, reason in removed:
-            lines.append(f"- {code}（{reason_text.get(reason, reason)}）")
+            entry = lookup.get(code)
+            label = f"{code} {entry.name}".strip() if entry and entry.name else code
+            industry = f"，{entry.industry}" if entry and entry.industry else ""
+            lines.append(f"- {label}{industry}（{reason_text.get(reason, reason)}）")
         lines.append("")
 
     # 按桶分段：分数是各策略池内的分位排名，跨桶排在一张表里会误导读者

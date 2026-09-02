@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 报告的「移出观察名单」段落改为显示 `代码 名称，行业`，此前只有代码，看不出移走的是什么。被移出的条目已经不在淘汰后的 `entries` 里，因此 `render_report()` 新增可选的 `known_entries`（淘汰前的名单）用于查名称；查不到名称或省略该参数时退回只显示代码，行为与此前一致。
 - [新功能] 新增 `INDUSTRY_PROVIDER=snapshot`（工作流默认）：从全市场快照按行业聚合算热度，零额外请求、不依赖板块接口。五个分项为超额收益（行业涨幅中位 − 全市场中位）、上涨家数比例、强势股比例、相对换手率和行业排名；breadth 以 50% 为原点，普跌行情下仍能区分强弱；样本少于 10 只的行业不给分而退回兜底值（2 只票的上涨比例只能取 0/50/100%，是噪声）。快照热度只填尚未有值的行，`akshare+snapshot` 可让板块接口通时优先用它的数据。实测 `theme_heat` 从恒为 50 变成 27.7~87.8 共 89 个取值。
 - [修复] `_compute_theme_heat_score()` 的输入分支改判**列存在且至少有一个非空值**。此前只判断列是否存在，而 `enrich_industry_concepts()` 会把所有热度列预建成全 NA，导致"板块接口挂了"与"没配接口"无法区分：全 NA 的 `board_heat_score` 会吃掉后面全部回退路径，`fillna(base)` 再把结果抹成兜底值，无论下游填了多少行业热度 `theme_heat` 都恒为 50——history 里 115 个候选无一例外。akshare 的板块接口走 `push2.eastmoney.com`，连续 5 轮实测全部失败（`RemoteDisconnected` / `502`），因此该因子自上线起从未真正工作过。`board_heat_score` 有值时仍然优先，原有优先级不变。
 - [修复] 新增 `scripts/repair_watchlist_hit_count.py`，按 `data/watchlist/history/` 重放并重算 `hit_count`。同一天去重是 2026-08-30（46a0470）才加上的，此前 `merge_run()` 每调用一次就 +1，同一天手动重跑几轮 weekly 会把计数灌高；已写进 `current.json` 的数据不会自愈，因为 `merge_run` 只做增量。实测 8 只票存储 6/7 而真实值为 2，全部顶到命中加分上限 +10，通过 `rank_score()` 影响行业配额与容量裁剪（构造用例中一只 70 分的虚高票能挤掉 77 分的干净票）；另有条目因 TTL 剪枝后重建而低于真实值，同样修正。脚本幂等，`--dry-run` 只报告差异，history 中查不到的条目保持原值以免误伤 pinned 占位。

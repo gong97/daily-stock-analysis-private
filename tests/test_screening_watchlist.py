@@ -546,6 +546,62 @@ def test_render_report_contains_core_sections():
     assert "贵州茅台" in report
 
 
+def test_render_report_names_removed_entries_from_known_entries():
+    """移出段落要带名称和行业——被移出的条目已不在 entries 里，只报代码看不出移走了什么。"""
+    survivor = _make("600519", score=88.0)
+    dropped = WatchlistEntry(
+        code="000001",
+        name="平安银行",
+        industry="银行",
+        last_seen="2026-08-28",
+        latest_score=60.0,
+        strategies={"dual_low": _hit(60.0, BUCKET_DEFENSIVE)},
+    )
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries={"600519": survivor},
+        added=[],
+        removed=[("000001", "ttl")],
+        summaries=[],
+        known_entries={"600519": survivor, "000001": dropped},
+    )
+    assert "000001 平安银行，银行（超过留存期）" in report
+
+
+def test_render_report_removed_entries_degrade_without_name():
+    """查不到名称（或没传 known_entries）时退回只显示代码，不能报错。"""
+    known = {
+        "B": WatchlistEntry(code="B", name="只有名字", last_seen="2026-08-28"),
+        "C": WatchlistEntry(code="C", last_seen="2026-08-28"),
+    }
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries={},
+        added=[],
+        removed=[("B", "capacity"), ("C", "ttl"), ("MISSING", "ttl")],
+        summaries=[],
+        known_entries=known,
+    )
+    assert "B 只有名字（超出名单容量）" in report
+    assert "- C（超过留存期）" in report
+    assert "- MISSING（超过留存期）" in report
+
+
+def test_render_report_removed_section_is_backward_compatible():
+    """不传 known_entries 时行为与此前一致：只显示代码。"""
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries={},
+        added=[],
+        removed=[("000001", "ttl")],
+        summaries=[],
+    )
+    assert "- 000001（超过留存期）" in report
+
+
 def test_render_report_without_changes_still_renders_current_list():
     report = render_report(
         run_date=RUN_DATE,

@@ -431,6 +431,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         defaults=DEFAULT_MAX_PER_INDUSTRY_BY_BUCKET,
         scalar_default=DEFAULT_MAX_PER_INDUSTRY,
     )
+    # 淘汰前留一份引用：被移出的条目不在淘汰后的 entries 里，报告要靠它查名称。
+    entries_before_expire = dict(entries)
     entries, removed = expire_entries(
         entries,
         run_date=run_date,
@@ -449,6 +451,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         added=added,
         removed=removed,
         summaries=summaries,
+        known_entries=entries_before_expire,
     )
 
     diagnostic = industry_quota_diagnostic(entries, removed)
