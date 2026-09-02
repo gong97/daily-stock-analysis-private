@@ -217,6 +217,130 @@ def test_merge_run_takes_cadence_from_highest_scoring_strategy():
         assert entry.holding_period == "short_term"
 
 
+def test_latest_score_stays_inside_the_primary_bucket():
+    """跨桶命中的票，latest_score 取主桶内最高分，不取全局最高分。
+
+    实测中远海控/上海银行/中国平安三只同时被 balanced 与 defensive 策略选中，
+    主桶取 balanced（aggressive > balanced > defensive），分数却来自 defensive
+    的 quality_value——拿着另一把尺子的读数在 balanced 桶里排序，虚高 4~6 分。
+    分桶的前提就是「分数只在同桶内可比」。
+    """
+    entries, _ = merge_run(
+        {},
+        {
+            # defensive 策略给的分更高，但它不是主桶
+            "quality_value": [_pick("601919", score=84.64, rank=1)],
+            "balanced_alpha": [_pick("601919", score=78.66, rank=3)],
+            "momentum_quality": [_pick("601919", score=75.18, rank=9)],
+        },
+        run_date=RUN_DATE,
+        holding_periods={
+            "quality_value": "watchlist",
+            "balanced_alpha": "swing",
+            "momentum_quality": "swing",
+        },
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={
+            "quality_value": BUCKET_DEFENSIVE,
+            "balanced_alpha": BUCKET_BALANCED,
+            "momentum_quality": BUCKET_BALANCED,
+        },
+    )
+    entry = entries["601919"]
+    assert entry.bucket == BUCKET_BALANCED
+    assert entry.latest_score == 78.66, "不该取 defensive 的 84.64"
+    assert entry.latest_rank == 3, "rank 要跟着胜出的那条背书"
+    # best_score 的语义是「历史最好」，跨桶取最大值仍然合理
+    assert entry.best_score == 84.64
+
+
+def test_latest_rank_belongs_to_the_winning_strategy_for_that_stock():
+    """rank 是每只票在该策略内的名次，不能张冠李戴成同策略另一只票的名次。"""
+    entries, _ = merge_run(
+        {},
+        {
+            "balanced_alpha": [
+                _pick("AAA", score=80.0, rank=1),
+                _pick("BBB", score=70.0, rank=8),
+            ],
+        },
+        run_date=RUN_DATE,
+        holding_periods={"balanced_alpha": "swing"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={"balanced_alpha": BUCKET_BALANCED},
+    )
+    assert entries["AAA"].latest_rank == 1
+    assert entries["BBB"].latest_rank == 8
+
+
+def test_single_bucket_entries_keep_the_global_maximum():
+    """只命中一个桶时行为不变：仍然是该桶内（也就是全部）背书的最高分。"""
+    entries, _ = merge_run(
+        {},
+        {
+            "balanced_alpha": [_pick("AAA", score=70.0, rank=5)],
+            "momentum_quality": [_pick("AAA", score=88.0, rank=1)],
+        },
+        run_date=RUN_DATE,
+        holding_periods={"balanced_alpha": "swing", "momentum_quality": "swing"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={
+            "balanced_alpha": BUCKET_BALANCED,
+            "momentum_quality": BUCKET_BALANCED,
+        },
+    )
+    assert entries["AAA"].latest_score == 88.0
+    assert entries["AAA"].latest_rank == 1
+
+
+def test_bucket_scoped_score_is_order_independent():
+    """结算在合并结束后统一做，与策略跑动顺序无关。"""
+    picks = {
+        "quality_value": [_pick("X", score=90.0, rank=1)],
+        "balanced_alpha": [_pick("X", score=70.0, rank=4)],
+    }
+    profiles = {
+        "quality_value": BUCKET_DEFENSIVE,
+        "balanced_alpha": BUCKET_BALANCED,
+    }
+    periods = {"quality_value": "watchlist", "balanced_alpha": "swing"}
+    forward, _ = merge_run({}, picks, run_date=RUN_DATE, holding_periods=periods,
+                           cadence_map=DEFAULT_CADENCE_MAP, risk_profiles=profiles)
+    backward, _ = merge_run({}, dict(reversed(list(picks.items()))), run_date=RUN_DATE,
+                            holding_periods=periods, cadence_map=DEFAULT_CADENCE_MAP,
+                            risk_profiles=profiles)
+    assert forward["X"].latest_score == backward["X"].latest_score == 70.0
+
+
+def test_existing_cross_bucket_scores_are_repaired_on_next_merge():
+    """历史遗留的跨桶分数在下一轮合并时自愈，不必等那只票再次被选中。
+
+    结算只依赖已存储的 strategies，是确定性的；只结算本轮碰到的代码会让
+    存量数据一直挂着错分。
+    """
+    stale = WatchlistEntry(
+        code="601919",
+        name="中远海控",
+        last_seen="2026-08-28",
+        latest_score=84.64,  # 来自 defensive 的 quality_value
+        best_score=84.64,
+        strategies={
+            "quality_value": _hit(84.64, BUCKET_DEFENSIVE),
+            "balanced_alpha": _hit(78.66, BUCKET_BALANCED),
+        },
+    )
+    # 本轮完全没有碰到 601919
+    entries, _ = merge_run(
+        {"601919": stale},
+        {"momentum_quality": [_pick("000001", score=60.0)]},
+        run_date=RUN_DATE,
+        holding_periods={"momentum_quality": "swing"},
+        cadence_map=DEFAULT_CADENCE_MAP,
+        risk_profiles={"momentum_quality": BUCKET_BALANCED},
+    )
+    assert entries["601919"].latest_score == 78.66
+
+
 def test_merge_run_second_run_increments_hit_and_keeps_best_score():
     entries, _ = merge_run(
         {},

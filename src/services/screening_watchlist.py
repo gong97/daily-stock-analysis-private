@@ -644,6 +644,10 @@ def merge_run(
     seen_this_run: set = set()
     # 每个代码在本轮开始前的 last_seen，用于按扫描日去重计数。
     previous_seen: Dict[str, Optional[date]] = {}
+    # 每 (代码, 策略) 的 (rank, cadence, holding_period)，供合并结束后按主桶
+    # 结算 latest_score 时回填。rank 是每只票在该策略内的名次，因此必须按
+    # (代码, 策略) 存——只按策略存会把最后一只票的名次张冠李戴。
+    run_meta: Dict[Tuple[str, str], Tuple[Optional[int], str, str]] = {}
 
     for strategy, picks in picks_by_strategy.items():
         holding_period = str(holding_periods.get(strategy, "") or "")
@@ -654,6 +658,9 @@ def merge_run(
             if not code:
                 continue
             score = _as_float(pick.get("final_score"), 0.0) or 0.0
+            run_meta[(code, strategy)] = (
+                _as_optional_int(pick.get("rank")), cadence, holding_period
+            )
             entry = merged.get(code)
             if entry is None:
                 entry = WatchlistEntry(
@@ -705,7 +712,47 @@ def merge_run(
             if risk_flags:
                 entry.risk_flags = [str(item) for item in risk_flags]
 
+    # 主桶内结算 latest_score：必须等全部策略合并完再算。
+    # `entry.bucket` 是从 strategies 派生的，合并途中每加一条背书都可能改变主桶，
+    # 循环里边走边定会用到还没成形的桶。
+    # 对**全部**条目结算，不只是本轮碰到的：结算只依赖已存储的 strategies，
+    # 是确定性的。只结算本轮碰到的会让历史遗留的跨桶分数一直挂着，直到那只票
+    # 碰巧再次被选中才自愈。
+    for entry in merged.values():
+        _settle_bucket_scoped_score(entry, run_meta)
+
     return merged, added
+
+
+def _settle_bucket_scoped_score(
+    entry: WatchlistEntry,
+    run_meta: Mapping[Tuple[str, str], Tuple[Optional[int], str, str]],
+) -> None:
+    """把 `latest_score` 收敛到**主桶内**的最高分。
+
+    跨桶命中的票（如同时被 balanced 与 defensive 策略选中）此前取的是全局最高分，
+    于是主桶取 balanced、分数却来自 defensive——拿着另一把尺子的读数在 balanced
+    桶里排序。实测中远海控/上海银行/中国平安三只都是这种情况，虚高 4~6 分。
+
+    分桶的前提就是"分数只在同桶内可比"（`latest_score` 是该策略硬筛存活池内的
+    分位排名），跨桶取分会让报告里"分数不可跨桶比较"的标注对这些行失效。
+
+    `best_score` 不受影响：它的语义是"历史最好成绩"，跨桶取最大值是合理的。
+    """
+    bucket = entry.bucket
+    in_bucket = {
+        name: hit for name, hit in entry.strategies.items() if hit.bucket == bucket
+    }
+    if not in_bucket:
+        return
+    winner = max(in_bucket.items(), key=lambda kv: (kv[1].score, kv[0]))
+    entry.latest_score = winner[1].score
+    meta = run_meta.get((entry.code, winner[0]))
+    if meta is not None:
+        rank, cadence, holding_period = meta
+        entry.latest_rank = rank
+        entry.cadence = cadence
+        entry.holding_period = holding_period
 
 
 @dataclass
