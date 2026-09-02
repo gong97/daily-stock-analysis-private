@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from datetime import datetime
@@ -89,8 +90,12 @@ def enrich_industry_concepts(
         if trend_note:
             notes.append(trend_note)
 
-    if provider and provider.lower() not in {"", "none", "off", "false"}:
-        if provider.lower() == "akshare":
+    # snapshot 不是"抓取型"provider：它从快照自身按行业聚合，必须等 industry 列
+    # 填好之后再算，因此只在这里记标志，实际计算放在 mapping 应用之后。
+    provider_key = (provider or "none").strip().lower()
+    use_snapshot_heat = provider_key in {"snapshot", "akshare+snapshot"}
+    if provider_key not in {"", "none", "off", "false"}:
+        if provider_key in {"akshare", "akshare+snapshot"}:
             provider_mapping, provider_notes = fetch_akshare_board_map(
                 max_boards=max_boards,
                 cache_dir=provider_cache_dir,
@@ -98,21 +103,169 @@ def enrich_industry_concepts(
             )
             _merge_mapping(mapping, provider_mapping)
             notes.extend(provider_notes)
-        else:
+        elif not use_snapshot_heat:
             notes.append(f"industry provider skipped: unsupported provider={provider}")
 
-    if not mapping:
-        return result, notes
+    if mapping:
+        result, filled_industry, filled_concepts, filled_heat = _apply_mapping_to_snapshot(
+            result,
+            mapping,
+        )
+        notes.append(
+            "industry/concepts enrichment applied: "
+            f"industry={filled_industry}, concepts={filled_concepts}, heat={filled_heat}"
+        )
 
-    result, filled_industry, filled_concepts, filled_heat = _apply_mapping_to_snapshot(
-        result,
-        mapping,
-    )
+    if use_snapshot_heat:
+        result, heat_notes = apply_snapshot_industry_heat(result)
+        notes.extend(heat_notes)
+
+    return result, notes
+
+
+# ---------------------------------------------------------------------------
+# 从全市场快照按行业算热度
+# ---------------------------------------------------------------------------
+# 快照自带 industry 列（em_datacenter 的 sty 参数，与快照同一 host，实测零缺失），
+# 因此行业热度可以纯本地聚合算出来，不依赖任何板块接口。
+#
+# 为什么需要这条路径：akshare 的板块接口走 push2.eastmoney.com，在 GitHub Actions
+# 上长期 RemoteDisconnected / 502（连续多轮实测全失败，degradation 里一直是 heat=0），
+# 导致 theme_heat 因子从上线起就恒为兜底值 50——即这个因子从未真正工作过。
+#
+# 五个分项都来自快照现成字段，零额外请求：
+_SNAPSHOT_HEAT_WEIGHTS = {
+    # 超额收益：行业涨幅中位数 − 全市场涨幅中位数。主信号。
+    "excess": 4.0,
+    # 上涨家数比例：广度。单看中位数分不清「普涨」和「一两只涨停拉动」。
+    "breadth": 20.0,
+    # 强势股比例（涨幅 >= 5%）：强度。
+    "strength": 15.0,
+    # 换手率相对全市场的分位：资金参与度。
+    "turnover": 10.0,
+}
+# 行业内样本少于该数时不算热度，回退兜底值。
+# 2 只票的「上涨家数比例」只能取 0/50/100%，是噪声不是信号；实测 103 个行业里
+# 15 个不足 10 只、最小的只有 2 只。与 industry_neutral_min_size 是同一类考量。
+SNAPSHOT_HEAT_MIN_SIZE = 10
+# 强势股阈值（涨跌幅百分比）。
+_SNAPSHOT_HEAT_STRONG_PCT = 5.0
+_SNAPSHOT_HEAT_BASE = 50.0
+
+
+def compute_snapshot_industry_heat(
+    df: pd.DataFrame,
+    *,
+    min_size: int = SNAPSHOT_HEAT_MIN_SIZE,
+) -> tuple[dict[str, dict[str, float]], list[str]]:
+    """按行业聚合快照，算出行业热度分与排名。
+
+    Returns:
+        ``({行业: {industry_heat_score, industry_change_pct, industry_rank, ...}}, 说明)``
+        样本不足 ``min_size`` 的行业不会出现在结果里——缺一个行业的热度会让
+        `theme_heat` 退回兜底值 50，这比给一个 2 只股票算出来的假信号好。
+    """
+    notes: list[str] = []
+    if df.empty or "industry" not in df.columns or "change_pct" not in df.columns:
+        return {}, ["snapshot heat skipped: snapshot lacks industry/change_pct"]
+
+    work = df.copy()
+    work["industry"] = work["industry"].astype(str).str.strip()
+    work = work[work["industry"] != ""]
+    work["change_pct"] = pd.to_numeric(work["change_pct"], errors="coerce")
+    work = work[work["change_pct"].notna()]
+    if work.empty:
+        return {}, ["snapshot heat skipped: no rows with industry and change_pct"]
+
+    market_median = float(work["change_pct"].median())
+    has_turnover = "turnover_rate" in work.columns
+    if has_turnover:
+        work["turnover_rate"] = pd.to_numeric(work["turnover_rate"], errors="coerce")
+        market_turnover = float(work["turnover_rate"].median(skipna=True))
+    else:
+        market_turnover = float("nan")
+
+    heat: dict[str, dict[str, float]] = {}
+    skipped_small = 0
+    for industry, group in work.groupby("industry"):
+        if len(group) < min_size:
+            skipped_small += 1
+            continue
+        change_median = float(group["change_pct"].median())
+        excess = change_median - market_median
+        breadth = float((group["change_pct"] > 0).mean())
+        strength = float((group["change_pct"] >= _SNAPSHOT_HEAT_STRONG_PCT).mean())
+
+        score = _SNAPSHOT_HEAT_BASE
+        score += excess * _SNAPSHOT_HEAT_WEIGHTS["excess"]
+        # breadth / strength 以「中性值」为原点，避免全市场普跌时所有行业一起被打低分：
+        # 热度是相对概念，50% 上涨家数就是不冷不热。
+        score += (breadth - 0.5) * _SNAPSHOT_HEAT_WEIGHTS["breadth"]
+        score += strength * _SNAPSHOT_HEAT_WEIGHTS["strength"]
+
+        turnover_median = float("nan")
+        if has_turnover and market_turnover == market_turnover and market_turnover > 0:
+            turnover_median = float(group["turnover_rate"].median(skipna=True))
+            if turnover_median == turnover_median:
+                ratio = turnover_median / market_turnover
+                # 相对全市场换手的对数比，压掉极端值：2 倍换手加满，0.5 倍扣满。
+                score += max(min(math.log2(ratio), 1.0), -1.0) * _SNAPSHOT_HEAT_WEIGHTS["turnover"]
+
+        heat[industry] = {
+            "industry_heat_score": max(0.0, min(100.0, score)),
+            "industry_change_pct": change_median,
+            "industry_breadth": breadth,
+            "industry_strength": strength,
+            "industry_turnover_median": turnover_median,
+            "industry_excess_pct": excess,
+            "industry_size": float(len(group)),
+        }
+
+    # 排名按热度分从高到低，1 起。theme_heat 的 industry_rank 加分要求 1..10。
+    for rank, industry in enumerate(
+        sorted(heat, key=lambda name: -heat[name]["industry_heat_score"]), start=1
+    ):
+        heat[industry]["industry_rank"] = float(rank)
 
     notes.append(
-        "industry/concepts enrichment applied: "
-        f"industry={filled_industry}, concepts={filled_concepts}, heat={filled_heat}"
+        "snapshot industry heat computed: "
+        f"industries={len(heat)}, skipped_small={skipped_small}, "
+        f"market_median_change={market_median:.2f}%"
     )
+    return heat, notes
+
+
+def apply_snapshot_industry_heat(
+    df: pd.DataFrame,
+    *,
+    min_size: int = SNAPSHOT_HEAT_MIN_SIZE,
+) -> tuple[pd.DataFrame, list[str]]:
+    """把按行业算出的热度写回逐股票的列。
+
+    只填**尚未有值**的行：板块接口通的时候它的数据更权威（覆盖概念板块、带趋势），
+    快照热度只补它没能填上的部分。
+    """
+    heat, notes = compute_snapshot_industry_heat(df, min_size=min_size)
+    if not heat:
+        return df, notes
+
+    result = df.copy()
+    industry_series = result["industry"].astype(str).str.strip()
+    filled = 0
+    for field in ("industry_heat_score", "industry_change_pct", "industry_rank"):
+        if field not in result.columns:
+            result[field] = pd.NA
+        incoming = industry_series.map(
+            lambda name: heat.get(name, {}).get(field, float("nan"))
+        )
+        incoming = pd.to_numeric(incoming, errors="coerce")
+        current = pd.to_numeric(result[field], errors="coerce")
+        mask = current.isna() & incoming.notna()
+        if field == "industry_heat_score":
+            filled = int(mask.sum())
+        result.loc[mask, field] = incoming[mask]
+
+    notes.append(f"snapshot industry heat applied: rows={filled}")
     return result, notes
 
 

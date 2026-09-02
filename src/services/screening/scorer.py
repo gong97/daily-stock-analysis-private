@@ -411,15 +411,29 @@ def _compute_size_score(df: pd.DataFrame, profile: dict[str, float] | None = Non
     )
 
 
+def _has_any_value(df: pd.DataFrame, column: str) -> bool:
+    """列存在**且至少有一个非空值**。
+
+    只判断列是否存在是不够的：`enrich_industry_concepts()` 会把所有热度列预建成
+    全 NA，于是"板块接口挂了"和"板块接口没配"在列结构上无法区分。此前第一个
+    分支只看 `in df.columns`，全 NA 的 `board_heat_score` 会直接吃掉后面所有
+    回退路径，`fillna(base)` 再把结果抹成兜底值——无论下游填了多少行业热度，
+    theme_heat 都恒为 50。
+    """
+    if column not in df.columns:
+        return False
+    return bool(pd.to_numeric(df[column], errors="coerce").notna().any())
+
+
 def _compute_theme_heat_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.Series:
     base = pd.Series(profile["theme_heat_unknown_score"], index=df.index)
-    if "board_heat_score" in df.columns:
+    if _has_any_value(df, "board_heat_score"):
         score = pd.to_numeric(df["board_heat_score"], errors="coerce").fillna(base)
-    elif "industry_heat_score" in df.columns or "concept_heat_score" in df.columns:
+    elif _has_any_value(df, "industry_heat_score") or _has_any_value(df, "concept_heat_score"):
         industry = _numeric_column(df, "industry_heat_score")
         concept = _numeric_column(df, "concept_heat_score")
         score = pd.concat([industry, concept], axis=1).max(axis=1).fillna(base)
-    elif "industry_change_pct" in df.columns:
+    elif _has_any_value(df, "industry_change_pct"):
         change = pd.to_numeric(df["industry_change_pct"], errors="coerce").fillna(0)
         score = base + change * profile["theme_heat_change_slope"]
         if "industry_rank" in df.columns:
@@ -432,7 +446,7 @@ def _compute_theme_heat_score(df: pd.DataFrame, profile: dict[str, float]) -> pd
     else:
         return base.clip(0, 100)
 
-    if "board_heat_trend_score" in df.columns:
+    if _has_any_value(df, "board_heat_trend_score"):
         trend = pd.to_numeric(df["board_heat_trend_score"], errors="coerce").fillna(0)
         if "board_heat_observations" in df.columns:
             observations = pd.to_numeric(df["board_heat_observations"], errors="coerce").fillna(0)
@@ -447,7 +461,7 @@ def _compute_theme_heat_score(df: pd.DataFrame, profile: dict[str, float]) -> pd
         )
         score = score + (trend_bonus - cooling_penalty).where(trend_is_reliable, 0)
 
-    if "board_heat_persistence_score" in df.columns:
+    if _has_any_value(df, "board_heat_persistence_score"):
         persistence = pd.to_numeric(df["board_heat_persistence_score"], errors="coerce").fillna(0)
         persistence_bonus = (
             (persistence - profile["theme_heat_persistence_min_score"]).clip(lower=0)
@@ -455,7 +469,7 @@ def _compute_theme_heat_score(df: pd.DataFrame, profile: dict[str, float]) -> pd
         ).clip(upper=profile["theme_heat_persistence_bonus_cap"])
         score = score + persistence_bonus
 
-    if "board_heat_cooling_score" in df.columns:
+    if _has_any_value(df, "board_heat_cooling_score"):
         cooling = pd.to_numeric(df["board_heat_cooling_score"], errors="coerce").fillna(0)
         cooling_penalty = (cooling * profile["theme_heat_cooling_score_penalty_slope"]).clip(
             upper=profile["theme_heat_cooling_score_penalty_cap"]

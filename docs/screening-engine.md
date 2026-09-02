@@ -262,6 +262,13 @@ DSA 中存在两类用途不同的策略文件：
 名单排序的命中加分（每多一次 +2 分，上限 +10）影响行业配额和容量裁剪，
 如果按运行次数累计，手动重跑几轮就能把一只票顶进名单——那是运行次数在选股。
 `last_seen` 同理只前进不后退，用更早的日期补跑一轮不会把时间基准拉回去（否则 TTL 会凭空延长）。
+
+> **历史数据修复**：同一天去重是 2026-08-30 才加上的，此前 `merge_run()` 每调用一次
+> 就 +1。已经写进 `current.json` 的计数不会自愈——`merge_run` 只做增量，从不回头重算。
+> 实测有 8 只票被灌到 6/7（真实值 2），全部顶到 +10 的加分上限；另有条目因 TTL 剪枝后
+> 重建而**低于**真实值。`scripts/repair_watchlist_hit_count.py` 按 `history/` 重放，
+> 统计每只票出现过的不同扫描日数并覆盖回去（`--dry-run` 只报告差异）。
+> 修复是幂等的，只跑一次即可；history 里查不到的条目保持原值，因为缺记录不等于没命中过。
 超过 `WATCHLIST_TTL_DAYS`（默认 30 天）
 没有再被任何策略选中即移出；同一行业最多保留 `WATCHLIST_MAX_PER_INDUSTRY` 只（默认 2）；
 名单规模上限 `WATCHLIST_MAX_SIZE`（默认 60），
@@ -514,8 +521,65 @@ python scripts/refresh_industry_map.py          # 写 data/watchlist/industry_ma
 在 GitHub Actions 上稳定 502 / RemoteDisconnected（连续两轮实测失败），
 导致行业列全空、配额静默放行。`data.eastmoney.com`（快照用的那个 host）则一直是通的。
 
-akshare provider 现在只剩板块热度趋势一个用途（供 `theme_momentum`），
-它是 fail-open 的，失败只在 degradation 留记录。
+akshare provider 原本还负责板块热度（供 `theme_heat` 因子），但它同样走
+`push2.eastmoney.com`，实测**连续 5 轮全部失败**（industry board list `RemoteDisconnected`、
+concepts board list `502`），degradation 里一直是 `heat=0`。后果是 `theme_heat`
+从上线起就恒为兜底值 50——history 里 115 个候选的 `theme_heat` **无一例外都是 50.0**，
+这个因子从未真正工作过。
+
+### 从快照按行业算热度（`INDUSTRY_PROVIDER=snapshot`，默认）
+
+快照自带 `industry` 列（`em_datacenter` 的 `sty` 参数，与快照同一 host，实测零缺失），
+所以行业热度可以纯本地聚合算出来，**零额外请求、不依赖任何板块接口**。
+
+`compute_snapshot_industry_heat()` 按行业聚合五个分项：
+
+| 分项 | 含义 | 为什么需要 |
+| --- | --- | --- |
+| 超额收益 | 行业涨幅中位 − 全市场涨幅中位 | 主信号 |
+| 上涨家数比例 | 行业内上涨股票占比 | 广度：单看中位数分不清「普涨」和「一两只涨停拉动」 |
+| 强势股比例 | 涨幅 ≥5% 的占比 | 强度 |
+| 换手率 | 相对全市场换手的对数比，截断在 ±1 | 资金参与度 |
+| 行业排名 | 按热度分排序，填 `industry_rank` | 供 `theme_heat` 的排名加分 |
+
+两个刻意的设计：
+
+- **breadth 以 50% 为原点**，不是以 0 为原点。热度是相对概念，全市场普跌时
+  「一半股票在涨」的行业仍然算强，不该跟着一起塌到底。实测普跌日 −0.5% 的行业
+  得 49 分、−5.0% 的得 31 分，区分度保留。
+- **样本少于 `SNAPSHOT_HEAT_MIN_SIZE`（默认 10）的行业不给分**，退回兜底值 50。
+  2 只票的「上涨家数比例」只能取 0/50/100%，是噪声不是信号。实测 103 个行业里
+  15 个不足 10 只、最小的只有 2 只。这与 `industry_neutral_min_size` 是同一类考量。
+
+实测效果（同一份快照，88 个有效行业）：
+
+```
+全市场涨幅中位 −1.06%
+最热  地面装备  上涨89% 中位+2.70% 超额+3.76  → theme_heat 87.8
+最冷  非银行金融                              → theme_heat 27.7
+```
+
+`theme_heat` 从单一值 50 变成 27.7~87.8 的 89 个不同取值。
+
+**`INDUSTRY_PROVIDER` 的取值**：`snapshot`（默认）、`akshare`、`akshare+snapshot`
+（akshare 通时用它的数据，挂了由快照兜底）、`none`。快照热度只填**尚未有值**的行，
+板块接口通的时候它的数据更权威（覆盖概念板块、带趋势项）。
+
+**这一版只有横截面，没有趋势**：`board_heat_trend_score` / `persistence` / `cooling`
+需要跨日累积，快照只有当天截面。后续可以用 `history/` 补上。
+
+**sina 当快照源时该因子仍退回 50**——sina 没有 `industry` 列（见「快照源的字段能力」），
+这是正确的降级而不是缺陷。
+
+### 一个连带修掉的静默失效
+
+`_compute_theme_heat_score()` 的分支此前只判断**列是否存在**，而
+`enrich_industry_concepts()` 会把所有热度列预建成全 NA。于是"板块接口挂了"和
+"没配板块接口"在列结构上无法区分：全 NA 的 `board_heat_score` 会吃掉后面所有回退
+路径，`fillna(base)` 再把结果抹成兜底值。**无论下游填了多少行业热度，theme_heat 都恒为 50。**
+
+改成 `_has_any_value()`（列存在**且至少有一个非空值**）后回退链才真正生效。
+有值时 `board_heat_score` 仍然优先，原有优先级不变。
 
 **这一层是静默失效的重灾区**：`industry` 为空时条目一律放行（无法分组，强行淘汰会误伤），
 于是"配置在、逻辑在、数据不在"时，报告看起来完全正常，只是名单里挤满同一个行业。

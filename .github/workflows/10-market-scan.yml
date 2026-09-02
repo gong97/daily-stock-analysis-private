@@ -163,7 +163,12 @@ jobs:
           # 永不覆盖快照自带的更新鲜的行业（_apply_industry_column 的 current.eq("") 条件）。
           # 行业归属月度量级才变，建议每月跑一次刷新脚本并提交。
           INDUSTRY_MAP_FILES: ${{ vars.INDUSTRY_MAP_FILES || 'data/watchlist/industry_map.csv' }}
-          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'akshare' }}
+          # snapshot：从全市场快照按行业聚合算热度，零额外请求、不依赖板块接口。
+          # akshare 的板块接口走 push2.eastmoney.com，在 Actions 上长期 502 /
+          # RemoteDisconnected（连续多轮实测 heat=0，theme_heat 恒为兜底值 50）。
+          # 想同时要概念板块热度可设 akshare+snapshot：akshare 通时用它的数据，
+          # 挂了由快照兜底。
+          INDUSTRY_PROVIDER: ${{ vars.INDUSTRY_PROVIDER || 'snapshot' }}
           INDUSTRY_PROVIDER_MAX_BOARDS: ${{ vars.INDUSTRY_PROVIDER_MAX_BOARDS || '80' }}
           SCREENING_INDUSTRY_PROVIDER_CACHE_DIR: data/watchlist/cache/industry
           SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS: ${{ vars.SCREENING_INDUSTRY_PROVIDER_CACHE_TTL_HOURS || '20' }}
