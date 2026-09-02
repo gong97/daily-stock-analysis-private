@@ -502,16 +502,18 @@ class TestFundamentalContext(unittest.TestCase):
             fundamental_fetch_timeout_seconds=0.8,
             fundamental_retry_max=1,
         )
+        empty_payload = {
+            "status": "not_supported",
+            "stock_flow": {},
+            "sector_rankings": {"top": [], "bottom": []},
+            "source_chain": [],
+            "errors": [],
+        }
         with patch("src.config.get_config", return_value=cfg), \
+                patch("data_provider.base.fetch_sina_capital_flow", return_value=dict(empty_payload)), \
                 patch(
                     "data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_capital_flow",
-                    return_value={
-                        "status": "not_supported",
-                        "stock_flow": {},
-                        "sector_rankings": {"top": [], "bottom": []},
-                        "source_chain": [],
-                        "errors": [],
-                    },
+                    return_value=dict(empty_payload),
                 ):
             ctx = manager.get_capital_flow_context("600519", budget_seconds=0.5)
         self.assertEqual(ctx["status"], "not_supported")

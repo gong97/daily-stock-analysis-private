@@ -29,6 +29,7 @@ from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.services.market_symbol_utils import is_suffix_market_symbol
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
 from .fundamental_adapter import AkshareFundamentalAdapter
+from .sina_capital_flow import fetch_capital_flow as fetch_sina_capital_flow
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker
 
@@ -3428,11 +3429,17 @@ class DataFetcherManager:
 
     def _get_capital_flow_payload(self, stock_code: str) -> Dict[str, Any]:
         """
-        资金流取数：Tushare 优先，AkShare 兜底。
+        资金流取数：Tushare → 新浪直连 → AkShare。
 
-        两个源的返回结构一致（status / stock_flow / sector_rankings /
+        三个源的返回结构一致（status / stock_flow / sector_rankings /
         source_chain / errors），因此上层无需区分来源。Tushare 返回 None
-        表示不可用（无 token / 无权限 / 接口失败），此时才回落到 AkShare。
+        表示不可用（无 token / 无权限 / 接口失败）。
+
+        新浪插在中间的原因：AkShare 的资金流接口走 push2*.eastmoney.com，在
+        GitHub Actions 上稳定 RemoteDisconnected，而该 workflow 并未配置
+        TUSHARE_TOKEN，于是个股资金流整块为空、护栏把所有买入降级成观察。
+        新浪免 token 且在 Actions 上可达（日线兜底已经在用），只是拿不到板块
+        排行，所以板块仍靠 Tushare / AkShare。
         """
         tushare = self._find_tushare_fetcher()
         if tushare is not None:
@@ -3441,9 +3448,20 @@ class DataFetcherManager:
                 if isinstance(payload, dict):
                     return payload
             except Exception as exc:
-                logger.warning("[CapitalFlow] Tushare 取数失败，回落 AkShare: %s", exc)
+                logger.warning("[CapitalFlow] Tushare 取数失败，回落新浪: %s", exc)
 
-        return self._fundamental_adapter.get_capital_flow(stock_code)
+        sina_payload = fetch_sina_capital_flow(stock_code)
+        if sina_payload.get("stock_flow"):
+            return sina_payload
+
+        payload = self._fundamental_adapter.get_capital_flow(stock_code)
+        sina_errors = list(sina_payload.get("errors") or [])
+        if sina_errors:
+            # 保留新浪的失败原因，否则日报里只看得到 AkShare 一家的错误。
+            payload["errors"] = list(payload.get("errors") or []) + sina_errors
+            if not payload.get("stock_flow") and payload.get("status") == "not_supported":
+                payload["status"] = "failed"
+        return payload
 
     def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
         """资金流向块（fail-open）。"""
