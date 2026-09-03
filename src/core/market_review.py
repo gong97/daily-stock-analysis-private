@@ -57,6 +57,12 @@ class MarketReviewRunResult:
 
     report: str
     market_review_payload: Dict[str, Any] = field(default_factory=dict)
+    market_light_snapshots: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # 合并推送场景下外层包装用的正文；非合并场景与 report 相同。
+    # 保留这个字段是为了让调用方在改用 return_structured=True 取
+    # market_light_snapshots 时，仍能拿到跟旧行为完全一致的正文
+    # （旧代码在 merge_notification=True 时返回的是这份，不是 report）。
+    merge_markdown_report: str = ""
 
 
 def _refresh_market_review_history_diagnostics(*, query_id: str) -> None:
@@ -435,6 +441,8 @@ def run_market_review(
                 return MarketReviewRunResult(
                     report=review_report,
                     market_review_payload=market_review_payload,
+                    market_light_snapshots=market_light_snapshots,
+                    merge_markdown_report=merge_markdown_report,
                 )
             if merge_notification:
                 return merge_markdown_report

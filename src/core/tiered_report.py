@@ -9,14 +9,26 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from src.core.tiered_analysis import TieredAnalysisOutcome, TieredCandidate
-from src.schemas.decision_action import localize_action_label
+from src.core.tiered_analysis import ADD_ACTIONS, CUT_ACTIONS, TieredAnalysisOutcome, TieredCandidate
+from src.schemas.decision_action import display_action_fields_for_result, localize_action_label
 from src.utils.sniper_points import extract_sniper_points
 
 _SIDE_TITLES = {
     "add": "📈 加仓候选（深度复核）",
     "cut": "📉 减仓 / 预警候选（深度复核）",
 }
+
+# 紧迫度映射：time_sensitivity 是 LLM 自由字符串，不是强约束的 Literal，
+# 所以用「包含匹配」而不是精确相等——顺序很重要，更紧急的判断要排在前面
+# （比如某个值同时含"立即"和"观察"字样时，先命中紧急档）。
+_URGENCY_MARKERS = (
+    ("立即", "🔴"),
+    ("今日", "🔴"),
+    ("本周", "🟡"),
+    ("不急", "🟢"),
+)
+
+_SUMMARY_ACTION_LABELS = {"add": "ADD", "cut": "CUT", "hold": "HOLD"}
 
 
 def _label(action: Optional[str], language: str) -> str:
@@ -163,6 +175,137 @@ def _next_check_lines(dashboard: Dict[str, Any]) -> List[str]:
     return ["**📅 下一观察点**", "", f"- {text}"]
 
 
+def _summary_action_bucket(result: Any) -> str:
+    """把展示口径的 action 归成 add/cut/hold 三档，用于总览表排序和显示。"""
+    action = display_action_fields_for_result(result)["action"]
+    if action in ADD_ACTIONS:
+        return "add"
+    if action in CUT_ACTIONS:
+        return "cut"
+    return "hold"
+
+
+def _summary_urgency_marker(dashboard: Dict[str, Any]) -> str:
+    """🔴🟡🟢：time_sensitivity 是自由字符串，用包含匹配 + 兜底。"""
+    time_sensitivity = str(dashboard.get("core_conclusion", {}).get("time_sensitivity") or "")
+    for marker, emoji in _URGENCY_MARKERS:
+        if marker in time_sensitivity:
+            return emoji
+    return "—"
+
+
+def _summary_key_price(bucket: str, deep: Any, dashboard: Dict[str, Any]) -> str:
+    """总览表的「关键价格」列：按动作分流，不同动作看不同的价位。"""
+    sniper = extract_sniper_points(deep)
+    price_position = dashboard.get("data_perspective", {}).get("price_position", {})
+
+    if bucket == "add":
+        ideal = sniper.get("ideal_buy")
+        secondary = sniper.get("secondary_buy")
+        if ideal is not None and secondary is not None:
+            lo, hi = sorted((ideal, secondary))
+            return f"{_fmt_price(lo)} ~ {_fmt_price(hi)}"
+        single = ideal if ideal is not None else secondary
+        if single is not None:
+            return _fmt_price(single)
+        return "—"
+
+    if bucket == "cut":
+        stop_loss = sniper.get("stop_loss")
+        if stop_loss is not None:
+            return f"< {_fmt_price(stop_loss)} 止损"
+        return "—"
+
+    # hold：优先给出「突破再买」的压力位，没有就给止损位兜底
+    resistance = price_position.get("resistance_level")
+    if resistance is not None:
+        return f"> {_fmt_price(resistance)} 再买"
+    stop_loss = sniper.get("stop_loss")
+    if stop_loss is not None:
+        return f"< {_fmt_price(stop_loss)} 止损"
+    return "—"
+
+
+def _market_light_header(market_light: Optional[Dict[str, Any]]) -> str:
+    """市场状态表头：用确定性计算的 MarketLightSnapshot，不涉及 LLM。"""
+    if not isinstance(market_light, dict):
+        return ""
+    if market_light.get("data_quality") == "unavailable":
+        return ""
+
+    temperature_label = str(market_light.get("temperature_label") or "").strip()
+    label = str(market_light.get("label") or "").strip()
+    score = market_light.get("score")
+    guidance = str(market_light.get("guidance") or "").strip()
+
+    status_text = " · ".join(t for t in (temperature_label, label) if t)
+    if not status_text and score is None and not guidance:
+        return ""
+
+    parts = []
+    if status_text:
+        parts.append(f"市场状态：{status_text}")
+    if score is not None:
+        parts.append(f"市场评分：{score}/100")
+    if guidance:
+        parts.append(guidance)
+    return " | ".join(parts)
+
+
+def render_decision_summary(
+    outcome: TieredAnalysisOutcome,
+    *,
+    market_light: Optional[Dict[str, Any]] = None,
+    language: str = "zh",
+) -> str:
+    """今日持仓决策总览：市场状态表头 + 全部持仓的动作/关键价格/紧迫度一览表。
+
+    排在邮件最开头——这是当天唯一需要通读的表，下面的深度复核卡片和全量
+    初筛表是这张表里每一行的依据，不是必须逐条看完的内容。
+    """
+    results = [r for r in outcome.lite_results if getattr(r, "success", False)]
+    if not results:
+        return ""
+
+    rows = []
+    for result in results:
+        bucket = _summary_action_bucket(result)
+        dashboard = _dashboard_of(result)
+        score = getattr(result, "sentiment_score", 0) or 0
+        rows.append(
+            {
+                "name": getattr(result, "name", ""),
+                "code": getattr(result, "code", ""),
+                "bucket": bucket,
+                "score": score,
+                "key_price": _summary_key_price(bucket, result, dashboard),
+                "urgency": _summary_urgency_marker(dashboard),
+            }
+        )
+
+    # 要动的排前面：CUT → ADD → HOLD；组内按评分降序。
+    bucket_order = {"cut": 0, "add": 1, "hold": 2}
+    rows.sort(key=lambda r: (bucket_order[r["bucket"]], -r["score"]))
+
+    lines: List[str] = ["# 📋 今日持仓决策", ""]
+
+    header = _market_light_header(market_light)
+    if header:
+        lines.append(header)
+        lines.append("")
+
+    lines.append("| 股票 | 动作 | 关键价格 | 紧迫度 |")
+    lines.append("| --- | --- | --- | --- |")
+    for row in rows:
+        action_label = _SUMMARY_ACTION_LABELS[row["bucket"]]
+        lines.append(
+            f"| {row['name']} {row['code']} | {action_label} | "
+            f"{row['key_price']} | {row['urgency']} |"
+        )
+
+    return "\n".join(lines)
+
+
 def render_candidate_block(
     candidate: TieredCandidate,
     *,
@@ -281,16 +424,24 @@ def render_tiered_email(
     *,
     notifier: Any,
     market_report: str = "",
+    market_light: Optional[Dict[str, Any]] = None,
     lite_report_type: Any = None,
     language: str = "zh",
     tier1_model: str = "",
     tier2_model: str = "",
 ) -> str:
-    """拼出完整邮件正文：大盘 → 深度复核 → 全量初筛。
+    """拼出完整邮件正文：决策总览 → 大盘 → 深度复核 → 全量初筛。
 
-    深挖段落放在初筛表之前：需要行动的少数几只应当先被看到。
+    决策总览排在最前：当天要不要动、动哪几只，3 秒内看完，不必逐段往下翻。
+    深挖段落排在初筛表之前：需要行动的少数几只应当先被看到。
     """
     parts: List[str] = []
+
+    decision_summary = render_decision_summary(
+        outcome, market_light=market_light, language=language
+    )
+    if decision_summary:
+        parts.append(decision_summary)
 
     if market_report:
         parts.append(f"# 📈 大盘复盘\n\n{market_report}")

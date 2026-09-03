@@ -647,13 +647,29 @@ def _resolve_daily_market_context_target_date(
     )
 
 
-def _market_review_report_text(review_result: Any) -> str:
+def _market_review_report_text(review_result: Any, *, merge_notification: bool = False) -> str:
     if review_result is None:
         return ""
+    if merge_notification:
+        merge_report = getattr(review_result, "merge_markdown_report", None)
+        if isinstance(merge_report, str) and merge_report:
+            return merge_report
     report = getattr(review_result, "report", None)
     if isinstance(report, str):
         return report
     return review_result if isinstance(review_result, str) else ""
+
+
+def _market_review_light_snapshot(
+    review_result: Any, *, region: str = "cn"
+) -> Optional[Dict[str, Any]]:
+    """取出本轮复盘已经算好的 MarketLightSnapshot（零额外成本，不重新拉行情）。"""
+    snapshots = getattr(review_result, "market_light_snapshots", None)
+    if not isinstance(snapshots, dict):
+        return None
+    normalized_region = str(region or "cn").strip().lower()
+    snapshot = snapshots.get(normalized_region)
+    return snapshot if isinstance(snapshot, dict) else None
 
 
 def _save_reused_market_review_report(
@@ -830,6 +846,7 @@ def run_full_analysis(
                 analysis_reference_time,
             )
         market_report = ""
+        market_light_snapshot: Optional[Dict[str, Any]] = None
         market_context_summary = ""
         market_context_full_report = ""
         market_context_generated_during_stock = False
@@ -999,6 +1016,7 @@ def run_full_analysis(
                     override_region=market_review_region,
                     query_id=query_id,
                     trigger_source=review_trigger_source,
+                    return_structured=True,
                 )
                 # 如果复盘仍未执行成功，再做一次复用历史/缓存读取（防止与并发运行竞态）。
                 if not review_result and should_use_daily_market_context:
@@ -1024,7 +1042,15 @@ def run_full_analysis(
 
             # 如果有结果，赋值给 market_report 用于后续飞书文档生成
             if review_result:
-                market_report = _market_review_report_text(review_result)
+                market_report = _market_review_report_text(
+                    review_result, merge_notification=merge_notification
+                )
+                # 持仓分析目前只覆盖 A 股，总览表的市场状态固定取 cn；
+                # market_review_region 可能是 "both"/"jp,kr" 这类多市场值，
+                # 那种情况下 snapshots 里没有对应的单一 key，取不到就是 None。
+                market_light_snapshot = _market_review_light_snapshot(
+                    review_result, region="cn"
+                )
             elif can_reuse_market_context:
                 market_report = market_context_full_report or market_context_summary
 
@@ -1036,6 +1062,7 @@ def run_full_analysis(
                 tiered_outcome,
                 notifier=pipeline.notifier,
                 market_report=market_report,
+                market_light=market_light_snapshot,
                 lite_report_type=getattr(config, 'report_type', 'simple'),
                 language=getattr(config, 'report_language', 'zh') or 'zh',
                 tier1_model=getattr(config, 'tier1_model', ''),

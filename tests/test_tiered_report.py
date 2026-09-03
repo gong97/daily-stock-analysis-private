@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.tiered_analysis import TieredCandidate
-from src.core.tiered_report import render_candidate_block
+from src.core.tiered_analysis import TieredAnalysisOutcome, TieredCandidate
+from src.core.tiered_report import render_candidate_block, render_decision_summary
 
 
 def _make_deep_result(dashboard=None, **overrides):
@@ -177,6 +177,149 @@ class TestRenderCandidateBlockNoDeepResult(unittest.TestCase):
         self.assertIn("600985.SH", block)
         self.assertIn("深度复核未返回结果，请以初筛结论为准。", block)
         self.assertNotIn("🎯 执行计划", block)
+
+
+def _make_lite_result(*, code, name, action, score, dashboard=None, success=True):
+    """构造一份 Tier 1（lite）结果：用于总览表测试。
+
+    action 和 score 要落在同一个决策档位里（见 decision_scale.py 的分档），
+    否则 display_action_fields_for_result 里的 align_with_score 会用分数
+    覆盖掉我们显式设的 action，导致测试断言的桶和实际渲染的桶对不上。
+    """
+    return SimpleNamespace(
+        code=code,
+        name=name,
+        success=success,
+        action=action,
+        operation_advice=None,
+        action_label=None,
+        report_type=None,
+        report_language="zh",
+        sentiment_score=score,
+        guardrail_reason=None,
+        downgrade_reason=None,
+        dashboard=dashboard if dashboard is not None else {},
+    )
+
+
+class TestRenderDecisionSummary(unittest.TestCase):
+    """今日持仓决策总览表：市场状态表头 + 全部持仓一览。"""
+
+    def test_full_data_renders_header_and_all_buckets(self):
+        add_result = _make_lite_result(
+            code="300750.SZ",
+            name="宁德时代",
+            action="add",
+            score=78,
+            dashboard={
+                "core_conclusion": {"time_sensitivity": "立即行动"},
+                "battle_plan": {
+                    "sniper_points": {
+                        "ideal_buy": "理想买入点：330元",
+                        "secondary_buy": "次优买入点：336元",
+                    }
+                },
+            },
+        )
+        hold_result = _make_lite_result(
+            code="603986.SH",
+            name="兆易创新",
+            action="hold",
+            score=50,
+            dashboard={
+                "core_conclusion": {"time_sensitivity": "本周内"},
+                "data_perspective": {
+                    "price_position": {"resistance_level": 132.5}
+                },
+            },
+        )
+        cut_result = _make_lite_result(
+            code="601012.SH",
+            name="隆基绿能",
+            action="reduce",
+            score=30,
+            dashboard={
+                "core_conclusion": {"time_sensitivity": "今日内"},
+                "battle_plan": {
+                    "sniper_points": {"stop_loss": "止损位：17.80元"}
+                },
+            },
+        )
+        outcome = TieredAnalysisOutcome(
+            lite_results=[add_result, hold_result, cut_result],
+        )
+        market_light = {
+            "temperature_label": "震荡",
+            "label": "需观察",
+            "score": 52,
+            "guidance": "信号分化，控制仓位并等待量价确认。",
+            "data_quality": "ok",
+        }
+
+        summary = render_decision_summary(outcome, market_light=market_light)
+
+        self.assertIn("# 📋 今日持仓决策", summary)
+        self.assertIn("市场状态：震荡 · 需观察", summary)
+        self.assertIn("市场评分：52/100", summary)
+        self.assertIn("信号分化", summary)
+        self.assertIn("| 宁德时代 300750.SZ | ADD | ¥330.00 ~ ¥336.00 | 🔴 |", summary)
+        self.assertIn("| 兆易创新 603986.SH | HOLD | > ¥132.50 再买 | 🟡 |", summary)
+        self.assertIn("| 隆基绿能 601012.SH | CUT | < ¥17.80 止损 | 🔴 |", summary)
+
+        # 排序：CUT 排最前
+        cut_pos = summary.index("隆基绿能")
+        add_pos = summary.index("宁德时代")
+        hold_pos = summary.index("兆易创新")
+        self.assertLess(cut_pos, add_pos)
+        self.assertLess(add_pos, hold_pos)
+
+    def test_no_market_light_renders_table_only(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50,
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+
+        summary = render_decision_summary(outcome, market_light=None)
+
+        self.assertIn("# 📋 今日持仓决策", summary)
+        self.assertNotIn("市场状态", summary)
+        self.assertIn("长江电力 600900.SH", summary)
+
+    def test_empty_dashboard_shows_dash_not_placeholder(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50, dashboard={},
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+
+        summary = render_decision_summary(outcome)
+
+        self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
+        self.assertNotIn("N/A", summary)
+        self.assertNotIn("None", summary)
+
+    def test_unknown_time_sensitivity_falls_back_to_dash(self):
+        result = _make_lite_result(
+            code="600900.SH",
+            name="长江电力",
+            action="hold",
+            score=50,
+            dashboard={"core_conclusion": {"time_sensitivity": "神秘状态"}},
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+
+        summary = render_decision_summary(outcome)
+        self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
+
+    def test_no_successful_results_returns_empty_string(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50, success=False,
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+        self.assertEqual(render_decision_summary(outcome), "")
+
+    def test_no_lite_results_returns_empty_string(self):
+        outcome = TieredAnalysisOutcome(lite_results=[])
+        self.assertEqual(render_decision_summary(outcome), "")
 
 
 if __name__ == "__main__":
