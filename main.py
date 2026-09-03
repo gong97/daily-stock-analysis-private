@@ -847,6 +847,7 @@ def run_full_analysis(
             )
         market_report = ""
         market_light_snapshot: Optional[Dict[str, Any]] = None
+        previous_decisions: Optional[Dict[str, Optional[Dict[str, Any]]]] = None
         market_context_summary = ""
         market_context_full_report = ""
         market_context_generated_during_stock = False
@@ -923,6 +924,28 @@ def run_full_analysis(
                 current_time=analysis_reference_time,
             )
             results = tiered_outcome.lite_results
+
+            # 「今日重大变化」的历史基线：查询/解析失败都不能影响当天邮件
+            # 发出——这段只是锦上添花，决策总表和卡片才是主体。
+            try:
+                from src.enums import ReportType
+                from src.services.history_comparison_service import (
+                    get_previous_decisions_batch,
+                )
+
+                lite_codes = [
+                    getattr(r, "code", "") for r in tiered_outcome.lite_results
+                ]
+                lite_codes = [c for c in lite_codes if c]
+                if lite_codes:
+                    previous_decisions = get_previous_decisions_batch(
+                        lite_codes,
+                        report_type=ReportType.BRIEF.value,
+                        report_language=getattr(config, 'report_language', 'zh') or 'zh',
+                    )
+            except Exception as exc:
+                logger.warning("[tiered] 获取历史基线失败，跳过重大变化对比: %s", exc)
+                previous_decisions = None
         else:
             results = pipeline.run(
                 stock_codes=stock_codes,
@@ -1063,6 +1086,7 @@ def run_full_analysis(
                 notifier=pipeline.notifier,
                 market_report=market_report,
                 market_light=market_light_snapshot,
+                previous_decisions=previous_decisions,
                 lite_report_type=getattr(config, 'report_type', 'simple'),
                 language=getattr(config, 'report_language', 'zh') or 'zh',
                 tier1_model=getattr(config, 'tier1_model', ''),

@@ -9,7 +9,11 @@ from types import SimpleNamespace
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.core.tiered_analysis import TieredAnalysisOutcome, TieredCandidate
-from src.core.tiered_report import render_candidate_block, render_decision_summary
+from src.core.tiered_report import (
+    render_candidate_block,
+    render_decision_summary,
+    render_major_changes,
+)
 
 
 def _make_deep_result(dashboard=None, **overrides):
@@ -320,6 +324,147 @@ class TestRenderDecisionSummary(unittest.TestCase):
     def test_no_lite_results_returns_empty_string(self):
         outcome = TieredAnalysisOutcome(lite_results=[])
         self.assertEqual(render_decision_summary(outcome), "")
+
+
+class TestRenderMajorChanges(unittest.TestCase):
+    """今日重大变化：昨日基线 vs 今日结论的 diff。"""
+
+    def test_action_change_renders_with_arrow_and_reason(self):
+        result = _make_lite_result(
+            code="300750.SZ",
+            name="宁德时代",
+            action="add",
+            score=78,
+            dashboard={
+                "core_conclusion": {"one_sentence": "站回 MA20，量能配合转好。"},
+                "battle_plan": {
+                    "sniper_points": {
+                        "take_profit": "目标位：338元",
+                        "stop_loss": "止损位：304元",
+                    }
+                },
+            },
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+        previous = {
+            "300750.SZ": {
+                "action": "hold",
+                "sentiment_score": 50,
+                "stop_loss": 298.0,
+                "take_profit": 322.0,
+            }
+        }
+
+        summary = render_major_changes(outcome, previous=previous)
+
+        self.assertIn("## 📌 今日重大变化", summary)
+        self.assertIn("宁德时代 300750.SZ", summary)
+        self.assertIn("HOLD → ADD ↑", summary)
+        self.assertIn("原因：站回 MA20，量能配合转好。", summary)
+        self.assertIn("目标：¥322.00 → ¥338.00", summary)
+        self.assertIn("止损：¥298.00 → ¥304.00", summary)
+
+    def test_price_only_change_without_action_change_still_included(self):
+        result = _make_lite_result(
+            code="600900.SH",
+            name="长江电力",
+            action="hold",
+            score=50,
+            dashboard={
+                "battle_plan": {"sniper_points": {"stop_loss": "止损位：27.80元"}},
+            },
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+        previous = {
+            "600900.SH": {"action": "hold", "sentiment_score": 50, "stop_loss": 27.0}
+        }
+
+        summary = render_major_changes(outcome, previous=previous)
+
+        self.assertIn("长江电力 600900.SH", summary)
+        self.assertIn("止损：¥27.00 → ¥27.80", summary)
+
+    def test_score_only_change_counts_as_unchanged(self):
+        """动作、止损、目标价都没变，只有 sentiment_score 波动——不应进入变化列表。
+
+        混入一只真正变化的股票，这样断言的是「未变化的那只被计入了 unchanged
+        计数」，而不是重新测试「全部无变化时整段返回空」（那是另一个用例）。
+        """
+        changed = _make_lite_result(
+            code="601012.SH",
+            name="隆基绿能",
+            action="reduce",
+            score=30,
+            dashboard={"battle_plan": {"sniper_points": {"stop_loss": "止损位：17.80元"}}},
+        )
+        unchanged = _make_lite_result(
+            code="600900.SH",
+            name="长江电力",
+            action="hold",
+            score=55,
+            dashboard={},
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[changed, unchanged])
+        previous = {
+            "601012.SH": {"action": "hold", "sentiment_score": 40},
+            "600900.SH": {"action": "hold", "sentiment_score": 50},
+        }
+
+        summary = render_major_changes(outcome, previous=previous)
+
+        self.assertNotIn("长江电力", summary)
+        self.assertIn("隆基绿能", summary)
+        self.assertIn("其余 1 只无重大变化", summary)
+
+    def test_no_previous_baseline_returns_empty_string(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50,
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+
+        self.assertEqual(render_major_changes(outcome, previous=None), "")
+        self.assertEqual(render_major_changes(outcome, previous={}), "")
+
+    def test_missing_baseline_for_one_stock_counts_as_no_comparison(self):
+        """没有基线的股票（比如新入池）既不算变化也不进入 unchanged 计数，
+        直接跳过——不能拿它跟别的股票的基线比。混入一只真正变化的股票，
+        断言的是「没基线的那只完全不出现在输出的任何地方」。"""
+        changed = _make_lite_result(
+            code="601012.SH",
+            name="隆基绿能",
+            action="reduce",
+            score=30,
+            dashboard={"battle_plan": {"sniper_points": {"stop_loss": "止损位：17.80元"}}},
+        )
+        without_baseline = _make_lite_result(
+            code="000001.SZ", name="新入池股票", action="hold", score=50, dashboard={},
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[changed, without_baseline])
+        previous = {"601012.SH": {"action": "hold", "sentiment_score": 40}}
+
+        summary = render_major_changes(outcome, previous=previous)
+
+        self.assertNotIn("新入池股票", summary)
+        self.assertIn("隆基绿能", summary)
+        self.assertNotIn("其余", summary)
+
+    def test_all_unchanged_returns_empty_string(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50, dashboard={},
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+        previous = {"600900.SH": {"action": "hold", "sentiment_score": 50}}
+
+        self.assertEqual(render_major_changes(outcome, previous=previous), "")
+
+    def test_no_successful_results_returns_empty_string(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50, success=False,
+        )
+        outcome = TieredAnalysisOutcome(lite_results=[result])
+        previous = {"600900.SH": {"action": "hold", "sentiment_score": 50}}
+
+        self.assertEqual(render_major_changes(outcome, previous=previous), "")
 
 
 if __name__ == "__main__":

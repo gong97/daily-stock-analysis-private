@@ -306,6 +306,125 @@ def render_decision_summary(
     return "\n".join(lines)
 
 
+def _major_change_reason(deep: Any, dashboard: Dict[str, Any]) -> str:
+    """今天的结论原文——不是「为什么变了」的归因，系统里没有这个计算。
+    用今天 LLM 真实给出的判断依据，不编造差异解释。"""
+    one_sentence = (dashboard.get("core_conclusion", {}).get("one_sentence") or "").strip()
+    if one_sentence:
+        return one_sentence
+    return (getattr(deep, "buy_reason", "") or "").strip()
+
+
+def _major_change_price_diff(label: str, before: Any, after: Any) -> Optional[str]:
+    """止损/目标价从 before 变到 after 才输出一行；两边都拿不到数值就跳过。"""
+    try:
+        before_f = float(before) if before is not None else None
+    except (TypeError, ValueError):
+        before_f = None
+    try:
+        after_f = float(after) if after is not None else None
+    except (TypeError, ValueError):
+        after_f = None
+
+    if before_f is None and after_f is None:
+        return None
+    if before_f is not None and after_f is not None and abs(before_f - after_f) < 0.005:
+        return None
+    return f"- {label}：{_fmt_price(before_f)} → {_fmt_price(after_f)}"
+
+
+def _major_change_arrow(before_bucket: str, after_bucket: str) -> str:
+    """ADD 方向算变好（↑），CUT 方向算变差（↓），同档位之间给个中性箭头。"""
+    rank = {"cut": 0, "hold": 1, "add": 2}
+    if rank[after_bucket] > rank[before_bucket]:
+        return "↑"
+    if rank[after_bucket] < rank[before_bucket]:
+        return "↓"
+    return ""
+
+
+def render_major_changes(
+    outcome: TieredAnalysisOutcome,
+    *,
+    previous: Optional[Dict[str, Optional[Dict[str, Any]]]] = None,
+    language: str = "zh",
+) -> str:
+    """今日重大变化：逐只对比「昨天同档位的结论」和「今天的结论」。
+
+    只有动作档位变化，或止损/目标价变化，才算「重大变化」进入这张列表；
+    仅评分波动、动作和价位都没变的，一律归进末尾的「其余 N 只无重大变化」，
+    避免持仓多时被大量噪音行淹没真正的信号。
+
+    previous 为空（首次运行、当天没有可比基线）时整段不出现，不抛异常。
+    """
+    if not previous:
+        return ""
+
+    results = [r for r in outcome.lite_results if getattr(r, "success", False)]
+    if not results:
+        return ""
+
+    changed_blocks: List[str] = []
+    unchanged_count = 0
+
+    for result in results:
+        code = getattr(result, "code", "")
+        baseline = previous.get(code)
+        if not baseline:
+            continue
+
+        dashboard = _dashboard_of(result)
+        after_bucket = _summary_action_bucket(result)
+        before_action = baseline.get("action")
+        before_bucket = "hold"
+        if before_action in ADD_ACTIONS:
+            before_bucket = "add"
+        elif before_action in CUT_ACTIONS:
+            before_bucket = "cut"
+
+        sniper = extract_sniper_points(result)
+        take_profit_line = _major_change_price_diff(
+            "目标", baseline.get("take_profit"), sniper.get("take_profit")
+        )
+        stop_loss_line = _major_change_price_diff(
+            "止损", baseline.get("stop_loss"), sniper.get("stop_loss")
+        )
+        action_changed = before_bucket != after_bucket
+
+        if not action_changed and take_profit_line is None and stop_loss_line is None:
+            unchanged_count += 1
+            continue
+
+        before_label = _SUMMARY_ACTION_LABELS.get(before_bucket, before_bucket.upper())
+        after_label = _SUMMARY_ACTION_LABELS.get(after_bucket, after_bucket.upper())
+        arrow = _major_change_arrow(before_bucket, after_bucket)
+        headline = f"**{getattr(result, 'name', '')} {code}** {before_label} → {after_label}"
+        if arrow:
+            headline += f" {arrow}"
+
+        block_lines = [headline]
+        reason = _major_change_reason(result, dashboard)
+        if reason:
+            block_lines.append(f"- 原因：{reason}")
+        if take_profit_line:
+            block_lines.append(take_profit_line)
+        if stop_loss_line:
+            block_lines.append(stop_loss_line)
+
+        changed_blocks.append("\n".join(block_lines))
+
+    if not changed_blocks:
+        return ""
+
+    lines: List[str] = ["## 📌 今日重大变化", ""]
+    lines.append("\n\n".join(changed_blocks))
+    if unchanged_count > 0:
+        lines.append("")
+        lines.append(f"_其余 {unchanged_count} 只无重大变化。_")
+
+    return "\n".join(lines)
+
+
 def render_candidate_block(
     candidate: TieredCandidate,
     *,
@@ -425,14 +544,16 @@ def render_tiered_email(
     notifier: Any,
     market_report: str = "",
     market_light: Optional[Dict[str, Any]] = None,
+    previous_decisions: Optional[Dict[str, Optional[Dict[str, Any]]]] = None,
     lite_report_type: Any = None,
     language: str = "zh",
     tier1_model: str = "",
     tier2_model: str = "",
 ) -> str:
-    """拼出完整邮件正文：决策总览 → 大盘 → 深度复核 → 全量初筛。
+    """拼出完整邮件正文：决策总览 → 重大变化 → 大盘 → 深度复核 → 全量初筛。
 
     决策总览排在最前：当天要不要动、动哪几只，3 秒内看完，不必逐段往下翻。
+    重大变化紧随其后：相比上一次同档位的结论，哪些票的判断/点位变了。
     深挖段落排在初筛表之前：需要行动的少数几只应当先被看到。
     """
     parts: List[str] = []
@@ -442,6 +563,12 @@ def render_tiered_email(
     )
     if decision_summary:
         parts.append(decision_summary)
+
+    major_changes = render_major_changes(
+        outcome, previous=previous_decisions, language=language
+    )
+    if major_changes:
+        parts.append(major_changes)
 
     if market_report:
         parts.append(f"# 📈 大盘复盘\n\n{market_report}")
