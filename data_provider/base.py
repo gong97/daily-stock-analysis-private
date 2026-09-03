@@ -3452,6 +3452,7 @@ class DataFetcherManager:
 
         sina_payload = fetch_sina_capital_flow(stock_code)
         if sina_payload.get("stock_flow"):
+            logger.info("[CapitalFlow] %s 命中新浪直连", stock_code)
             return sina_payload
 
         payload = self._fundamental_adapter.get_capital_flow(stock_code)
@@ -3479,6 +3480,15 @@ class DataFetcherManager:
             )
 
         if timeout <= 0:
+            # Logged because this path is otherwise invisible: it returns before
+            # any source is contacted, so the run shows an empty capital_flow
+            # block with no fetch attempt anywhere in the log. That signature
+            # made a stage-budget exhaustion look like a broken data source.
+            logger.warning(
+                "[CapitalFlow] %s 跳过取数：基本面阶段预算已耗尽（前序步骤占满 "
+                "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS），未联系任何数据源",
+                stock_code,
+            )
             return self._build_fundamental_block(
                 "failed",
                 {},

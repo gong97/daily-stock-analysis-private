@@ -430,6 +430,16 @@ jobs:
           MAX_WORKERS: ${{ vars.MAX_WORKERS || secrets.MAX_WORKERS || '2' }}
           # 筹码分布：默认 false（云端接口不稳定）；需启用时在 Settings → Variables 添加 ENABLE_CHIP_DISTRIBUTION=true
           ENABLE_CHIP_DISTRIBUTION: ${{ vars.ENABLE_CHIP_DISTRIBUTION || secrets.ENABLE_CHIP_DISTRIBUTION || 'false' }}
+          # 基本面阶段总预算：valuation → bundle → capital_flow → dragon_tiger → boards
+          # 共享这一个预算，按顺序扣减。默认 8s 是按本地网络定的，但 Actions 上
+          # 光第一步 get_realtime_quote 就要 5-7s（eastmoney 被墙，要等它超时才切腾讯），
+          # 预算到资金流这步已归零 → `timeout <= 0` 静默返回 failed，
+          # 新浪那条可用的链路根本没被调用到。实测 2026-09-03 run 33779139212:
+          # 单次取数 elapsed 18-71s，89 次 RemoteDisconnected。
+          # 文档也建议免费数据源被限流时调到 12-15s，这里取 25s 留足余量。
+          FUNDAMENTAL_STAGE_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || '25' }}
+          # 单块取数超时，需 <= 上面的总预算，否则一块就能吃光全部预算。
+          FUNDAMENTAL_FETCH_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || '8' }}
           # 实时行情数据源优先级（腾讯有量比且稳定，推荐首选）
           # 可选值: tencent, akshare_sina, efinance, akshare_em, tickflow, tushare
           # 如果有 TickFlow 或 Tushare Pro，可按权限把 tickflow / tushare 放在更靠前位置
