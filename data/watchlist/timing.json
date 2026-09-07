@@ -2081,6 +2081,95 @@
           ]
         }
       ]
+    },
+    {
+      "run_date": "2026-09-07",
+      "recorded_at": "2026-09-07T15:10:19",
+      "cadence": "daily",
+      "total_elapsed_sec": 71.36,
+      "strategies": [
+        {
+          "strategy": "capital_heat",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 43.81,
+          "snapshot_count": 5150,
+          "after_filter_count": 113,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "em_datacenter",
+          "run_id": "53513d9f6a40",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=508, heat=0",
+            "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=0.39%",
+            "Industry/concepts enrichment: snapshot industry heat applied: rows=5065",
+            "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+            "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+          ]
+        },
+        {
+          "strategy": "oversold_reversal",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 0.33,
+          "snapshot_count": 5150,
+          "after_filter_count": 266,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "b2033452bc63",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=508, heat=0",
+            "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=0.39%",
+            "Industry/concepts enrichment: snapshot industry heat applied: rows=5065"
+          ]
+        },
+        {
+          "strategy": "theme_momentum",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 0.27,
+          "snapshot_count": 5150,
+          "after_filter_count": 184,
+          "pick_count": 5,
+          "daily_enriched": false,
+          "snapshot_source": "last_good_cache",
+          "run_id": "fd01a94f516c",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=508, heat=0",
+            "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=0.39%",
+            "Industry/concepts enrichment: snapshot industry heat applied: rows=5065"
+          ]
+        },
+        {
+          "strategy": "volume_breakout",
+          "cadence": "daily",
+          "holding_period": "short_term",
+          "elapsed_sec": 26.95,
+          "snapshot_count": 5150,
+          "after_filter_count": 19,
+          "pick_count": 5,
+          "daily_enriched": true,
+          "snapshot_source": "last_good_cache",
+          "run_id": "3a971f43786c",
+          "error": "",
+          "degradation": [
+            "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+            "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=508, heat=0",
+            "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=0.39%",
+            "Industry/concepts enrichment: snapshot industry heat applied: rows=5065",
+            "Daily K-line enrichment attempted 58 candidates, succeeded 58 of 58 snapshot-filtered candidates",
+            "Daily K-line sources: tencent=58",
+            "Daily hard-filter rejections: require_price_above_ma20 removed 4 (58->54); breakout_20d_pct_min removed 15 (54->39); range_20d_pct_max removed 7 (39->32); body_pct_min removed 2 (32->30); consolidation_days_20d_min removed 11 (30->19)"
+          ]
+        }
+      ]
     }
   ]
 }
