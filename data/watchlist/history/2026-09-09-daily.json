@@ -1,0 +1,569 @@
+{
+  "run_date": "2026-09-09",
+  "cadence": "daily",
+  "summaries": [
+    {
+      "strategy": "capital_heat",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 45.79,
+      "snapshot_count": 5152,
+      "after_filter_count": 129,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "em_datacenter",
+      "run_id": "34121f147127",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=638, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=-0.62%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5066",
+        "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+        "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+      ]
+    },
+    {
+      "strategy": "oversold_reversal",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 0.28,
+      "snapshot_count": 5152,
+      "after_filter_count": 380,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "6d5f5a939701",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=638, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=-0.62%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5066"
+      ]
+    },
+    {
+      "strategy": "theme_momentum",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 0.23,
+      "snapshot_count": 5152,
+      "after_filter_count": 195,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "8da742bce95c",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=638, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=-0.62%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5066"
+      ]
+    },
+    {
+      "strategy": "volume_breakout",
+      "cadence": "daily",
+      "holding_period": "short_term",
+      "elapsed_sec": 34.45,
+      "snapshot_count": 5152,
+      "after_filter_count": 25,
+      "pick_count": 5,
+      "daily_enriched": true,
+      "snapshot_source": "last_good_cache",
+      "run_id": "15077cede5e4",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=638, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=-0.62%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5066",
+        "Daily K-line enrichment attempted 86 candidates, succeeded 86 of 86 snapshot-filtered candidates",
+        "Daily K-line sources: tencent=86",
+        "Daily hard-filter rejections: require_price_above_ma20 removed 8 (86->78); signal_score_min removed 10 (78->68); breakout_20d_pct_min removed 22 (68->46); range_20d_pct_max removed 6 (46->40); body_pct_min removed 4 (40->36); consolidation_days_20d_min removed 11 (36->25)"
+      ]
+    }
+  ],
+  "picks": {
+    "capital_heat": [
+      {
+        "rank": 1,
+        "code": "000807",
+        "name": "云铝股份",
+        "final_score": 75.5797,
+        "screen_score": 73.17972797204744,
+        "industry": "基本金属",
+        "price": 29.03,
+        "change_pct": 5.6,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 72.7629,
+          "liquidity": 92.2481,
+          "momentum": 74.7,
+          "reversal": 5.0,
+          "activity": 75.5335,
+          "stability": 61.2,
+          "size": 94.5736,
+          "theme_heat": 70.4666,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "002384",
+        "name": "东山精密",
+        "final_score": 75.4009,
+        "screen_score": 75.0009059539815,
+        "industry": "电子器件",
+        "price": 196.06,
+        "change_pct": 5.17,
+        "risk_level": "low",
+        "risk_flags": [
+          "high_pb"
+        ],
+        "factor_scores": {
+          "value": 20.9143,
+          "liquidity": 100.0,
+          "momentum": 73.3025,
+          "reversal": 5.0,
+          "activity": 81.9265,
+          "stability": 62.49,
+          "size": 99.2248,
+          "theme_heat": 61.5569,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "600522",
+        "name": "中天科技",
+        "final_score": 75.2763,
+        "screen_score": 72.87629092473885,
+        "industry": "通信设备",
+        "price": 34.12,
+        "change_pct": 4.95,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 59.9994,
+          "liquidity": 98.4496,
+          "momentum": 72.5875,
+          "reversal": 5.0,
+          "activity": 77.332,
+          "stability": 63.15,
+          "size": 96.8992,
+          "theme_heat": 57.2839,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601126",
+        "name": "四方股份",
+        "final_score": 74.8959,
+        "screen_score": 72.49585586155426,
+        "industry": "输变电设备",
+        "price": 43.14,
+        "change_pct": 7.58,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 39.0192,
+          "liquidity": 87.5969,
+          "momentum": 72.711,
+          "reversal": 5.0,
+          "activity": 85.6514,
+          "stability": 55.26,
+          "size": 86.0465,
+          "theme_heat": 55.0445,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "600875",
+        "name": "东方电气",
+        "final_score": 72.6883,
+        "screen_score": 70.28828225833497,
+        "industry": "电源设备",
+        "price": 26.36,
+        "change_pct": 5.52,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 75.3545,
+          "liquidity": 86.0465,
+          "momentum": 74.44,
+          "reversal": 5.0,
+          "activity": 78.91,
+          "stability": 61.44,
+          "size": 93.7984,
+          "theme_heat": 42.6124,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "oversold_reversal": [
+      {
+        "rank": 1,
+        "code": "002432",
+        "name": "九安医疗",
+        "final_score": 90.3865,
+        "screen_score": 85.98649671052632,
+        "industry": "医疗器械",
+        "price": 65.3,
+        "change_pct": -2.77,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 86.6342,
+          "liquidity": 96.5789,
+          "momentum": 47.4975,
+          "reversal": 90.51,
+          "activity": 76.6469,
+          "stability": 69.69,
+          "size": 92.8947,
+          "theme_heat": 29.4731,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000928",
+        "name": "中钢国际",
+        "final_score": 89.2512,
+        "screen_score": 84.85122342105264,
+        "industry": "建筑施工",
+        "price": 5.74,
+        "change_pct": -3.69,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 83.898,
+          "liquidity": 82.6316,
+          "momentum": 44.5075,
+          "reversal": 97.53,
+          "activity": 69.2642,
+          "stability": 66.93,
+          "size": 47.3684,
+          "theme_heat": 44.7115,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "603345",
+        "name": "安井食品",
+        "final_score": 87.2092,
+        "screen_score": 82.80917105263158,
+        "industry": "食品",
+        "price": 74.35,
+        "change_pct": -2.84,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 80.548,
+          "liquidity": 80.5263,
+          "momentum": 47.27,
+          "reversal": 91.42,
+          "activity": 82.7125,
+          "stability": 69.48,
+          "size": 88.6842,
+          "theme_heat": 41.0814,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601799",
+        "name": "星宇股份",
+        "final_score": 86.5755,
+        "screen_score": 82.17546947368422,
+        "industry": "汽车",
+        "price": 75.2,
+        "change_pct": -3.07,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 77.3862,
+          "liquidity": 75.0,
+          "momentum": 46.5225,
+          "reversal": 94.41,
+          "activity": 79.528,
+          "stability": 68.79,
+          "size": 86.0526,
+          "theme_heat": 41.9701,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "002517",
+        "name": "恺英网络",
+        "final_score": 85.9179,
+        "screen_score": 83.91789460526317,
+        "industry": "互联网服务",
+        "price": 17.1,
+        "change_pct": -3.55,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 57.2368,
+          "liquidity": 92.1053,
+          "momentum": 44.9625,
+          "reversal": 99.35,
+          "activity": 82.8509,
+          "stability": 67.35,
+          "size": 93.9474,
+          "theme_heat": 40.5475,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "theme_momentum": [
+      {
+        "rank": 1,
+        "code": "300065",
+        "name": "海兰信",
+        "final_score": 76.4563,
+        "screen_score": 73.85632325174825,
+        "industry": "船舶与海洋装备",
+        "price": 16.17,
+        "change_pct": 4.8,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 30.3924,
+          "liquidity": 66.1538,
+          "momentum": 72.1,
+          "reversal": 5.0,
+          "activity": 80.0849,
+          "stability": 63.6,
+          "size": 58.4615,
+          "theme_heat": 87.1073,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "002171",
+        "name": "楚江新材",
+        "final_score": 74.7553,
+        "screen_score": 72.15529404152274,
+        "industry": "基本金属",
+        "price": 11.06,
+        "change_pct": 7.38,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 69.778,
+          "liquidity": 83.0769,
+          "momentum": 79.003,
+          "reversal": 5.0,
+          "activity": 78.8894,
+          "stability": 55.86,
+          "size": 77.4359,
+          "theme_heat": 70.4666,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "603663",
+        "name": "三祥新材",
+        "final_score": 74.0114,
+        "screen_score": 71.4114394506959,
+        "industry": "稀有金属",
+        "price": 41.93,
+        "change_pct": 7.21,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 15.9803,
+          "liquidity": 88.7179,
+          "momentum": 79.1135,
+          "reversal": 5.0,
+          "activity": 85.1541,
+          "stability": 56.37,
+          "size": 86.1538,
+          "theme_heat": 60.785,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "603115",
+        "name": "海星股份",
+        "final_score": 73.7146,
+        "screen_score": 71.1146398018648,
+        "industry": "电子元件",
+        "price": 83.51,
+        "change_pct": 7.0,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 26.9283,
+          "liquidity": 82.5641,
+          "momentum": 79.25,
+          "reversal": 5.0,
+          "activity": 80.1944,
+          "stability": 57.0,
+          "size": 82.0513,
+          "theme_heat": 65.3958,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601126",
+        "name": "四方股份",
+        "final_score": 72.6923,
+        "screen_score": 70.09225109184943,
+        "industry": "输变电设备",
+        "price": 43.14,
+        "change_pct": 7.58,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 40.9842,
+          "liquidity": 92.3077,
+          "momentum": 78.873,
+          "reversal": 5.0,
+          "activity": 85.0911,
+          "stability": 55.26,
+          "size": 93.3333,
+          "theme_heat": 55.0445,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "volume_breakout": [
+      {
+        "rank": 1,
+        "code": "000933",
+        "name": "神火股份",
+        "final_score": 81.8495,
+        "screen_score": 81.14951403165347,
+        "industry": "基本金属",
+        "price": 28.91,
+        "change_pct": 5.2,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 65.175,
+          "liquidity": 100.0,
+          "momentum": 81.9606,
+          "reversal": 5.0,
+          "activity": 73.6334,
+          "stability": 66.6744,
+          "size": 100.0,
+          "theme_heat": 70.4666,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "300008",
+        "name": "天海防务",
+        "final_score": 78.4932,
+        "screen_score": 77.79323008218182,
+        "industry": "船舶与海洋装备",
+        "price": 6.58,
+        "change_pct": 2.97,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 37.8544,
+          "liquidity": 84.0,
+          "momentum": 72.5931,
+          "reversal": 5.0,
+          "activity": 78.0209,
+          "stability": 72.69,
+          "size": 84.0,
+          "theme_heat": 87.1073,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "000690",
+        "name": "宝新能源",
+        "final_score": 78.1898,
+        "screen_score": 77.48975401834225,
+        "industry": "电力",
+        "price": 5.41,
+        "change_pct": 5.66,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 88.2721,
+          "liquidity": 88.0,
+          "momentum": 76.0009,
+          "reversal": 5.0,
+          "activity": 80.5596,
+          "stability": 64.62,
+          "size": 88.0,
+          "theme_heat": 59.8847,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "600776",
+        "name": "东方通信",
+        "final_score": 77.9096,
+        "screen_score": 77.20957806419418,
+        "industry": "通信设备",
+        "price": 14.03,
+        "change_pct": 5.25,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 37.5515,
+          "liquidity": 92.0,
+          "momentum": 73.3115,
+          "reversal": 5.0,
+          "activity": 79.7935,
+          "stability": 65.85,
+          "size": 92.0,
+          "theme_heat": 57.2839,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "003033",
+        "name": "征和工业",
+        "final_score": 76.3106,
+        "screen_score": 75.61060681662961,
+        "industry": "通用设备",
+        "price": 75.92,
+        "change_pct": 6.43,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 37.2485,
+          "liquidity": 68.0,
+          "momentum": 89.2648,
+          "reversal": 5.0,
+          "activity": 82.3086,
+          "stability": 52.4521,
+          "size": 76.0,
+          "theme_heat": 47.4282,
+          "topic_alignment": 50.0
+        }
+      }
+    ]
+  }
+}
