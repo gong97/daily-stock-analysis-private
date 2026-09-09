@@ -2459,32 +2459,19 @@ class SearchService:
         )
 
         # 初始化搜索引擎（按优先级排序）
-        # 1. Bocha 优先（中文搜索优化，AI摘要）
+        #
+        # 顺序原则：无配额 / 大额度的引擎排在有限额度的付费引擎前面，让每天的
+        # 6 维度搜索优先消耗“便宜”的引擎，Tavily / SerpAPI 只在前面的失败时兜底。
+        # provider_index 每个维度 +1，因此列表越靠前的引擎被轮到的次数越多；
+        # 换引擎重试也是沿列表向后取。之前 Tavily 排第 2，导致每月 1000 次免费
+        # 额度在 80% 上下告警。
+        #
+        # 1. Bocha 优先（中文搜索优化，AI摘要；主力付费源，中文效果最好）
         if bocha_keys:
             self._providers.append(BochaSearchProvider(bocha_keys))
             logger.info(f"已配置 Bocha 搜索，共 {len(bocha_keys)} 个 API Key")
 
-        # 2. Tavily（免费额度更多，每月 1000 次）
-        if tavily_keys:
-            self._providers.append(TavilySearchProvider(tavily_keys))
-            logger.info(f"已配置 Tavily 搜索，共 {len(tavily_keys)} 个 API Key")
-
-        # 3. Brave Search（隐私优先，全球覆盖）
-        if brave_keys:
-            self._providers.append(BraveSearchProvider(brave_keys))
-            logger.info(f"已配置 Brave 搜索，共 {len(brave_keys)} 个 API Key")
-
-        # 4. SerpAPI 作为备选（每月 100 次）
-        if serpapi_keys:
-            self._providers.append(SerpAPISearchProvider(serpapi_keys))
-            logger.info(f"已配置 SerpAPI 搜索，共 {len(serpapi_keys)} 个 API Key")
-
-        # 5. MiniMax（Coding Plan Web Search，结构化结果）
-        if minimax_keys:
-            self._providers.append(MiniMaxSearchProvider(minimax_keys))
-            logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
-
-        # 6. SearXNG（自建实例优先；未配置时可自动发现公共实例）
+        # 2. SearXNG（自建实例优先；未配置时可自动发现公共实例。无配额，优先消耗）
         searxng_provider = SearXNGSearchProvider(
             searxng_base_urls,
             use_public_instances=bool(searxng_public_instances_enabled and not searxng_base_urls),
@@ -2496,7 +2483,27 @@ class SearchService:
             else:
                 logger.info("已启用 SearXNG 公共实例自动发现模式")
 
-        # 7. Anspire Search（实时智能搜索优化）
+        # 3. Brave Search（隐私优先，全球覆盖；免费额度较大，放在 Tavily 前面）
+        if brave_keys:
+            self._providers.append(BraveSearchProvider(brave_keys))
+            logger.info(f"已配置 Brave 搜索，共 {len(brave_keys)} 个 API Key")
+
+        # 4. Tavily（每月仅 1000 次免费额度，降级为兜底，仅在上面几个失败时使用）
+        if tavily_keys:
+            self._providers.append(TavilySearchProvider(tavily_keys))
+            logger.info(f"已配置 Tavily 搜索，共 {len(tavily_keys)} 个 API Key")
+
+        # 5. SerpAPI 作为备选（每月 100 次）
+        if serpapi_keys:
+            self._providers.append(SerpAPISearchProvider(serpapi_keys))
+            logger.info(f"已配置 SerpAPI 搜索，共 {len(serpapi_keys)} 个 API Key")
+
+        # 6. MiniMax（Coding Plan Web Search，结构化结果）
+        if minimax_keys:
+            self._providers.append(MiniMaxSearchProvider(minimax_keys))
+            logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
+
+        # 7. Anspire Search（实时智能搜索优化，配置时置于队首）
         if anspire_keys:
             self._providers.insert(0, AnspireSearchProvider(anspire_keys))
             logger.info(f"已配置 Anspire Search 搜索，共 {len(anspire_keys)} 个 API Key")
