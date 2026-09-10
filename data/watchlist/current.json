@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-09",
+    "last_run_date": "2026-09-10",
     "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
@@ -22,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-09T21:52:02+08:00",
+    "updated_at": "2026-09-10T21:46:37+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -89,40 +89,6 @@
         "oversold_reversal": {
           "score": 93.0323,
           "last_seen": "2026-09-07",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "000783",
-      "name": "长江证券",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "非银行金融",
-      "first_seen": "2026-08-30",
-      "last_seen": "2026-09-04",
-      "hit_count": 4,
-      "latest_score": 91.3807,
-      "best_score": 91.3807,
-      "latest_rank": 1,
-      "price": 9.26,
-      "change_pct": 0.33,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "shrink_pullback": {
-          "score": 81.6647,
-          "last_seen": "2026-09-04",
-          "bucket": "balanced"
-        },
-        "oversold_reversal": {
-          "score": 91.3807,
-          "last_seen": "2026-09-03",
           "bucket": "balanced"
         }
       },
@@ -422,29 +388,63 @@
       "pinned": false
     },
     {
-      "code": "000338",
-      "name": "潍柴动力",
+      "code": "600352",
+      "name": "浙江龙盛",
       "holding_period": "short_term",
       "cadence": "daily",
       "bucket": "balanced",
       "buckets": [
         "balanced"
       ],
-      "industry": "汽车",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-08",
-      "hit_count": 1,
-      "latest_score": 91.1672,
-      "best_score": 91.1672,
+      "industry": "化学制品",
+      "first_seen": "2026-09-04",
+      "last_seen": "2026-09-10",
+      "hit_count": 2,
+      "latest_score": 89.1539,
+      "best_score": 89.1539,
+      "latest_rank": 1,
+      "price": 12.29,
+      "change_pct": -3.46,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "momentum_quality": {
+          "score": 74.0263,
+          "last_seen": "2026-09-04",
+          "bucket": "balanced"
+        },
+        "oversold_reversal": {
+          "score": 89.1539,
+          "last_seen": "2026-09-10",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "000703",
+      "name": "恒逸石化",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "合成纤维及树脂",
+      "first_seen": "2026-09-01",
+      "last_seen": "2026-09-10",
+      "hit_count": 2,
+      "latest_score": 87.8654,
+      "best_score": 89.0136,
       "latest_rank": 2,
-      "price": 26.61,
-      "change_pct": -3.38,
+      "price": 18.0,
+      "change_pct": -3.49,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "oversold_reversal": {
-          "score": 91.1672,
-          "last_seen": "2026-09-08",
+          "score": 87.8654,
+          "last_seen": "2026-09-10",
           "bucket": "balanced"
         }
       },
@@ -538,58 +538,58 @@
       "pinned": false
     },
     {
-      "code": "000703",
-      "name": "恒逸石化",
+      "code": "000690",
+      "name": "宝新能源",
       "holding_period": "short_term",
       "cadence": "daily",
       "bucket": "balanced",
       "buckets": [
         "balanced"
       ],
-      "industry": "合成纤维及树脂",
-      "first_seen": "2026-09-01",
-      "last_seen": "2026-09-01",
+      "industry": "电力",
+      "first_seen": "2026-09-10",
+      "last_seen": "2026-09-10",
       "hit_count": 1,
-      "latest_score": 89.0136,
-      "best_score": 89.0136,
-      "latest_rank": 2,
-      "price": 18.98,
+      "latest_score": 87.6241,
+      "best_score": 87.6241,
+      "latest_rank": 3,
+      "price": 5.26,
       "change_pct": -2.77,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "oversold_reversal": {
-          "score": 89.0136,
-          "last_seen": "2026-09-01",
+          "score": 87.6241,
+          "last_seen": "2026-09-10",
           "bucket": "balanced"
         }
       },
       "pinned": false
     },
     {
-      "code": "603345",
-      "name": "安井食品",
+      "code": "601001",
+      "name": "晋控煤业",
       "holding_period": "short_term",
       "cadence": "daily",
       "bucket": "balanced",
       "buckets": [
         "balanced"
       ],
-      "industry": "食品",
-      "first_seen": "2026-09-09",
-      "last_seen": "2026-09-09",
+      "industry": "煤炭",
+      "first_seen": "2026-09-10",
+      "last_seen": "2026-09-10",
       "hit_count": 1,
-      "latest_score": 87.2092,
-      "best_score": 87.2092,
-      "latest_rank": 3,
-      "price": 74.35,
-      "change_pct": -2.84,
+      "latest_score": 87.5792,
+      "best_score": 87.5792,
+      "latest_rank": 4,
+      "price": 17.02,
+      "change_pct": -3.3,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "oversold_reversal": {
-          "score": 87.2092,
-          "last_seen": "2026-09-09",
+          "score": 87.5792,
+          "last_seen": "2026-09-10",
           "bucket": "balanced"
         }
       },
@@ -867,6 +867,42 @@
       "pinned": false
     },
     {
+      "code": "600864",
+      "name": "哈投股份",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "非银行金融",
+      "first_seen": "2026-09-10",
+      "last_seen": "2026-09-10",
+      "hit_count": 1,
+      "latest_score": 81.6508,
+      "best_score": 81.6508,
+      "latest_rank": 1,
+      "price": 6.0,
+      "change_pct": 5.26,
+      "risk_level": "low",
+      "risk_flags": [
+        "rsi_overbought"
+      ],
+      "strategies": {
+        "capital_heat": {
+          "score": 68.0641,
+          "last_seen": "2026-09-10",
+          "bucket": "aggressive"
+        },
+        "volume_breakout": {
+          "score": 81.6508,
+          "last_seen": "2026-09-10",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "600601",
       "name": "方正科技",
       "holding_period": "short_term",
@@ -976,31 +1012,36 @@
       "pinned": false
     },
     {
-      "code": "601118",
-      "name": "海南橡胶",
+      "code": "300008",
+      "name": "天海防务",
       "holding_period": "short_term",
       "cadence": "daily",
       "bucket": "aggressive",
       "buckets": [
         "aggressive"
       ],
-      "industry": "农业",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-08",
+      "industry": "船舶与海洋装备",
+      "first_seen": "2026-09-10",
+      "last_seen": "2026-09-10",
       "hit_count": 1,
-      "latest_score": 79.2676,
-      "best_score": 79.2676,
-      "latest_rank": 1,
-      "price": 7.87,
-      "change_pct": 9.31,
+      "latest_score": 79.2093,
+      "best_score": 79.2093,
+      "latest_rank": 2,
+      "price": 6.79,
+      "change_pct": 3.19,
       "risk_level": "low",
       "risk_flags": [
-        "negative_or_invalid_pe"
+        "rsi_overbought"
       ],
       "strategies": {
         "theme_momentum": {
-          "score": 79.2676,
-          "last_seen": "2026-09-08",
+          "score": 73.8481,
+          "last_seen": "2026-09-10",
+          "bucket": "aggressive"
+        },
+        "volume_breakout": {
+          "score": 79.2093,
+          "last_seen": "2026-09-10",
           "bucket": "aggressive"
         }
       },
@@ -1037,35 +1078,6 @@
           "score": 79.0901,
           "last_seen": "2026-09-04",
           "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "600362",
-      "name": "江西铜业",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "基本金属",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-08",
-      "hit_count": 1,
-      "latest_score": 78.2689,
-      "best_score": 78.2689,
-      "latest_rank": 1,
-      "price": 48.53,
-      "change_pct": 5.45,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 78.2689,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
         }
       },
       "pinned": false
@@ -1451,35 +1463,6 @@
           "score": 72.6923,
           "last_seen": "2026-09-09",
           "bucket": "aggressive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "600352",
-      "name": "浙江龙盛",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "化学制品",
-      "first_seen": "2026-09-04",
-      "last_seen": "2026-09-04",
-      "hit_count": 1,
-      "latest_score": 74.0263,
-      "best_score": 74.0263,
-      "latest_rank": 1,
-      "price": 12.52,
-      "change_pct": 0.16,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "momentum_quality": {
-          "score": 74.0263,
-          "last_seen": "2026-09-04",
-          "bucket": "balanced"
         }
       },
       "pinned": false
