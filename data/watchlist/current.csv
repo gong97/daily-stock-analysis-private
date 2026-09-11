@@ -9,16 +9,16 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 601857,中国石油,石油天然气,defensive,defensive,weekly,swing,2026-09-04,2026-09-04,1,70.25,70.25,low,low_volatility_quality,0
 600028,中国石化,石油天然气,defensive,defensive,weekly,swing,2026-08-31,2026-08-31,1,70.20,70.20,low,low_volatility_quality,0
 600900,长江电力,电力,defensive,defensive,weekly,swing,2026-09-04,2026-09-04,1,69.29,69.29,low,low_volatility_quality,0
+603799,华友钴业,稀有金属,balanced,balanced,daily,short_term,2026-09-02,2026-09-11,4,93.05,93.05,low,momentum_quality|oversold_reversal,0
 601318,中国平安,非银行金融,balanced,balanced|defensive,daily,short_term,2026-08-30,2026-09-07,4,93.03,93.03,low,balanced_alpha|blue_chip_income|low_volatility_quality|momentum_quality|oversold_reversal|shrink_pullback,0
 601166,兴业银行,银行,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-04,3,92.59,93.22,low,balanced_alpha|blue_chip_income|momentum_quality|oversold_reversal|quality_value,0
 002432,九安医疗,医疗器械,balanced,balanced,daily,short_term,2026-08-31,2026-09-09,4,90.39,93.31,low,balanced_alpha|momentum_quality|oversold_reversal,0
 000425,徐工机械,专用设备,balanced,balanced,daily,short_term,2026-09-02,2026-09-03,4,90.11,90.11,low,oversold_reversal,0
 601919,中远海控,港口航运,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-04,3,92.04,92.04,low,balanced_alpha|blue_chip_income|low_volatility_quality|momentum_quality|oversold_reversal|quality_value|shrink_pullback,0
 601668,中国建筑,建筑施工,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-04,3,91.08,91.08,low,balanced_alpha|blue_chip_income|dual_low|oversold_reversal|quality_value,0
-603799,华友钴业,稀有金属,balanced,balanced,weekly,swing,2026-09-02,2026-09-04,3,90.82,90.82,low,momentum_quality|oversold_reversal,0
 002466,天齐锂业,稀有金属,balanced,balanced,daily,short_term,2026-09-04,2026-09-04,1,92.52,92.52,low,oversold_reversal,0
+600219,南山铝业,基本金属,balanced,balanced,daily,short_term,2026-09-11,2026-09-11,1,91.35,91.35,low,oversold_reversal,0
 600352,浙江龙盛,化学制品,balanced,balanced,daily,short_term,2026-09-04,2026-09-10,2,89.15,89.15,low,momentum_quality|oversold_reversal,0
-000703,恒逸石化,合成纤维及树脂,balanced,balanced,daily,short_term,2026-09-01,2026-09-10,2,87.87,89.01,low,oversold_reversal,0
 603588,高能环境,环保,balanced,balanced,daily,short_term,2026-09-01,2026-09-01,1,89.44,89.44,low,oversold_reversal,0
 000928,中钢国际,建筑施工,balanced,balanced,daily,short_term,2026-09-09,2026-09-09,1,89.25,89.25,low,oversold_reversal,0
 600585,海螺水泥,水泥,balanced,balanced,daily,short_term,2026-09-01,2026-09-01,1,89.20,89.20,low,oversold_reversal,0
@@ -42,4 +42,4 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 002171,楚江新材,基本金属,aggressive,aggressive,daily,short_term,2026-09-03,2026-09-09,2,74.76,74.76,low,capital_heat|theme_momentum|volume_breakout,0
 603444,吉比特,互联网服务,aggressive,aggressive,daily,short_term,2026-09-04,2026-09-04,1,76.68,76.68,low,capital_heat|theme_momentum,0
 002430,杭氧股份,环保,aggressive,aggressive,daily,short_term,2026-08-31,2026-08-31,1,75.60,75.60,low,capital_heat|theme_momentum|volume_breakout,0
-601126,四方股份,输变电设备,aggressive,aggressive,daily,short_term,2026-09-09,2026-09-09,1,74.90,74.90,low,capital_heat|theme_momentum,0
+002130,沃尔核材,电子器件,aggressive,aggressive,daily,short_term,2026-09-11,2026-09-11,1,74.94,74.94,low,theme_momentum|volume_breakout,0

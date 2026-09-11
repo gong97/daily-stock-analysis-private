@@ -1,37 +1,36 @@
 # 全市场扫描观察名单（daily）
 
-- 扫描日期：2026-09-10
+- 扫描日期：2026-09-11
 - 名单规模：44（防守 10｜均衡 19｜进攻 15）
-- 本次新进：4｜本次移出：15
-- 策略数：4｜总耗时：87.0s
+- 本次新进：2｜本次移出：16
+- 策略数：4｜总耗时：71.1s
 - 行业配额：已生效，本次裁掉 1 条
 
 ## 新进入观察名单
 
 | 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
 | --- | --- | --- | --- | --- | --- |
-| 进攻 | 600864 | 哈投股份 | 非银行金融 | 81.65 | capital_heat, volume_breakout |
-| 均衡 | 000690 | 宝新能源 | 电力 | 87.62 | oversold_reversal |
-| 均衡 | 601001 | 晋控煤业 | 煤炭 | 87.58 | oversold_reversal |
-| 进攻 | 300008 | 天海防务 | 船舶与海洋装备 | 79.21 | theme_momentum, volume_breakout |
+| 均衡 | 600219 | 南山铝业 | 基本金属 | 91.35 | oversold_reversal |
+| 进攻 | 002130 | 沃尔核材 | 电子器件 | 74.94 | theme_momentum, volume_breakout |
 
 ## 移出观察名单
 
-- 000338 潍柴动力，汽车（超出名单容量）
-- 603345 安井食品，食品（超出名单容量）
-- 601118 海南橡胶，农业（超出名单容量）
-- 600362 江西铜业，基本金属（超出名单容量）
-- 000021 深科技，计算机硬件（超出名单容量）
-- 601991 大唐发电，电力（超出名单容量）
-- 600310 广西能源，电力（超出名单容量）
-- 001896 豫能控股，电力（超出名单容量）
-- 002600 领益智造，电子元件（超出名单容量）
-- 300131 英唐智控，电子元件（超出名单容量）
-- 002451 摩恩电气，输变电设备（超出名单容量）
-- 300395 菲利华，金属非金属新材料（超出名单容量）
-- 300806 斯迪克，化学新材料（超出名单容量）
-- 600812 华北制药，化学制药（超出名单容量）
-- 000783 长江证券，非银行金融（同行业已达全局上限）
+- 000703 恒逸石化，合成纤维及树脂（超出名单容量）
+- 000792 盐湖股份，化肥农药（超出名单容量）
+- 600982 宁波能源，电力（超出名单容量）
+- 601606 长城军工，地面装备（超出名单容量）
+- 300408 三环集团，电子元件（超出名单容量）
+- 603678 火炬电子，电子元件（超出名单容量）
+- 601126 四方股份，输变电设备（超出名单容量）
+- 002265 建设工业，地面装备（超出名单容量）
+- 600522 中天科技，通信设备（超出名单容量）
+- 300207 欣旺达，电子设备制造（超出名单容量）
+- 002202 金风科技，电源设备（超出名单容量）
+- 601218 吉鑫科技，电源设备（超出名单容量）
+- 600498 烽火通信，通信设备（超出名单容量）
+- 300414 中光防雷，通信设备（超出名单容量）
+- 300121 阳谷华泰，橡胶制品（超出名单容量）
+- 000776 广发证券，非银行金融（同行业已达全局上限）
 
 ## 当前名单 · 防守（10）
 
@@ -52,15 +51,15 @@
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 601318（兼 防守） | 中国平安 | 非银行金融 | 93.03 | 4 | 2026-08-30 | 2026-09-07 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, shrink_pullback |
-| 2 | 002432 | 九安医疗 | 医疗器械 | 90.39 | 4 | 2026-08-31 | 2026-09-09 | balanced_alpha, momentum_quality, oversold_reversal |
-| 3 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, momentum_quality, oversold_reversal, quality_value |
-| 4 | 601919（兼 防守） | 中远海控 | 港口航运 | 92.04 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value, shrink_pullback |
-| 5 | 000425 | 徐工机械 | 专用设备 | 90.11 | 4 | 2026-09-02 | 2026-09-03 | oversold_reversal |
-| 6 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
-| 7 | 603799 | 华友钴业 | 稀有金属 | 90.82 | 3 | 2026-09-02 | 2026-09-04 | momentum_quality, oversold_reversal |
-| 8 | 600352 | 浙江龙盛 | 化学制品 | 89.15 | 2 | 2026-09-04 | 2026-09-10 | momentum_quality, oversold_reversal |
-| 9 | 000703 | 恒逸石化 | 合成纤维及树脂 | 87.87 | 2 | 2026-09-01 | 2026-09-10 | oversold_reversal |
+| 1 | 603799 | 华友钴业 | 稀有金属 | 93.05 | 4 | 2026-09-02 | 2026-09-11 | momentum_quality, oversold_reversal |
+| 2 | 601318（兼 防守） | 中国平安 | 非银行金融 | 93.03 | 4 | 2026-08-30 | 2026-09-07 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, shrink_pullback |
+| 3 | 002432 | 九安医疗 | 医疗器械 | 90.39 | 4 | 2026-08-31 | 2026-09-09 | balanced_alpha, momentum_quality, oversold_reversal |
+| 4 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, momentum_quality, oversold_reversal, quality_value |
+| 5 | 601919（兼 防守） | 中远海控 | 港口航运 | 92.04 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value, shrink_pullback |
+| 6 | 000425 | 徐工机械 | 专用设备 | 90.11 | 4 | 2026-09-02 | 2026-09-03 | oversold_reversal |
+| 7 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 3 | 2026-08-30 | 2026-09-04 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
+| 8 | 600219 | 南山铝业 | 基本金属 | 91.35 | 1 | 2026-09-11 | 2026-09-11 | oversold_reversal |
+| 9 | 600352 | 浙江龙盛 | 化学制品 | 89.15 | 2 | 2026-09-04 | 2026-09-10 | momentum_quality, oversold_reversal |
 | 10 | 002466 | 天齐锂业 | 稀有金属 | 92.52 | 1 | 2026-09-04 | 2026-09-04 | oversold_reversal |
 | 11 | 000928 | 中钢国际 | 建筑施工 | 89.25 | 1 | 2026-09-09 | 2026-09-09 | oversold_reversal |
 | 12 | 000690 | 宝新能源 | 电力 | 87.62 | 1 | 2026-09-10 | 2026-09-10 | oversold_reversal |
@@ -87,7 +86,7 @@
 | 9 | 000807（兼 均衡） | 云铝股份 | 基本金属 | 75.58 | 2 | 2026-09-04 | 2026-09-09 | capital_heat, shrink_pullback |
 | 10 | 600096 | 云天化 | 化肥农药 | 77.53 | 1 | 2026-09-08 | 2026-09-08 | capital_heat, theme_momentum |
 | 11 | 002171 | 楚江新材 | 基本金属 | 74.76 | 2 | 2026-09-03 | 2026-09-09 | capital_heat, theme_momentum, volume_breakout |
-| 12 | 601126 | 四方股份 | 输变电设备 | 74.90 | 1 | 2026-09-09 | 2026-09-09 | capital_heat, theme_momentum |
+| 12 | 002130 | 沃尔核材 | 电子器件 | 74.94 | 1 | 2026-09-11 | 2026-09-11 | theme_momentum, volume_breakout |
 | 13 | 603444 | 吉比特 | 互联网服务 | 76.68 | 1 | 2026-09-04 | 2026-09-04 | capital_heat, theme_momentum |
 | 14 | 603596 | 伯特利 | 汽车 | 77.40 | 1 | 2026-08-31 | 2026-09-01 | capital_heat, theme_momentum, volume_breakout |
 | 15 | 002430 | 杭氧股份 | 环保 | 75.60 | 1 | 2026-08-31 | 2026-08-31 | capital_heat, theme_momentum, volume_breakout |
@@ -98,7 +97,7 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| capital_heat | short_term | 59.8 | 5150 | 94 | 5 | 否 |
-| oversold_reversal | short_term | 0.3 | 5150 | 637 | 5 | 否 |
-| theme_momentum | short_term | 0.3 | 5150 | 112 | 5 | 否 |
-| volume_breakout | short_term | 26.7 | 5150 | 18 | 5 | 是 |
+| capital_heat | short_term | 46.8 | 5153 | 87 | 5 | 否 |
+| oversold_reversal | short_term | 0.4 | 5153 | 955 | 5 | 否 |
+| theme_momentum | short_term | 0.3 | 5153 | 127 | 5 | 否 |
+| volume_breakout | short_term | 23.7 | 5153 | 17 | 5 | 是 |
