@@ -9,10 +9,10 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 601857,中国石油,石油天然气,defensive,defensive,weekly,watchlist,2026-09-04,2026-09-11,2,74.42,74.42,low,blue_chip_income|low_volatility_quality,0
 600028,中国石化,石油天然气,defensive,defensive,weekly,swing,2026-08-31,2026-09-11,2,70.92,70.92,low,low_volatility_quality,0
 600900,长江电力,电力,defensive,defensive,weekly,swing,2026-09-04,2026-09-04,1,69.29,69.29,low,low_volatility_quality,0
+002432,九安医疗,医疗器械,balanced,balanced,daily,short_term,2026-08-31,2026-09-14,6,91.54,93.31,low,balanced_alpha|momentum_quality|oversold_reversal,0
 601318,中国平安,非银行金融,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-11,5,93.03,93.03,low,balanced_alpha|blue_chip_income|low_volatility_quality|momentum_quality|oversold_reversal|shrink_pullback,0
 603799,华友钴业,稀有金属,balanced,balanced,weekly,watchlist,2026-09-02,2026-09-11,4,93.05,93.05,low,balanced_alpha|momentum_quality|oversold_reversal,0
 601166,兴业银行,银行,balanced,balanced|defensive,weekly,swing,2026-08-30,2026-09-11,4,92.59,93.22,low,balanced_alpha|blue_chip_income|low_volatility_quality|momentum_quality|oversold_reversal|quality_value,0
-002432,九安医疗,医疗器械,balanced,balanced,weekly,watchlist,2026-08-31,2026-09-11,5,90.39,93.31,low,balanced_alpha|momentum_quality|oversold_reversal,0
 601919,中远海控,港口航运,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-11,4,92.04,92.04,low,balanced_alpha|blue_chip_income|low_volatility_quality|momentum_quality|oversold_reversal|quality_value|shrink_pullback,0
 601668,中国建筑,建筑施工,balanced,balanced|defensive,weekly,watchlist,2026-08-30,2026-09-11,4,91.08,91.08,low,balanced_alpha|blue_chip_income|dual_low|oversold_reversal|quality_value,0
 000425,徐工机械,专用设备,balanced,balanced,daily,short_term,2026-09-02,2026-09-03,4,90.11,90.11,low,oversold_reversal,0

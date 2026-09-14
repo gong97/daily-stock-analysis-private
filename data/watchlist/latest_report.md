@@ -1,36 +1,30 @@
-# 全市场扫描观察名单（weekly）
+# 全市场扫描观察名单（daily）
 
-- 扫描日期：2026-09-11
+- 扫描日期：2026-09-14
 - 名单规模：45（防守 10｜均衡 20｜进攻 15）
-- 本次新进：7｜本次移出：11
-- 策略数：7｜总耗时：266.5s
-- 行业配额：已生效，本次裁掉 5 条
-
-## 新进入观察名单
-
-| 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
-| --- | --- | --- | --- | --- | --- |
-| 均衡 | 000725 | 京东方A | 电子器件 | 79.24 | balanced_alpha |
-| 均衡 | 002011 | 盾安环境 | 通用设备 | 72.28 | momentum_quality |
-| 均衡 | 002185 | 华天科技 | 半导体 | 72.06 | momentum_quality |
-| 防守 | 600741 | 华域汽车 | 汽车 | 83.04 | quality_value |
-| 防守 | 601669 | 中国电建 | 基础建设 | 80.25 | quality_value |
-| 均衡 | 600036 | 招商银行 | 银行 | 80.98 | shrink_pullback |
-| 均衡 | 600989 | 宝丰能源 | 化学原料 | 76.99 | shrink_pullback |
+- 本次新进：0｜本次移出：17
+- 策略数：4｜总耗时：74.5s
+- 行业配额：已生效，本次裁掉 0 条
 
 ## 移出观察名单
 
-- 600016 民生银行，银行（同行业在该桶已满额）
-- 601186 中国铁建，基础建设（同行业在该桶已满额）
-- 601328 交通银行，银行（同行业在该桶已满额）
-- 000928 中钢国际，建筑施工（超出名单容量）
-- 000690 宝新能源，电力（超出名单容量）
-- 601001 晋控煤业，煤炭（超出名单容量）
-- 603588 高能环境，环保（超出名单容量）
-- 600585 海螺水泥，水泥（超出名单容量）
-- 002517 恺英网络，互联网服务（超出名单容量）
-- 601211 国泰海通，非银行金融（同行业已达全局上限）
-- 000001 平安银行，银行（同行业已达全局上限）
+- 600362 江西铜业，基本金属（超出名单容量）
+- 600875 东方电气，电源设备（超出名单容量）
+- 002602 世纪华通，互联网服务（超出名单容量）
+- 601156 东航物流，航空机场（超出名单容量）
+- 300454 深信服，计算机软件（超出名单容量）
+- 002268 电科网安，计算机软件（超出名单容量）
+- 600353 旭光电子，电子器件（超出名单容量）
+- 002859 洁美科技，电子设备制造（超出名单容量）
+- 603920 世运电路，电子元件（超出名单容量）
+- 002745 木林森，光电子器件（超出名单容量）
+- 300568 星源材质，金属非金属新材料（超出名单容量）
+- 002106 莱宝高科，电子器件（超出名单容量）
+- 002202 金风科技，电源设备（超出名单容量）
+- 600163 中闽能源，电力（超出名单容量）
+- 600798 宁波海运，港口航运（超出名单容量）
+- 300347 泰格医药，医疗服务（超出名单容量）
+- 600641 先导基电，半导体（超出名单容量）
 
 ## 当前名单 · 防守（10）
 
@@ -51,10 +45,10 @@
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 601318（兼 防守） | 中国平安 | 非银行金融 | 93.03 | 5 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, shrink_pullback |
-| 2 | 603799 | 华友钴业 | 稀有金属 | 93.05 | 4 | 2026-09-02 | 2026-09-11 | balanced_alpha, momentum_quality, oversold_reversal |
-| 3 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value |
-| 4 | 002432 | 九安医疗 | 医疗器械 | 90.39 | 5 | 2026-08-31 | 2026-09-11 | balanced_alpha, momentum_quality, oversold_reversal |
+| 1 | 002432 | 九安医疗 | 医疗器械 | 91.54 | 6 | 2026-08-31 | 2026-09-14 | balanced_alpha, momentum_quality, oversold_reversal |
+| 2 | 601318（兼 防守） | 中国平安 | 非银行金融 | 93.03 | 5 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, shrink_pullback |
+| 3 | 603799 | 华友钴业 | 稀有金属 | 93.05 | 4 | 2026-09-02 | 2026-09-11 | balanced_alpha, momentum_quality, oversold_reversal |
+| 4 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value |
 | 5 | 601919（兼 防守） | 中远海控 | 港口航运 | 92.04 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value, shrink_pullback |
 | 6 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
 | 7 | 000425 | 徐工机械 | 专用设备 | 90.11 | 4 | 2026-09-02 | 2026-09-03 | oversold_reversal |
@@ -98,10 +92,7 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| balanced_alpha | watchlist | 105.6 | 5153 | 1111 | 5 | 否 |
-| blue_chip_income | watchlist | 0.3 | 5153 | 159 | 5 | 否 |
-| dual_low | watchlist | 0.3 | 5153 | 259 | 5 | 否 |
-| low_volatility_quality | swing | 106.4 | 5153 | 94 | 5 | 是 |
-| momentum_quality | swing | 0.3 | 5153 | 534 | 5 | 否 |
-| quality_value | watchlist | 0.3 | 5153 | 385 | 5 | 否 |
-| shrink_pullback | swing | 53.3 | 5153 | 47 | 5 | 是 |
+| capital_heat | short_term | 44.1 | 5153 | 99 | 5 | 否 |
+| oversold_reversal | short_term | 0.5 | 5153 | 242 | 5 | 否 |
+| theme_momentum | short_term | 0.4 | 5153 | 134 | 5 | 否 |
+| volume_breakout | short_term | 29.6 | 5153 | 13 | 5 | 是 |

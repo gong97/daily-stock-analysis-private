@@ -1,17 +1,14 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-11",
-    "last_run_cadence": "weekly",
+    "last_run_date": "2026-09-14",
+    "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
-      "balanced_alpha",
-      "blue_chip_income",
-      "dual_low",
-      "low_volatility_quality",
-      "momentum_quality",
-      "quality_value",
-      "shrink_pullback"
+      "capital_heat",
+      "oversold_reversal",
+      "theme_momentum",
+      "volume_breakout"
     ],
     "last_run_failed_strategies": [],
     "llm_ranked": false,
@@ -25,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-11T22:36:55+08:00",
+    "updated_at": "2026-09-14T23:59:42+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -39,6 +36,45 @@
     "hit_count_repaired_from_history": true
   },
   "entries": [
+    {
+      "code": "002432",
+      "name": "九安医疗",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "医疗器械",
+      "first_seen": "2026-08-31",
+      "last_seen": "2026-09-14",
+      "hit_count": 6,
+      "latest_score": 91.5445,
+      "best_score": 93.3133,
+      "latest_rank": 1,
+      "price": 59.2,
+      "change_pct": -3.58,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "balanced_alpha": {
+          "score": 78.7535,
+          "last_seen": "2026-09-11",
+          "bucket": "balanced"
+        },
+        "momentum_quality": {
+          "score": 72.1579,
+          "last_seen": "2026-08-31",
+          "bucket": "balanced"
+        },
+        "oversold_reversal": {
+          "score": 91.5445,
+          "last_seen": "2026-09-14",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
     {
       "code": "601318",
       "name": "中国平安",
@@ -189,45 +225,6 @@
           "score": 73.5019,
           "last_seen": "2026-09-11",
           "bucket": "defensive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "002432",
-      "name": "九安医疗",
-      "holding_period": "watchlist",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "医疗器械",
-      "first_seen": "2026-08-31",
-      "last_seen": "2026-09-11",
-      "hit_count": 5,
-      "latest_score": 90.3865,
-      "best_score": 93.3133,
-      "latest_rank": 2,
-      "price": 61.4,
-      "change_pct": -1.59,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "balanced_alpha": {
-          "score": 78.7535,
-          "last_seen": "2026-09-11",
-          "bucket": "balanced"
-        },
-        "momentum_quality": {
-          "score": 72.1579,
-          "last_seen": "2026-08-31",
-          "bucket": "balanced"
-        },
-        "oversold_reversal": {
-          "score": 90.3865,
-          "last_seen": "2026-09-09",
-          "bucket": "balanced"
         }
       },
       "pinned": false
