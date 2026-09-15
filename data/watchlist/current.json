@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-14",
+    "last_run_date": "2026-09-15",
     "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
@@ -22,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-14T23:59:42+08:00",
+    "updated_at": "2026-09-15T22:25:57+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -167,6 +167,35 @@
         "balanced_alpha": {
           "score": 78.1872,
           "last_seen": "2026-09-11",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "000425",
+      "name": "徐工机械",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "专用设备",
+      "first_seen": "2026-09-02",
+      "last_seen": "2026-09-15",
+      "hit_count": 5,
+      "latest_score": 90.877,
+      "best_score": 90.877,
+      "latest_rank": 1,
+      "price": 7.81,
+      "change_pct": -3.58,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "oversold_reversal": {
+          "score": 90.877,
+          "last_seen": "2026-09-15",
           "bucket": "balanced"
         }
       },
@@ -334,64 +363,6 @@
         "oversold_reversal": {
           "score": 91.0804,
           "last_seen": "2026-09-01",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "000425",
-      "name": "徐工机械",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "专用设备",
-      "first_seen": "2026-09-02",
-      "last_seen": "2026-09-03",
-      "hit_count": 4,
-      "latest_score": 90.1088,
-      "best_score": 90.1088,
-      "latest_rank": 4,
-      "price": 7.97,
-      "change_pct": -3.28,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "oversold_reversal": {
-          "score": 90.1088,
-          "last_seen": "2026-09-03",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "002466",
-      "name": "天齐锂业",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "稀有金属",
-      "first_seen": "2026-09-04",
-      "last_seen": "2026-09-04",
-      "hit_count": 1,
-      "latest_score": 92.5238,
-      "best_score": 92.5238,
-      "latest_rank": 1,
-      "price": 45.35,
-      "change_pct": -3.35,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "oversold_reversal": {
-          "score": 92.5238,
-          "last_seen": "2026-09-04",
           "bucket": "balanced"
         }
       },
@@ -1232,11 +1203,6 @@
           "last_seen": "2026-09-01",
           "bucket": "aggressive"
         },
-        "volume_breakout": {
-          "score": 77.3978,
-          "last_seen": "2026-08-31",
-          "bucket": "aggressive"
-        },
         "capital_heat": {
           "score": 73.8382,
           "last_seen": "2026-09-01",
@@ -1450,39 +1416,34 @@
       "pinned": false
     },
     {
-      "code": "002430",
-      "name": "杭氧股份",
+      "code": "603236",
+      "name": "移远通信",
       "holding_period": "short_term",
       "cadence": "daily",
       "bucket": "aggressive",
       "buckets": [
         "aggressive"
       ],
-      "industry": "环保",
-      "first_seen": "2026-08-31",
-      "last_seen": "2026-08-31",
+      "industry": "通信设备",
+      "first_seen": "2026-09-15",
+      "last_seen": "2026-09-15",
       "hit_count": 1,
-      "latest_score": 75.6026,
-      "best_score": 75.6026,
-      "latest_rank": 3,
-      "price": 26.11,
-      "change_pct": 5.92,
+      "latest_score": 75.3498,
+      "best_score": 75.3498,
+      "latest_rank": 2,
+      "price": 66.85,
+      "change_pct": 6.64,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
         "capital_heat": {
-          "score": 72.3387,
-          "last_seen": "2026-08-31",
+          "score": 75.3498,
+          "last_seen": "2026-09-15",
           "bucket": "aggressive"
         },
         "theme_momentum": {
-          "score": 68.1714,
-          "last_seen": "2026-08-31",
-          "bucket": "aggressive"
-        },
-        "volume_breakout": {
-          "score": 75.6026,
-          "last_seen": "2026-08-31",
+          "score": 72.3817,
+          "last_seen": "2026-09-15",
           "bucket": "aggressive"
         }
       },
