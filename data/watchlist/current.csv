@@ -19,10 +19,10 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 600219,南山铝业,基本金属,balanced,balanced,daily,short_term,2026-09-11,2026-09-11,1,91.35,91.35,low,oversold_reversal,0
 600352,浙江龙盛,化学制品,balanced,balanced,daily,short_term,2026-09-04,2026-09-10,2,89.15,89.15,low,momentum_quality|oversold_reversal,0
 600309,万华化学,化学原料,balanced,balanced|defensive,daily,short_term,2026-09-04,2026-09-16,2,86.75,86.75,low,low_volatility_quality|oversold_reversal|shrink_pullback,0
+600458,时代新材,化学制品,balanced,balanced,daily,short_term,2026-09-17,2026-09-17,1,85.56,85.56,low,oversold_reversal,0
 300750,宁德时代,电源设备,balanced,balanced,daily,short_term,2026-09-16,2026-09-16,1,85.07,85.07,low,oversold_reversal,0
 600036,招商银行,银行,balanced,balanced,weekly,swing,2026-09-11,2026-09-11,1,80.98,80.98,low,shrink_pullback,0
 600089,特变电工,输变电设备,balanced,balanced,weekly,watchlist,2026-09-04,2026-09-11,2,78.66,78.66,low,balanced_alpha|momentum_quality,0
-000725,京东方A,电子器件,balanced,balanced,weekly,watchlist,2026-09-11,2026-09-11,1,79.24,79.24,low,balanced_alpha,0
 000100,TCL科技,电子元件,balanced,balanced,weekly,swing,2026-09-04,2026-09-11,2,76.68,76.68,low,balanced_alpha|momentum_quality,0
 600104,上汽集团,汽车,balanced,balanced|defensive,weekly,swing,2026-09-04,2026-09-11,2,75.76,77.67,low,momentum_quality|quality_value,0
 600989,宝丰能源,化学原料,balanced,balanced,weekly,swing,2026-09-11,2026-09-11,1,76.99,76.99,low,shrink_pullback,0
@@ -35,6 +35,7 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 600864,哈投股份,非银行金融,aggressive,aggressive,daily,short_term,2026-09-10,2026-09-10,1,81.65,81.65,low,capital_heat|volume_breakout,0
 600601,方正科技,电子元件,aggressive,aggressive,daily,short_term,2026-09-07,2026-09-07,1,81.32,81.32,low,capital_heat|theme_momentum,0
 000519,中兵红箭,地面装备,aggressive,aggressive,daily,short_term,2026-09-03,2026-09-04,2,78.52,78.52,low,capital_heat|theme_momentum|volume_breakout,0
+000725,京东方A,电子器件,aggressive,aggressive|balanced,daily,short_term,2026-09-11,2026-09-17,2,78.21,79.24,low,balanced_alpha|capital_heat,0
 600737,中粮糖业,农业,aggressive,aggressive,daily,short_term,2026-09-07,2026-09-07,1,80.06,80.06,low,capital_heat|theme_momentum,0
 000807,云铝股份,基本金属,aggressive,aggressive|balanced,weekly,swing,2026-09-04,2026-09-11,3,75.58,76.65,low,capital_heat|shrink_pullback,0
 300008,天海防务,船舶与海洋装备,aggressive,aggressive,daily,short_term,2026-09-10,2026-09-10,1,79.21,79.21,low,theme_momentum|volume_breakout,0
@@ -42,5 +43,4 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 605589,圣泉集团,化学新材料,aggressive,aggressive,daily,short_term,2026-09-16,2026-09-16,1,76.90,76.90,low,capital_heat|theme_momentum,0
 002171,楚江新材,基本金属,aggressive,aggressive,daily,short_term,2026-09-03,2026-09-09,2,74.76,74.76,low,capital_heat|theme_momentum|volume_breakout,0
 603444,吉比特,互联网服务,aggressive,aggressive,daily,short_term,2026-09-04,2026-09-04,1,76.68,76.68,low,capital_heat|theme_momentum,0
-603236,移远通信,通信设备,aggressive,aggressive,daily,short_term,2026-09-15,2026-09-15,1,75.35,75.35,low,capital_heat|theme_momentum,0
 002130,沃尔核材,电子器件,aggressive,aggressive,daily,short_term,2026-09-11,2026-09-11,1,74.94,74.94,low,theme_momentum|volume_breakout,0
