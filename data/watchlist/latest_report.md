@@ -1,36 +1,39 @@
 # 全市场扫描观察名单（daily）
 
-- 扫描日期：2026-09-17
+- 扫描日期：2026-09-18
 - 名单规模：45（防守 10｜均衡 20｜进攻 15）
-- 本次新进：1｜本次移出：17
-- 策略数：4｜总耗时：84.0s
-- 行业配额：已生效，本次裁掉 0 条
+- 本次新进：4｜本次移出：17
+- 策略数：4｜总耗时：109.7s
+- 行业配额：已生效，本次裁掉 2 条
 
 ## 新进入观察名单
 
 | 桶 | 代码 | 名称 | 行业 | 分数 | 策略 |
 | --- | --- | --- | --- | --- | --- |
-| 均衡 | 600458 | 时代新材 | 化学制品 | 85.56 | oversold_reversal |
+| 进攻 | 603986 | 兆易创新 | 半导体 | 79.37 | capital_heat |
+| 均衡 | 600016 | 民生银行 | 银行 | 88.35 | oversold_reversal |
+| 均衡 | 002487 | 大金重工 | 金属制品 | 77.55 | oversold_reversal |
+| 进攻 | 300623 | 捷捷微电 | 半导体 | 79.44 | theme_momentum |
 
 ## 移出观察名单
 
-- 601899 紫金矿业，贵金属（超出名单容量）
-- 600596 新安股份，化肥农药（超出名单容量）
-- 600578 京能电力，电力（超出名单容量）
-- 000938 紫光股份，计算机软件（超出名单容量）
-- 002062 宏润建设，基础建设（超出名单容量）
-- 002510 天汽模，汽车（超出名单容量）
-- 002080 中材科技，合成纤维及树脂（超出名单容量）
-- 300623 捷捷微电，半导体（超出名单容量）
-- 603613 国联股份，互联网商务（超出名单容量）
-- 603236 移远通信，通信设备（超出名单容量）
-- 002041 登海种业，农业（超出名单容量）
-- 301550 斯菱智驱，汽车（超出名单容量）
-- 603061 金海通，半导体（超出名单容量）
-- 600460 士兰微，半导体（超出名单容量）
-- 300115 长盈精密，电子器件（超出名单容量）
-- 600516 方大炭素，金属非金属新材料（超出名单容量）
-- 000338 潍柴动力，汽车（超出名单容量）
+- 600036 招商银行，银行（同行业在该桶已满额）
+- 000425 徐工机械，专用设备（超出名单容量）
+- 600256 广汇能源，石油天然气（超出名单容量）
+- 300223 君正股份，半导体（同行业在该桶已满额）
+- 688385 复旦微电，半导体（超出名单容量）
+- 002292 奥飞娱乐，影视动漫（超出名单容量）
+- 002008 大族激光，电子设备制造（超出名单容量）
+- 603867 新化股份，化学制品（超出名单容量）
+- 002612 朗姿股份，服装家纺（超出名单容量）
+- 300014 亿纬锂能，电源设备（超出名单容量）
+- 300475 香农芯创，电子元件（超出名单容量）
+- 000811 冰轮环境，通用设备（超出名单容量）
+- 002981 朝阳科技，电子设备制造（超出名单容量）
+- 688362 甬矽电子，半导体（超出名单容量）
+- 000519 中兵红箭，地面装备（超出名单容量）
+- 688313 仕佳光子，电子器件（超出名单容量）
+- 002171 楚江新材，基本金属（超出名单容量）
 
 ## 当前名单 · 防守（10）
 
@@ -54,16 +57,16 @@
 | 1 | 002432 | 九安医疗 | 医疗器械 | 91.54 | 6 | 2026-08-31 | 2026-09-14 | balanced_alpha, momentum_quality, oversold_reversal |
 | 2 | 601318（兼 防守） | 中国平安 | 非银行金融 | 93.03 | 5 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, shrink_pullback |
 | 3 | 603799 | 华友钴业 | 稀有金属 | 93.05 | 4 | 2026-09-02 | 2026-09-11 | balanced_alpha, momentum_quality, oversold_reversal |
-| 4 | 000425 | 徐工机械 | 专用设备 | 86.30 | 6 | 2026-09-02 | 2026-09-16 | oversold_reversal |
-| 5 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value |
-| 6 | 601919（兼 防守） | 中远海控 | 港口航运 | 92.04 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value, shrink_pullback |
-| 7 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
+| 4 | 601166（兼 防守） | 兴业银行 | 银行 | 92.59 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value |
+| 5 | 601919（兼 防守） | 中远海控 | 港口航运 | 92.04 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, low_volatility_quality, momentum_quality, oversold_reversal, quality_value, shrink_pullback |
+| 6 | 601668（兼 防守） | 中国建筑 | 建筑施工 | 91.08 | 4 | 2026-08-30 | 2026-09-11 | balanced_alpha, blue_chip_income, dual_low, oversold_reversal, quality_value |
+| 7 | 600016 | 民生银行 | 银行 | 88.35 | 1 | 2026-09-18 | 2026-09-18 | oversold_reversal |
 | 8 | 600219 | 南山铝业 | 基本金属 | 91.35 | 1 | 2026-09-11 | 2026-09-11 | oversold_reversal |
 | 9 | 600309（兼 防守） | 万华化学 | 化学原料 | 86.75 | 2 | 2026-09-04 | 2026-09-16 | low_volatility_quality, oversold_reversal, shrink_pullback |
 | 10 | 600352 | 浙江龙盛 | 化学制品 | 89.15 | 2 | 2026-09-04 | 2026-09-10 | momentum_quality, oversold_reversal |
 | 11 | 600458 | 时代新材 | 化学制品 | 85.56 | 1 | 2026-09-17 | 2026-09-17 | oversold_reversal |
 | 12 | 300750 | 宁德时代 | 电源设备 | 85.07 | 1 | 2026-09-16 | 2026-09-16 | oversold_reversal |
-| 13 | 600036 | 招商银行 | 银行 | 80.98 | 1 | 2026-09-11 | 2026-09-11 | shrink_pullback |
+| 13 | 002487 | 大金重工 | 金属制品 | 77.55 | 1 | 2026-09-18 | 2026-09-18 | oversold_reversal |
 | 14 | 600089 | 特变电工 | 输变电设备 | 78.66 | 2 | 2026-09-04 | 2026-09-11 | balanced_alpha, momentum_quality |
 | 15 | 000100 | TCL科技 | 电子元件 | 76.68 | 2 | 2026-09-04 | 2026-09-11 | balanced_alpha, momentum_quality |
 | 16 | 600104（兼 防守） | 上汽集团 | 汽车 | 75.76 | 2 | 2026-09-04 | 2026-09-11 | momentum_quality, quality_value |
@@ -76,19 +79,19 @@
 
 | # | 代码 | 名称 | 行业 | 最近分 | 命中日数 | 首次入选 | 最近入选 | 策略 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 002258 | 利尔化学 | 化肥农药 | 85.31 | 1 | 2026-09-08 | 2026-09-08 | theme_momentum, volume_breakout |
-| 2 | 000725（兼 均衡） | 京东方A | 电子器件 | 78.21 | 2 | 2026-09-11 | 2026-09-17 | balanced_alpha, capital_heat |
-| 3 | 600864 | 哈投股份 | 非银行金融 | 81.65 | 1 | 2026-09-10 | 2026-09-10 | capital_heat, volume_breakout |
-| 4 | 000807（兼 均衡） | 云铝股份 | 基本金属 | 75.58 | 3 | 2026-09-04 | 2026-09-11 | capital_heat, shrink_pullback |
-| 5 | 605589 | 圣泉集团 | 化学新材料 | 76.90 | 1 | 2026-09-16 | 2026-09-16 | capital_heat, theme_momentum |
-| 6 | 600601 | 方正科技 | 电子元件 | 81.32 | 1 | 2026-09-07 | 2026-09-07 | capital_heat, theme_momentum |
-| 7 | 600685 | 中船防务 | 船舶与海洋装备 | 82.68 | 1 | 2026-09-04 | 2026-09-04 | theme_momentum, volume_breakout |
-| 8 | 300008 | 天海防务 | 船舶与海洋装备 | 79.21 | 1 | 2026-09-10 | 2026-09-10 | theme_momentum, volume_breakout |
-| 9 | 002157 | 正邦科技 | 畜牧业 | 81.72 | 1 | 2026-09-04 | 2026-09-04 | capital_heat, volume_breakout |
-| 10 | 600737 | 中粮糖业 | 农业 | 80.06 | 1 | 2026-09-07 | 2026-09-07 | capital_heat, theme_momentum |
-| 11 | 000519 | 中兵红箭 | 地面装备 | 78.52 | 2 | 2026-09-03 | 2026-09-04 | capital_heat, theme_momentum, volume_breakout |
-| 12 | 600096 | 云天化 | 化肥农药 | 77.53 | 1 | 2026-09-08 | 2026-09-08 | capital_heat, theme_momentum |
-| 13 | 002171 | 楚江新材 | 基本金属 | 74.76 | 2 | 2026-09-03 | 2026-09-09 | capital_heat, theme_momentum, volume_breakout |
+| 1 | 002258（兼 均衡） | 利尔化学 | 化肥农药 | 85.31 | 2 | 2026-09-08 | 2026-09-18 | oversold_reversal, theme_momentum, volume_breakout |
+| 2 | 000725（兼 均衡） | 京东方A | 电子器件 | 76.93 | 3 | 2026-09-11 | 2026-09-18 | balanced_alpha, capital_heat |
+| 3 | 300623 | 捷捷微电 | 半导体 | 79.44 | 1 | 2026-09-18 | 2026-09-18 | theme_momentum |
+| 4 | 603986 | 兆易创新 | 半导体 | 79.37 | 1 | 2026-09-18 | 2026-09-18 | capital_heat |
+| 5 | 600864 | 哈投股份 | 非银行金融 | 81.65 | 1 | 2026-09-10 | 2026-09-10 | capital_heat, volume_breakout |
+| 6 | 000807（兼 均衡） | 云铝股份 | 基本金属 | 75.58 | 3 | 2026-09-04 | 2026-09-11 | capital_heat, shrink_pullback |
+| 7 | 605589 | 圣泉集团 | 化学新材料 | 76.90 | 1 | 2026-09-16 | 2026-09-16 | capital_heat, theme_momentum |
+| 8 | 600601 | 方正科技 | 电子元件 | 81.32 | 1 | 2026-09-07 | 2026-09-07 | capital_heat, theme_momentum |
+| 9 | 600685 | 中船防务 | 船舶与海洋装备 | 82.68 | 1 | 2026-09-04 | 2026-09-04 | theme_momentum, volume_breakout |
+| 10 | 300008 | 天海防务 | 船舶与海洋装备 | 79.21 | 1 | 2026-09-10 | 2026-09-10 | theme_momentum, volume_breakout |
+| 11 | 002157 | 正邦科技 | 畜牧业 | 81.72 | 1 | 2026-09-04 | 2026-09-04 | capital_heat, volume_breakout |
+| 12 | 600737 | 中粮糖业 | 农业 | 80.06 | 1 | 2026-09-07 | 2026-09-07 | capital_heat, theme_momentum |
+| 13 | 600096 | 云天化 | 化肥农药 | 77.53 | 1 | 2026-09-08 | 2026-09-08 | capital_heat, theme_momentum |
 | 14 | 002130 | 沃尔核材 | 电子器件 | 74.94 | 1 | 2026-09-11 | 2026-09-11 | theme_momentum, volume_breakout |
 | 15 | 603444 | 吉比特 | 互联网服务 | 76.68 | 1 | 2026-09-04 | 2026-09-04 | capital_heat, theme_momentum |
 
@@ -98,7 +101,7 @@
 
 | 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |
 | --- | --- | --- | --- | --- | --- | --- |
-| capital_heat | short_term | 41.9 | 5153 | 131 | 5 | 否 |
-| oversold_reversal | short_term | 0.5 | 5153 | 344 | 5 | 否 |
-| theme_momentum | short_term | 0.4 | 5153 | 169 | 5 | 否 |
-| volume_breakout | short_term | 41.3 | 5153 | 14 | 5 | 是 |
+| capital_heat | short_term | 48.5 | 5153 | 203 | 5 | 否 |
+| oversold_reversal | short_term | 0.4 | 5153 | 61 | 5 | 否 |
+| theme_momentum | short_term | 0.4 | 5153 | 328 | 5 | 否 |
+| volume_breakout | short_term | 60.4 | 5153 | 18 | 5 | 是 |

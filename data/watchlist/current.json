@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-17",
+    "last_run_date": "2026-09-18",
     "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
@@ -22,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-17T22:25:01+08:00",
+    "updated_at": "2026-09-18T21:45:30+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -340,35 +340,6 @@
       "pinned": false
     },
     {
-      "code": "000425",
-      "name": "徐工机械",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "专用设备",
-      "first_seen": "2026-09-02",
-      "last_seen": "2026-09-16",
-      "hit_count": 6,
-      "latest_score": 86.3037,
-      "best_score": 90.877,
-      "latest_rank": 2,
-      "price": 7.58,
-      "change_pct": -2.94,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "oversold_reversal": {
-          "score": 86.3037,
-          "last_seen": "2026-09-16",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "600219",
       "name": "南山铝业",
       "holding_period": "short_term",
@@ -472,6 +443,35 @@
       "pinned": false
     },
     {
+      "code": "600016",
+      "name": "民生银行",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "银行",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-18",
+      "hit_count": 1,
+      "latest_score": 88.3543,
+      "best_score": 88.3543,
+      "latest_rank": 1,
+      "price": 3.46,
+      "change_pct": -2.54,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "oversold_reversal": {
+          "score": 88.3543,
+          "last_seen": "2026-09-18",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "600015",
       "name": "华夏银行",
       "holding_period": "watchlist",
@@ -498,6 +498,48 @@
           "score": 82.0843,
           "last_seen": "2026-09-11",
           "bucket": "defensive"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "002258",
+      "name": "利尔化学",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive",
+        "balanced"
+      ],
+      "industry": "化肥农药",
+      "first_seen": "2026-09-08",
+      "last_seen": "2026-09-18",
+      "hit_count": 2,
+      "latest_score": 85.3069,
+      "best_score": 85.3069,
+      "latest_rank": 4,
+      "price": 14.69,
+      "change_pct": -2.46,
+      "risk_level": "low",
+      "risk_flags": [
+        "portfolio_sector_concentration:化肥农药"
+      ],
+      "strategies": {
+        "theme_momentum": {
+          "score": 73.854,
+          "last_seen": "2026-09-08",
+          "bucket": "aggressive"
+        },
+        "volume_breakout": {
+          "score": 85.3069,
+          "last_seen": "2026-09-08",
+          "bucket": "aggressive"
+        },
+        "oversold_reversal": {
+          "score": 77.1893,
+          "last_seen": "2026-09-18",
+          "bucket": "balanced"
         }
       },
       "pinned": false
@@ -603,42 +645,6 @@
           "score": 85.5573,
           "last_seen": "2026-09-17",
           "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "002258",
-      "name": "利尔化学",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "化肥农药",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-08",
-      "hit_count": 1,
-      "latest_score": 85.3069,
-      "best_score": 85.3069,
-      "latest_rank": 1,
-      "price": 15.55,
-      "change_pct": 3.94,
-      "risk_level": "low",
-      "risk_flags": [
-        "portfolio_sector_concentration:化肥农药"
-      ],
-      "strategies": {
-        "theme_momentum": {
-          "score": 73.854,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
-        },
-        "volume_breakout": {
-          "score": 85.3069,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
         }
       },
       "pinned": false
@@ -873,30 +879,36 @@
       "pinned": false
     },
     {
-      "code": "600036",
-      "name": "招商银行",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
+      "code": "000725",
+      "name": "京东方A",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
       "buckets": [
+        "aggressive",
         "balanced"
       ],
-      "industry": "银行",
+      "industry": "电子器件",
       "first_seen": "2026-09-11",
-      "last_seen": "2026-09-11",
-      "hit_count": 1,
-      "latest_score": 80.9817,
-      "best_score": 80.9817,
-      "latest_rank": 1,
-      "price": 41.35,
-      "change_pct": -0.53,
+      "last_seen": "2026-09-18",
+      "hit_count": 3,
+      "latest_score": 76.9279,
+      "best_score": 79.2429,
+      "latest_rank": 3,
+      "price": 5.92,
+      "change_pct": 2.96,
       "risk_level": "low",
       "risk_flags": [],
       "strategies": {
-        "shrink_pullback": {
-          "score": 80.9817,
+        "balanced_alpha": {
+          "score": 79.2429,
           "last_seen": "2026-09-11",
           "bucket": "balanced"
+        },
+        "capital_heat": {
+          "score": 76.9279,
+          "last_seen": "2026-09-18",
+          "bucket": "aggressive"
         }
       },
       "pinned": false
@@ -936,45 +948,6 @@
       "pinned": false
     },
     {
-      "code": "000519",
-      "name": "中兵红箭",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "地面装备",
-      "first_seen": "2026-09-03",
-      "last_seen": "2026-09-04",
-      "hit_count": 2,
-      "latest_score": 78.5165,
-      "best_score": 78.5165,
-      "latest_rank": 5,
-      "price": 15.8,
-      "change_pct": 3.27,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 70.1025,
-          "last_seen": "2026-09-04",
-          "bucket": "aggressive"
-        },
-        "theme_momentum": {
-          "score": 78.5165,
-          "last_seen": "2026-09-03",
-          "bucket": "aggressive"
-        },
-        "volume_breakout": {
-          "score": 73.1549,
-          "last_seen": "2026-09-03",
-          "bucket": "aggressive"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "601669",
       "name": "中国电建",
       "holding_period": "watchlist",
@@ -999,41 +972,6 @@
           "score": 80.2497,
           "last_seen": "2026-09-11",
           "bucket": "defensive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "000725",
-      "name": "京东方A",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive",
-        "balanced"
-      ],
-      "industry": "电子器件",
-      "first_seen": "2026-09-11",
-      "last_seen": "2026-09-17",
-      "hit_count": 2,
-      "latest_score": 78.2114,
-      "best_score": 79.2429,
-      "latest_rank": 1,
-      "price": 5.75,
-      "change_pct": 5.5,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "balanced_alpha": {
-          "score": 79.2429,
-          "last_seen": "2026-09-11",
-          "bucket": "balanced"
-        },
-        "capital_heat": {
-          "score": 78.2114,
-          "last_seen": "2026-09-17",
-          "bucket": "aggressive"
         }
       },
       "pinned": false
@@ -1102,6 +1040,64 @@
         "capital_heat": {
           "score": 75.5797,
           "last_seen": "2026-09-09",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "300623",
+      "name": "捷捷微电",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "半导体",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-18",
+      "hit_count": 1,
+      "latest_score": 79.4442,
+      "best_score": 79.4442,
+      "latest_rank": 1,
+      "price": 35.3,
+      "change_pct": 7.26,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "theme_momentum": {
+          "score": 79.4442,
+          "last_seen": "2026-09-18",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "603986",
+      "name": "兆易创新",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "半导体",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-18",
+      "hit_count": 1,
+      "latest_score": 79.3658,
+      "best_score": 79.3658,
+      "latest_rank": 1,
+      "price": 388.18,
+      "change_pct": 4.95,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "capital_heat": {
+          "score": 79.3658,
+          "last_seen": "2026-09-18",
           "bucket": "aggressive"
         }
       },
@@ -1213,6 +1209,37 @@
       "pinned": false
     },
     {
+      "code": "002487",
+      "name": "大金重工",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "金属制品",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-18",
+      "hit_count": 1,
+      "latest_score": 77.5459,
+      "best_score": 77.5459,
+      "latest_rank": 2,
+      "price": 39.6,
+      "change_pct": -3.91,
+      "risk_level": "low",
+      "risk_flags": [
+        "high_turnover"
+      ],
+      "strategies": {
+        "oversold_reversal": {
+          "score": 77.5459,
+          "last_seen": "2026-09-18",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "600096",
       "name": "云天化",
       "holding_period": "short_term",
@@ -1304,45 +1331,6 @@
         "theme_momentum": {
           "score": 76.9032,
           "last_seen": "2026-09-16",
-          "bucket": "aggressive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "002171",
-      "name": "楚江新材",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "基本金属",
-      "first_seen": "2026-09-03",
-      "last_seen": "2026-09-09",
-      "hit_count": 2,
-      "latest_score": 74.7553,
-      "best_score": 74.7553,
-      "latest_rank": 2,
-      "price": 11.06,
-      "change_pct": 7.38,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 73.3088,
-          "last_seen": "2026-09-03",
-          "bucket": "aggressive"
-        },
-        "theme_momentum": {
-          "score": 74.7553,
-          "last_seen": "2026-09-09",
-          "bucket": "aggressive"
-        },
-        "volume_breakout": {
-          "score": 73.7884,
-          "last_seen": "2026-09-03",
           "bucket": "aggressive"
         }
       },
