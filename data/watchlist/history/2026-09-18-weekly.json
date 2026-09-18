@@ -1,0 +1,978 @@
+{
+  "run_date": "2026-09-18",
+  "cadence": "weekly",
+  "summaries": [
+    {
+      "strategy": "balanced_alpha",
+      "cadence": "weekly",
+      "holding_period": "watchlist",
+      "elapsed_sec": 104.71,
+      "snapshot_count": 5153,
+      "after_filter_count": 1127,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "em_datacenter",
+      "run_id": "a72d2c064c19",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067",
+        "Snapshot source fallback: sina: snapshot source sina timed out after 60s",
+        "Snapshot source fallback: efinance: Expecting value: line 1 column 1 (char 0)",
+        "Snapshot source fallback: akshare_em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+      ]
+    },
+    {
+      "strategy": "blue_chip_income",
+      "cadence": "weekly",
+      "holding_period": "watchlist",
+      "elapsed_sec": 0.45,
+      "snapshot_count": 5153,
+      "after_filter_count": 184,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "2a1116265726",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067"
+      ]
+    },
+    {
+      "strategy": "dual_low",
+      "cadence": "weekly",
+      "holding_period": "watchlist",
+      "elapsed_sec": 0.38,
+      "snapshot_count": 5153,
+      "after_filter_count": 249,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "69bcac97900d",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067"
+      ]
+    },
+    {
+      "strategy": "low_volatility_quality",
+      "cadence": "weekly",
+      "holding_period": "swing",
+      "elapsed_sec": 98.17,
+      "snapshot_count": 5153,
+      "after_filter_count": 55,
+      "pick_count": 5,
+      "daily_enriched": true,
+      "snapshot_source": "last_good_cache",
+      "run_id": "88969004ded0",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067",
+        "Daily K-line enrichment attempted 300 candidates, succeeded 300 of 542 snapshot-filtered candidates",
+        "Daily K-line sources: tencent=300",
+        "Daily K-line quality flags: short_history_lt60=1",
+        "Daily hard-filter rejections: change_60d_min removed 72 (300->228); change_60d_max removed 11 (228->217); signal_score_min removed 129 (217->88); range_20d_pct_max removed 3 (88->85); volatility_20d_pct_max removed 24 (85->61); max_drawdown_20d_pct_min removed 6 (61->55)"
+      ]
+    },
+    {
+      "strategy": "momentum_quality",
+      "cadence": "weekly",
+      "holding_period": "swing",
+      "elapsed_sec": 0.42,
+      "snapshot_count": 5153,
+      "after_filter_count": 583,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "80bc24526262",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067"
+      ]
+    },
+    {
+      "strategy": "quality_value",
+      "cadence": "weekly",
+      "holding_period": "watchlist",
+      "elapsed_sec": 0.41,
+      "snapshot_count": 5153,
+      "after_filter_count": 440,
+      "pick_count": 5,
+      "daily_enriched": false,
+      "snapshot_source": "last_good_cache",
+      "run_id": "7fef1440d9f3",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067"
+      ]
+    },
+    {
+      "strategy": "shrink_pullback",
+      "cadence": "weekly",
+      "holding_period": "swing",
+      "elapsed_sec": 45.12,
+      "snapshot_count": 5153,
+      "after_filter_count": 16,
+      "pick_count": 5,
+      "daily_enriched": true,
+      "snapshot_source": "last_good_cache",
+      "run_id": "1a8ef6841053",
+      "error": "",
+      "degradation": [
+        "Industry/concepts enrichment: industry map loaded: data/watchlist/industry_map.csv rows=5147",
+        "Industry/concepts enrichment: industry/concepts enrichment applied: industry=0, concepts=712, heat=0",
+        "Industry/concepts enrichment: snapshot industry heat computed: industries=88, skipped_small=15, market_median_change=1.03%",
+        "Industry/concepts enrichment: snapshot industry heat applied: rows=5067",
+        "Daily K-line enrichment attempted 300 candidates, succeeded 300 of 3011 snapshot-filtered candidates",
+        "Daily K-line sources: tencent=300",
+        "Daily hard-filter rejections: require_ma_bullish removed 244 (300->56); require_price_above_ma20 removed 11 (56->45); volume_ratio_20d_max removed 4 (45->41); pullback_to_ma20_pct_max removed 11 (41->30); volatility_20d_pct_max removed 14 (30->16)"
+      ]
+    }
+  ],
+  "picks": {
+    "balanced_alpha": [
+      {
+        "rank": 1,
+        "code": "000100",
+        "name": "TCL科技",
+        "final_score": 79.005,
+        "screen_score": 76.80496004273503,
+        "industry": "电子元件",
+        "price": 4.99,
+        "change_pct": 3.31,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.2692,
+          "liquidity": 92.3077,
+          "momentum": 67.2575,
+          "reversal": 5.0,
+          "activity": 85.8955,
+          "stability": 68.07,
+          "size": 92.3077,
+          "theme_heat": 69.3378,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "002432",
+        "name": "九安医疗",
+        "final_score": 78.8587,
+        "screen_score": 76.65865319392017,
+        "industry": "医疗器械",
+        "price": 62.12,
+        "change_pct": 2.83,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 88.125,
+          "liquidity": 100.0,
+          "momentum": 65.6975,
+          "reversal": 9.57,
+          "activity": 82.5816,
+          "stability": 69.51,
+          "size": 80.0,
+          "theme_heat": 50.4942,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "601668",
+        "name": "中国建筑",
+        "final_score": 78.8488,
+        "screen_score": 76.64879357484739,
+        "industry": "建筑施工",
+        "price": 4.28,
+        "change_pct": 0.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.125,
+          "liquidity": 100.0,
+          "momentum": 57.2475,
+          "reversal": 58.01,
+          "activity": 69.1574,
+          "stability": 77.31,
+          "size": 100.0,
+          "theme_heat": 49.6097,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "000725",
+        "name": "京东方A",
+        "final_score": 78.4339,
+        "screen_score": 76.23394348290597,
+        "industry": "电子器件",
+        "price": 5.92,
+        "change_pct": 2.96,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 81.4135,
+          "liquidity": 100.0,
+          "momentum": 66.12,
+          "reversal": 6.84,
+          "activity": 80.0793,
+          "stability": 69.12,
+          "size": 100.0,
+          "theme_heat": 69.0139,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "000425",
+        "name": "徐工机械",
+        "final_score": 78.2058,
+        "screen_score": 74.80575048870308,
+        "industry": "专用设备",
+        "price": 7.45,
+        "change_pct": -1.19,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 79.9107,
+          "liquidity": 95.2381,
+          "momentum": 52.6325,
+          "reversal": 76.47,
+          "activity": 73.3941,
+          "stability": 74.43,
+          "size": 97.619,
+          "theme_heat": 57.2649,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "blue_chip_income": [
+      {
+        "rank": 1,
+        "code": "601318",
+        "name": "中国平安",
+        "final_score": 84.5602,
+        "screen_score": 82.06020153225808,
+        "industry": "非银行金融",
+        "price": 53.37,
+        "change_pct": 0.04,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 75.3024,
+          "liquidity": 100.0,
+          "momentum": 56.63,
+          "reversal": 60.48,
+          "activity": 82.6979,
+          "stability": 77.88,
+          "size": 96.7742,
+          "theme_heat": 49.8611,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "601668",
+        "name": "中国建筑",
+        "final_score": 79.1122,
+        "screen_score": 76.61220880434783,
+        "industry": "建筑施工",
+        "price": 4.28,
+        "change_pct": 0.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.0149,
+          "liquidity": 65.2174,
+          "momentum": 57.2475,
+          "reversal": 58.01,
+          "activity": 81.1611,
+          "stability": 77.31,
+          "size": 76.6304,
+          "theme_heat": 49.6097,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "601601",
+        "name": "中国太保",
+        "final_score": 76.5519,
+        "screen_score": 76.55185032258063,
+        "industry": "非银行金融",
+        "price": 32.08,
+        "change_pct": 0.63,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 70.6492,
+          "liquidity": 87.0968,
+          "momentum": 58.5475,
+          "reversal": 52.81,
+          "activity": 82.1298,
+          "stability": 76.11,
+          "size": 87.0968,
+          "theme_heat": 49.8611,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601857",
+        "name": "中国石油",
+        "final_score": 74.3623,
+        "screen_score": 74.3623120652174,
+        "industry": "石油天然气",
+        "price": 10.56,
+        "change_pct": -0.56,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 57.9429,
+          "liquidity": 88.0435,
+          "momentum": 54.68,
+          "reversal": 68.28,
+          "activity": 80.5349,
+          "stability": 76.32,
+          "size": 97.2826,
+          "theme_heat": 48.0407,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601919",
+        "name": "中远海控",
+        "final_score": 73.7013,
+        "screen_score": 73.70134945652174,
+        "industry": "港口航运",
+        "price": 16.1,
+        "change_pct": -1.04,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 64.7636,
+          "liquidity": 81.5217,
+          "momentum": 53.12,
+          "reversal": 74.52,
+          "activity": 82.2269,
+          "stability": 74.88,
+          "size": 85.8696,
+          "theme_heat": 33.0634,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "dual_low": [
+      {
+        "rank": 1,
+        "code": "600016",
+        "name": "民生银行",
+        "final_score": 86.5161,
+        "screen_score": 82.3160670682731,
+        "industry": "银行",
+        "price": 3.46,
+        "change_pct": -2.54,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 88.5085,
+          "liquidity": 98.3936,
+          "momentum": 48.167,
+          "reversal": 94.02,
+          "activity": 83.479,
+          "stability": 70.38,
+          "size": 92.7711,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "000001",
+        "name": "平安银行",
+        "final_score": 83.8874,
+        "screen_score": 80.88741611445784,
+        "industry": "银行",
+        "price": 11.7,
+        "change_pct": 0.78,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 86.0848,
+          "liquidity": 95.9839,
+          "momentum": 59.035,
+          "reversal": 50.86,
+          "activity": 81.4191,
+          "stability": 75.66,
+          "size": 99.1968,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "601668",
+        "name": "中国建筑",
+        "final_score": 83.6557,
+        "screen_score": 80.65569593373495,
+        "industry": "建筑施工",
+        "price": 4.28,
+        "change_pct": 0.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 86.6692,
+          "liquidity": 91.1647,
+          "momentum": 57.2475,
+          "reversal": 58.01,
+          "activity": 79.9874,
+          "stability": 77.31,
+          "size": 95.9839,
+          "theme_heat": 49.6097,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601390",
+        "name": "中国中铁",
+        "final_score": 81.0979,
+        "screen_score": 78.09789698795183,
+        "industry": "基础建设",
+        "price": 4.3,
+        "change_pct": 0.47,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 87.4613,
+          "liquidity": 75.502,
+          "momentum": 58.0275,
+          "reversal": 54.89,
+          "activity": 80.995,
+          "stability": 76.59,
+          "size": 87.9518,
+          "theme_heat": 39.36,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601169",
+        "name": "北京银行",
+        "final_score": 80.7935,
+        "screen_score": 80.7935422188755,
+        "industry": "银行",
+        "price": 5.54,
+        "change_pct": 0.0,
+        "risk_level": "low",
+        "risk_flags": [
+          "portfolio_sector_concentration:金融"
+        ],
+        "factor_scores": {
+          "value": 86.3449,
+          "liquidity": 93.1727,
+          "momentum": 56.5,
+          "reversal": 61.0,
+          "activity": 81.0861,
+          "stability": 78.0,
+          "size": 89.5582,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "low_volatility_quality": [
+      {
+        "rank": 1,
+        "code": "601318",
+        "name": "中国平安",
+        "final_score": 76.617,
+        "screen_score": 76.617018914101,
+        "industry": "非银行金融",
+        "price": 53.37,
+        "change_pct": 0.04,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 70.5932,
+          "liquidity": 100.0,
+          "momentum": 59.6805,
+          "reversal": 60.48,
+          "activity": 79.8149,
+          "stability": 78.5266,
+          "size": 83.6364,
+          "theme_heat": 49.8611,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "601857",
+        "name": "中国石油",
+        "final_score": 72.6232,
+        "screen_score": 71.42317090176806,
+        "industry": "石油天然气",
+        "price": 10.56,
+        "change_pct": -0.56,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 52.1795,
+          "liquidity": 85.4545,
+          "momentum": 62.348,
+          "reversal": 78.28,
+          "activity": 76.6536,
+          "stability": 77.7156,
+          "size": 90.9091,
+          "theme_heat": 48.0407,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "600104",
+        "name": "上汽集团",
+        "final_score": 70.8386,
+        "screen_score": 69.03863051650046,
+        "industry": "汽车",
+        "price": 11.1,
+        "change_pct": -0.8,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 67.4568,
+          "liquidity": 54.5455,
+          "momentum": 76.0005,
+          "reversal": 71.4,
+          "activity": 75.6996,
+          "stability": 80.645,
+          "size": 50.9091,
+          "theme_heat": 49.904,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601398",
+        "name": "工商银行",
+        "final_score": 69.0291,
+        "screen_score": 72.52910125784615,
+        "industry": "银行",
+        "price": 8.07,
+        "change_pct": -0.86,
+        "risk_level": "low",
+        "risk_flags": [
+          "portfolio_sector_concentration:金融"
+        ],
+        "factor_scores": {
+          "value": 44.8558,
+          "liquidity": 100.0,
+          "momentum": 64.7497,
+          "reversal": 72.18,
+          "activity": 76.9071,
+          "stability": 78.8404,
+          "size": 100.0,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "000333",
+        "name": "美的集团",
+        "final_score": 67.5634,
+        "screen_score": 66.36336729648394,
+        "industry": "白色家电",
+        "price": 84.4,
+        "change_pct": -0.75,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 25.4159,
+          "liquidity": 98.1818,
+          "momentum": 58.873,
+          "reversal": 80.75,
+          "activity": 79.1309,
+          "stability": 76.7673,
+          "size": 78.1818,
+          "theme_heat": 45.1592,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "momentum_quality": [
+      {
+        "rank": 1,
+        "code": "000100",
+        "name": "TCL科技",
+        "final_score": 76.921,
+        "screen_score": 75.12104999999998,
+        "industry": "电子元件",
+        "price": 4.99,
+        "change_pct": 3.31,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 84.9917,
+          "liquidity": 93.3333,
+          "momentum": 67.2575,
+          "reversal": 5.0,
+          "activity": 83.188,
+          "stability": 68.07,
+          "size": 86.6667,
+          "theme_heat": 69.3378,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "002241",
+        "name": "歌尔股份",
+        "final_score": 75.4461,
+        "screen_score": 75.44614428032426,
+        "industry": "电子设备制造",
+        "price": 23.33,
+        "change_pct": 4.71,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 85.875,
+          "liquidity": 90.0,
+          "momentum": 71.8075,
+          "reversal": 5.0,
+          "activity": 84.223,
+          "stability": 63.87,
+          "size": 80.0,
+          "theme_heat": 69.3491,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "600089",
+        "name": "特变电工",
+        "final_score": 74.1809,
+        "screen_score": 72.38094184781896,
+        "industry": "输变电设备",
+        "price": 18.13,
+        "change_pct": 1.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 86.125,
+          "liquidity": 89.4737,
+          "momentum": 60.4975,
+          "reversal": 43.17,
+          "activity": 68.6035,
+          "stability": 74.31,
+          "size": 89.4737,
+          "theme_heat": 61.5605,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "603799",
+        "name": "华友钴业",
+        "final_score": 74.0467,
+        "screen_score": 72.24667653717124,
+        "industry": "稀有金属",
+        "price": 35.78,
+        "change_pct": 1.71,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 90.375,
+          "liquidity": 85.7143,
+          "momentum": 62.0575,
+          "reversal": 33.09,
+          "activity": 72.8826,
+          "stability": 72.87,
+          "size": 71.4286,
+          "theme_heat": 57.6132,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "603986",
+        "name": "兆易创新",
+        "final_score": 73.327,
+        "screen_score": 70.92702954545454,
+        "industry": "半导体",
+        "price": 388.18,
+        "change_pct": 4.95,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 39.7159,
+          "liquidity": 100.0,
+          "momentum": 72.5875,
+          "reversal": 5.0,
+          "activity": 78.7075,
+          "stability": 63.15,
+          "size": 100.0,
+          "theme_heat": 84.3503,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "quality_value": [
+      {
+        "rank": 1,
+        "code": "601668",
+        "name": "中国建筑",
+        "final_score": 82.9879,
+        "screen_score": 80.1878990909091,
+        "industry": "建筑施工",
+        "price": 4.28,
+        "change_pct": 0.23,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 88.4403,
+          "liquidity": 82.0455,
+          "momentum": 57.2475,
+          "reversal": 58.01,
+          "activity": 77.2799,
+          "stability": 77.31,
+          "size": 91.3636,
+          "theme_heat": 49.6097,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "600016",
+        "name": "民生银行",
+        "final_score": 82.4938,
+        "screen_score": 78.49381142857145,
+        "industry": "银行",
+        "price": 3.46,
+        "change_pct": -2.54,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 81.4375,
+          "liquidity": 96.4286,
+          "momentum": 47.192,
+          "reversal": 94.02,
+          "activity": 82.2235,
+          "stability": 70.38,
+          "size": 67.8571,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "601919",
+        "name": "中远海控",
+        "final_score": 81.5242,
+        "screen_score": 78.72425,
+        "industry": "港口航运",
+        "price": 16.1,
+        "change_pct": -1.04,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 79.7031,
+          "liquidity": 87.5,
+          "momentum": 53.12,
+          "reversal": 74.52,
+          "activity": 78.3456,
+          "stability": 74.88,
+          "size": 100.0,
+          "theme_heat": 33.0634,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "600104",
+        "name": "上汽集团",
+        "final_score": 79.128,
+        "screen_score": 76.32797,
+        "industry": "汽车",
+        "price": 11.1,
+        "change_pct": -0.8,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 81.4375,
+          "liquidity": 75.0,
+          "momentum": 53.9,
+          "reversal": 71.4,
+          "activity": 75.6996,
+          "stability": 75.6,
+          "size": 90.0,
+          "theme_heat": 49.904,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "601390",
+        "name": "中国中铁",
+        "final_score": 78.6664,
+        "screen_score": 75.8664,
+        "industry": "基础建设",
+        "price": 4.3,
+        "change_pct": 0.47,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 88.9699,
+          "liquidity": 60.6818,
+          "momentum": 58.0275,
+          "reversal": 54.89,
+          "activity": 78.2875,
+          "stability": 76.59,
+          "size": 83.1818,
+          "theme_heat": 39.36,
+          "topic_alignment": 50.0
+        }
+      }
+    ],
+    "shrink_pullback": [
+      {
+        "rank": 1,
+        "code": "601328",
+        "name": "交通银行",
+        "final_score": 84.1902,
+        "screen_score": 79.19020874,
+        "industry": "银行",
+        "price": 7.46,
+        "change_pct": -1.58,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 78.0469,
+          "liquidity": 87.5,
+          "momentum": 75.0667,
+          "reversal": 81.54,
+          "activity": 80.5146,
+          "stability": 78.3204,
+          "size": 100.0,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "code": "600150",
+        "name": "中国船舶",
+        "final_score": 75.4674,
+        "screen_score": 75.56735227199998,
+        "industry": "船舶与海洋装备",
+        "price": 39.47,
+        "change_pct": 1.31,
+        "risk_level": "low",
+        "risk_flags": [
+          "rsi_overbought"
+        ],
+        "factor_scores": {
+          "value": 39.9062,
+          "liquidity": 93.75,
+          "momentum": 77.8723,
+          "reversal": 27.49,
+          "activity": 83.4257,
+          "stability": 77.2822,
+          "size": 87.5,
+          "theme_heat": 67.8757,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "code": "603259",
+        "name": "药明康德",
+        "final_score": 75.0674,
+        "screen_score": 75.06736456,
+        "industry": "化学制药",
+        "price": 160.0,
+        "change_pct": -0.31,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 23.6094,
+          "liquidity": 100.0,
+          "momentum": 69.7541,
+          "reversal": 64.5432,
+          "activity": 83.5619,
+          "stability": 79.95,
+          "size": 93.75,
+          "theme_heat": 53.6631,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 4,
+        "code": "601169",
+        "name": "北京银行",
+        "final_score": 73.1721,
+        "screen_score": 74.772065524,
+        "industry": "银行",
+        "price": 5.54,
+        "change_pct": 0.0,
+        "risk_level": "low",
+        "risk_flags": [
+          "portfolio_sector_concentration:金融"
+        ],
+        "factor_scores": {
+          "value": 90.375,
+          "liquidity": 68.75,
+          "momentum": 68.0534,
+          "reversal": 61.0,
+          "activity": 80.1936,
+          "stability": 81.671,
+          "size": 50.0,
+          "theme_heat": 30.7938,
+          "topic_alignment": 50.0
+        }
+      },
+      {
+        "rank": 5,
+        "code": "600104",
+        "name": "上汽集团",
+        "final_score": 72.3634,
+        "screen_score": 70.963425892,
+        "industry": "汽车",
+        "price": 11.1,
+        "change_pct": -0.8,
+        "risk_level": "low",
+        "risk_flags": [],
+        "factor_scores": {
+          "value": 71.9219,
+          "liquidity": 37.5,
+          "momentum": 76.0005,
+          "reversal": 71.4,
+          "activity": 77.5146,
+          "stability": 80.645,
+          "size": 68.75,
+          "theme_heat": 49.904,
+          "topic_alignment": 50.0
+        }
+      }
+    ]
+  }
+}
