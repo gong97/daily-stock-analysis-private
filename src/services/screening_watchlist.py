@@ -35,6 +35,12 @@ DEFAULT_CADENCE_MAP: Dict[str, str] = {
 }
 # holding_period 缺失或未知时的保守取值：宁可少跑，不要把未知策略拉成每日高频。
 FALLBACK_CADENCE = CADENCE_WEEKLY
+# 报告「持有周期」一栏的中文说明；未收录的取值原样显示。
+HOLDING_PERIOD_LABELS: Dict[str, str] = {
+    "short_term": "短线，信号几天内就会失效",
+    "swing": "波段，信号能维持几周",
+    "watchlist": "长线观察，不讲买点时机",
+}
 
 # 名单分桶：取自策略 YAML 的 style.risk_profile。
 #
@@ -899,11 +905,13 @@ def expire_entries(
             if hit_ttl > 0 and hit_seen is not None and (run_date - hit_seen).days > hit_ttl:
                 continue
             live[name] = hit
-        if len(live) != len(entry.strategies):
-            entry.strategies = live
         if not live and not entry.pinned:
+            # 出局条目保留原背书不剪：bucket 由背书推导，剪空后报告会把它
+            # 误标成 FALLBACK_BUCKET，看不出是从哪个桶移出的。
             removed.append((code, "ttl"))
             continue
+        if len(live) != len(entry.strategies):
+            entry.strategies = live
         surviving[code] = entry
 
     for bucket, bucket_entries in group_by_bucket(surviving.values()).items():
@@ -1154,6 +1162,7 @@ def render_report(
     summaries: Sequence[RunSummary],
     max_rows: int = 30,
     known_entries: Mapping[str, WatchlistEntry] | None = None,
+    strategy_labels: Mapping[str, str] | None = None,
 ) -> str:
     """渲染 Markdown 周报/日报正文。
 
@@ -1162,7 +1171,14 @@ def render_report(
         known_entries: 淘汰**之前**的名单，用来给已移出的条目查名称/行业——
             它们已经不在 `entries` 里了，只报代码看不出移走的是什么。
             省略时移出段落只显示代码。
+        strategy_labels: 策略名 → 中文显示名（策略 YAML 的 ``display_name``）。
+            查不到的策略原样显示英文名。
     """
+    labels: Mapping[str, str] = strategy_labels or {}
+
+    def strategy_text(names: Iterable[str]) -> str:
+        return "、".join(labels.get(name) or name for name in sorted(names))
+
     lines: List[str] = []
     lines.append(f"# 全市场扫描观察名单（{cadence}）")
     lines.append("")
@@ -1184,7 +1200,7 @@ def render_report(
         lines.append("## 失败策略")
         lines.append("")
         for item in failed:
-            lines.append(f"- `{item.strategy}`：{item.error}")
+            lines.append(f"- {strategy_text([item.strategy])}：{item.error}")
         lines.append("")
 
     if added:
@@ -1199,7 +1215,7 @@ def render_report(
             lines.append(
                 f"| {BUCKET_LABELS.get(entry.bucket, entry.bucket)} | {entry.code} | "
                 f"{entry.name} | {entry.industry} | "
-                f"{entry.latest_score:.2f} | {', '.join(sorted(entry.strategies))} |"
+                f"{entry.latest_score:.2f} | {strategy_text(entry.strategies)} |"
             )
         lines.append("")
 
@@ -1213,11 +1229,23 @@ def render_report(
             "capacity": "超出名单容量",
         }
         lookup: Mapping[str, WatchlistEntry] = known_entries or entries
-        for code, reason in removed:
+
+        def removed_bucket(code: str) -> str:
+            # 没有任何背书的条目只有兜底桶，不是真实归属，不标。
             entry = lookup.get(code)
+            return entry.bucket if entry is not None and entry.strategies else ""
+
+        # 按桶聚在一起，顺序同「当前名单」；查不到桶的排最后。
+        bucket_order = {bucket: index for index, bucket in enumerate(SUPPORTED_BUCKETS)}
+        for code, reason in sorted(
+            removed, key=lambda item: bucket_order.get(removed_bucket(item[0]), len(bucket_order))
+        ):
+            entry = lookup.get(code)
+            bucket = removed_bucket(code)
+            prefix = f"{BUCKET_LABELS.get(bucket, bucket)}｜" if bucket else ""
             label = f"{code} {entry.name}".strip() if entry and entry.name else code
             industry = f"，{entry.industry}" if entry and entry.industry else ""
-            lines.append(f"- {label}{industry}（{reason_text.get(reason, reason)}）")
+            lines.append(f"- {prefix}{label}{industry}（{reason_text.get(reason, reason)}）")
         lines.append("")
 
     # 按桶分段：分数是各策略池内的分位排名，跨桶排在一张表里会误导读者
@@ -1242,7 +1270,7 @@ def render_report(
             lines.append(
                 f"| {index} | {flag}{entry.code}{also_text} | {entry.name} | {entry.industry} | "
                 f"{entry.latest_score:.2f} | {entry.hit_count} | {entry.first_seen} | "
-                f"{entry.last_seen} | {', '.join(sorted(entry.strategies))} |"
+                f"{entry.last_seen} | {strategy_text(entry.strategies)} |"
             )
         if len(ordered) > max_rows:
             lines.append("")
@@ -1266,8 +1294,9 @@ def render_report(
     lines.append("| 策略 | 持有周期 | 耗时(s) | 快照 | 硬筛后 | 入选 | 日线补齐 |")
     lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for item in summaries:
+        holding_period = HOLDING_PERIOD_LABELS.get(item.holding_period, item.holding_period)
         lines.append(
-            f"| {item.strategy} | {item.holding_period} | {item.elapsed_sec:.1f} | "
+            f"| {strategy_text([item.strategy])} | {holding_period} | {item.elapsed_sec:.1f} | "
             f"{item.snapshot_count} | {item.after_filter_count} | {item.pick_count} | "
             f"{'是' if item.daily_enriched else '否'} |"
         )

@@ -452,6 +452,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         removed=removed,
         summaries=summaries,
         known_entries=entries_before_expire,
+        strategy_labels={
+            str(getattr(info, "name", "")): str(getattr(info, "display_name", "") or "")
+            for info in infos
+        },
     )
 
     diagnostic = industry_quota_diagnostic(entries, removed)

@@ -713,6 +713,52 @@ def test_render_report_removed_entries_degrade_without_name():
     assert "- MISSING（超过留存期）" in report
 
 
+def test_render_report_removed_entries_show_bucket_grouped_in_bucket_order():
+    """移出段落标出从哪个桶移出，并按 防守→均衡→进攻 聚在一起；无背书的条目不标桶。"""
+    known = {
+        "A": _make("A", bucket=BUCKET_AGGRESSIVE, industry="半导体"),
+        "D": _make("D", bucket=BUCKET_DEFENSIVE, industry="银行"),
+        "N": WatchlistEntry(code="N", last_seen="2026-08-28"),
+    }
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries={},
+        added=[],
+        removed=[("A", "capacity"), ("N", "ttl"), ("D", "industry_quota")],
+        summaries=[],
+        known_entries=known,
+    )
+    section = report.split("## 移出观察名单", 1)[1].split("##", 1)[0]
+    removed_lines = [line for line in section.splitlines() if line.startswith("- ")]
+    assert removed_lines == [
+        "- 防守｜D，银行（同行业在该桶已满额）",
+        "- 进攻｜A，半导体（超出名单容量）",
+        "- N（超过留存期）",
+    ]
+
+
+def test_ttl_removed_entry_keeps_its_bucket_for_the_report():
+    """TTL 出局的条目不能把背书剪空，否则报告会把它误标成兜底桶。"""
+    stale = _make("600000", bucket=BUCKET_AGGRESSIVE, last_seen="2026-07-01")
+    entries = {"600000": stale}
+    known = dict(entries)
+    kept, removed = expire_entries(entries, run_date=RUN_DATE, ttl_days=14, max_size=0)
+    assert kept == {}
+    assert removed == [("600000", "ttl")]
+    assert known["600000"].bucket == BUCKET_AGGRESSIVE
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries=kept,
+        added=[],
+        removed=removed,
+        summaries=[],
+        known_entries=known,
+    )
+    assert "- 进攻｜600000，测试（超过留存期）" in report
+
+
 def test_render_report_removed_section_is_backward_compatible():
     """不传 known_entries 时行为与此前一致：只显示代码。"""
     report = render_report(
@@ -724,6 +770,60 @@ def test_render_report_removed_section_is_backward_compatible():
         summaries=[],
     )
     assert "- 000001（超过留存期）" in report
+
+
+def test_render_report_shows_strategy_display_names():
+    """策略栏用 YAML 的中文 display_name；查不到的策略退回英文名。"""
+    entries = {
+        "600519": WatchlistEntry(
+            code="600519",
+            name="贵州茅台",
+            last_seen="2026-08-28",
+            latest_score=88.0,
+            strategies={
+                "quality_value": _hit(80.0, BUCKET_DEFENSIVE),
+                "dual_low": _hit(88.0, BUCKET_DEFENSIVE),
+                "unlabeled": _hit(70.0, BUCKET_DEFENSIVE),
+            },
+        )
+    }
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="weekly",
+        entries=entries,
+        added=["600519"],
+        removed=[],
+        summaries=[
+            RunSummary(strategy="dual_low", cadence="weekly", holding_period="watchlist"),
+            RunSummary(strategy="quality_value", cadence="weekly", error="RuntimeError: 超时"),
+        ],
+        strategy_labels={"dual_low": "双低选股", "quality_value": "稳健价值"},
+    )
+    assert "| 双低选股、稳健价值、unlabeled |" in report
+    assert "- 稳健价值：RuntimeError: 超时" in report
+    assert "| 双低选股 | watchlist |" not in report
+    assert "dual_low" not in report
+
+
+def test_render_report_translates_holding_period():
+    """「持有周期」一栏显示中文说明；未收录的取值原样显示。"""
+    report = render_report(
+        run_date=RUN_DATE,
+        cadence="daily",
+        entries={},
+        added=[],
+        removed=[],
+        summaries=[
+            RunSummary(strategy="a", cadence="daily", holding_period="short_term"),
+            RunSummary(strategy="b", cadence="weekly", holding_period="swing"),
+            RunSummary(strategy="c", cadence="weekly", holding_period="watchlist"),
+            RunSummary(strategy="d", cadence="weekly", holding_period="intraday"),
+        ],
+    )
+    assert "| a | 短线，信号几天内就会失效 |" in report
+    assert "| b | 波段，信号能维持几周 |" in report
+    assert "| c | 长线观察，不讲买点时机 |" in report
+    assert "| d | intraday |" in report
 
 
 def test_render_report_without_changes_still_renders_current_list():
