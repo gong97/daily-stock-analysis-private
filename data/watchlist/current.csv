@@ -34,14 +34,14 @@ code,name,industry,bucket,buckets,cadence,holding_period,first_seen,last_seen,hi
 603099,长白山,休闲服务,aggressive,aggressive,daily,short_term,2026-09-21,2026-09-21,1,84.90,84.90,low,theme_momentum|volume_breakout,0
 600864,哈投股份,非银行金融,aggressive,aggressive,daily,short_term,2026-09-10,2026-09-10,1,81.65,81.65,low,capital_heat|volume_breakout,0
 000807,云铝股份,基本金属,aggressive,aggressive|balanced,daily,short_term,2026-09-04,2026-09-21,4,75.58,82.33,low,capital_heat|oversold_reversal|shrink_pullback,0
-600601,方正科技,电子元件,aggressive,aggressive,daily,short_term,2026-09-07,2026-09-07,1,81.32,81.32,low,capital_heat|theme_momentum,0
 000725,京东方A,电子器件,aggressive,aggressive|balanced,weekly,watchlist,2026-09-11,2026-09-18,3,76.93,79.24,low,balanced_alpha|capital_heat,0
-600737,中粮糖业,农业,aggressive,aggressive,daily,short_term,2026-09-07,2026-09-07,1,80.06,80.06,low,capital_heat|theme_momentum,0
-603986,兆易创新,半导体,aggressive,aggressive|balanced,weekly,swing,2026-09-18,2026-09-18,1,79.37,79.37,low,capital_heat|momentum_quality,0
 300008,天海防务,船舶与海洋装备,aggressive,aggressive,daily,short_term,2026-09-10,2026-09-10,1,79.21,79.21,low,theme_momentum|volume_breakout,0
 600048,保利发展,房地产开发,aggressive,aggressive,daily,short_term,2026-09-21,2026-09-21,1,79.10,79.10,medium,theme_momentum|volume_breakout,0
 600096,云天化,化肥农药,aggressive,aggressive,daily,short_term,2026-09-08,2026-09-08,1,77.53,77.53,low,capital_heat|theme_momentum,0
+002131,利欧股份,营销服务,aggressive,aggressive,daily,short_term,2026-09-22,2026-09-22,1,77.52,77.52,low,theme_momentum,0
 600707,彩虹股份,电子器件,aggressive,aggressive,daily,short_term,2026-09-21,2026-09-21,1,77.14,77.14,low,capital_heat|theme_momentum,0
 605589,圣泉集团,化学新材料,aggressive,aggressive,daily,short_term,2026-09-16,2026-09-16,1,76.90,76.90,low,capital_heat|theme_momentum,0
 002422,科伦药业,化学制药,aggressive,aggressive,daily,short_term,2026-09-21,2026-09-21,1,75.84,75.84,low,capital_heat,0
+300017,网宿科技,互联网技术,aggressive,aggressive,daily,short_term,2026-09-22,2026-09-22,1,75.37,75.37,low,capital_heat|theme_momentum,0
 002130,沃尔核材,电子器件,aggressive,aggressive,daily,short_term,2026-09-11,2026-09-11,1,74.94,74.94,low,theme_momentum|volume_breakout,0
+603986,兆易创新,半导体,aggressive,aggressive|balanced,daily,short_term,2026-09-18,2026-09-22,2,72.07,79.37,low,capital_heat|momentum_quality,0

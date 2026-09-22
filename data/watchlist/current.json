@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-21",
+    "last_run_date": "2026-09-22",
     "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
@@ -22,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-22T00:02:00+08:00",
+    "updated_at": "2026-09-22T22:09:26+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -897,42 +897,6 @@
       "pinned": false
     },
     {
-      "code": "600601",
-      "name": "方正科技",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "电子元件",
-      "first_seen": "2026-09-07",
-      "last_seen": "2026-09-07",
-      "hit_count": 1,
-      "latest_score": 81.3205,
-      "best_score": 81.3205,
-      "latest_rank": 1,
-      "price": 13.97,
-      "change_pct": 6.72,
-      "risk_level": "low",
-      "risk_flags": [
-        "high_pb"
-      ],
-      "strategies": {
-        "capital_heat": {
-          "score": 75.4317,
-          "last_seen": "2026-09-07",
-          "bucket": "aggressive"
-        },
-        "theme_momentum": {
-          "score": 81.3205,
-          "last_seen": "2026-09-07",
-          "bucket": "aggressive"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "000725",
       "name": "京东方A",
       "holding_period": "watchlist",
@@ -997,40 +961,6 @@
       "pinned": false
     },
     {
-      "code": "600737",
-      "name": "中粮糖业",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "农业",
-      "first_seen": "2026-09-07",
-      "last_seen": "2026-09-07",
-      "hit_count": 1,
-      "latest_score": 80.0598,
-      "best_score": 80.0598,
-      "latest_rank": 2,
-      "price": 16.51,
-      "change_pct": 5.77,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 77.9012,
-          "last_seen": "2026-09-07",
-          "bucket": "aggressive"
-        },
-        "theme_momentum": {
-          "score": 80.0598,
-          "last_seen": "2026-09-07",
-          "bucket": "aggressive"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "600104",
       "name": "上汽集团",
       "holding_period": "watchlist",
@@ -1069,41 +999,6 @@
         },
         "shrink_pullback": {
           "score": 72.3634,
-          "last_seen": "2026-09-18",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "603986",
-      "name": "兆易创新",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive",
-        "balanced"
-      ],
-      "industry": "半导体",
-      "first_seen": "2026-09-18",
-      "last_seen": "2026-09-18",
-      "hit_count": 1,
-      "latest_score": 79.3658,
-      "best_score": 79.3658,
-      "latest_rank": 5,
-      "price": 388.18,
-      "change_pct": 4.95,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 79.3658,
-          "last_seen": "2026-09-18",
-          "bucket": "aggressive"
-        },
-        "momentum_quality": {
-          "score": 73.327,
           "last_seen": "2026-09-18",
           "bucket": "balanced"
         }
@@ -1320,6 +1215,37 @@
       "pinned": false
     },
     {
+      "code": "002131",
+      "name": "利欧股份",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "营销服务",
+      "first_seen": "2026-09-22",
+      "last_seen": "2026-09-22",
+      "hit_count": 1,
+      "latest_score": 77.5193,
+      "best_score": 77.5193,
+      "latest_rank": 1,
+      "price": 4.66,
+      "change_pct": 3.33,
+      "risk_level": "low",
+      "risk_flags": [
+        "negative_or_invalid_pe"
+      ],
+      "strategies": {
+        "theme_momentum": {
+          "score": 77.5193,
+          "last_seen": "2026-09-22",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "600707",
       "name": "彩虹股份",
       "holding_period": "short_term",
@@ -1506,6 +1432,40 @@
       "pinned": false
     },
     {
+      "code": "300017",
+      "name": "网宿科技",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "互联网技术",
+      "first_seen": "2026-09-22",
+      "last_seen": "2026-09-22",
+      "hit_count": 1,
+      "latest_score": 75.3661,
+      "best_score": 75.3661,
+      "latest_rank": 2,
+      "price": 15.92,
+      "change_pct": 4.81,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "capital_heat": {
+          "score": 75.3661,
+          "last_seen": "2026-09-22",
+          "bucket": "aggressive"
+        },
+        "theme_momentum": {
+          "score": 74.7661,
+          "last_seen": "2026-09-22",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "002130",
       "name": "沃尔核材",
       "holding_period": "short_term",
@@ -1537,6 +1497,41 @@
           "score": 74.936,
           "last_seen": "2026-09-11",
           "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "603986",
+      "name": "兆易创新",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive",
+        "balanced"
+      ],
+      "industry": "半导体",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-22",
+      "hit_count": 2,
+      "latest_score": 72.0722,
+      "best_score": 79.3658,
+      "latest_rank": 5,
+      "price": 402.1,
+      "change_pct": 2.65,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "capital_heat": {
+          "score": 72.0722,
+          "last_seen": "2026-09-22",
+          "bucket": "aggressive"
+        },
+        "momentum_quality": {
+          "score": 73.327,
+          "last_seen": "2026-09-18",
+          "bucket": "balanced"
         }
       },
       "pinned": false
