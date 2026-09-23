@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "meta": {
-    "last_run_date": "2026-09-22",
+    "last_run_date": "2026-09-23",
     "last_run_cadence": "daily",
     "last_run_market": "cn",
     "last_run_strategies": [
@@ -22,7 +22,7 @@
       "balanced": 20,
       "aggressive": 15
     },
-    "updated_at": "2026-09-22T22:09:26+08:00",
+    "updated_at": "2026-09-23T22:20:51+08:00",
     "max_per_industry": {
       "defensive": 2,
       "balanced": 2,
@@ -432,6 +432,42 @@
       "pinned": false
     },
     {
+      "code": "600150",
+      "name": "中国船舶",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "balanced",
+      "buckets": [
+        "balanced"
+      ],
+      "industry": "船舶与海洋装备",
+      "first_seen": "2026-09-18",
+      "last_seen": "2026-09-23",
+      "hit_count": 2,
+      "latest_score": 86.7826,
+      "best_score": 86.7826,
+      "latest_rank": 3,
+      "price": 38.59,
+      "change_pct": -3.81,
+      "risk_level": "low",
+      "risk_flags": [
+        "rsi_overbought"
+      ],
+      "strategies": {
+        "shrink_pullback": {
+          "score": 75.4674,
+          "last_seen": "2026-09-18",
+          "bucket": "balanced"
+        },
+        "oversold_reversal": {
+          "score": 86.7826,
+          "last_seen": "2026-09-23",
+          "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "600309",
       "name": "万华化学",
       "holding_period": "short_term",
@@ -580,48 +616,6 @@
           "score": 82.0843,
           "last_seen": "2026-09-11",
           "bucket": "defensive"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "002258",
-      "name": "利尔化学",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive",
-        "balanced"
-      ],
-      "industry": "化肥农药",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-18",
-      "hit_count": 2,
-      "latest_score": 85.3069,
-      "best_score": 85.3069,
-      "latest_rank": 4,
-      "price": 14.69,
-      "change_pct": -2.46,
-      "risk_level": "low",
-      "risk_flags": [
-        "portfolio_sector_concentration:化肥农药"
-      ],
-      "strategies": {
-        "theme_momentum": {
-          "score": 73.854,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
-        },
-        "volume_breakout": {
-          "score": 85.3069,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
-        },
-        "oversold_reversal": {
-          "score": 77.1893,
-          "last_seen": "2026-09-18",
-          "bucket": "balanced"
         }
       },
       "pinned": false
@@ -1079,6 +1073,35 @@
       "pinned": false
     },
     {
+      "code": "300215",
+      "name": "电科院",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "专业服务",
+      "first_seen": "2026-09-23",
+      "last_seen": "2026-09-23",
+      "hit_count": 1,
+      "latest_score": 79.0139,
+      "best_score": 79.0139,
+      "latest_rank": 1,
+      "price": 6.87,
+      "change_pct": 5.86,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "volume_breakout": {
+          "score": 79.0139,
+          "last_seen": "2026-09-23",
+          "bucket": "aggressive"
+        }
+      },
+      "pinned": false
+    },
+    {
       "code": "002241",
       "name": "歌尔股份",
       "holding_period": "swing",
@@ -1176,40 +1199,6 @@
           "score": 78.2058,
           "last_seen": "2026-09-18",
           "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
-      "code": "600096",
-      "name": "云天化",
-      "holding_period": "short_term",
-      "cadence": "daily",
-      "bucket": "aggressive",
-      "buckets": [
-        "aggressive"
-      ],
-      "industry": "化肥农药",
-      "first_seen": "2026-09-08",
-      "last_seen": "2026-09-08",
-      "hit_count": 1,
-      "latest_score": 77.527,
-      "best_score": 77.527,
-      "latest_rank": 2,
-      "price": 31.91,
-      "change_pct": 5.17,
-      "risk_level": "low",
-      "risk_flags": [],
-      "strategies": {
-        "capital_heat": {
-          "score": 76.2457,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
-        },
-        "theme_momentum": {
-          "score": 77.527,
-          "last_seen": "2026-09-08",
-          "bucket": "aggressive"
         }
       },
       "pinned": false
@@ -1401,37 +1390,6 @@
       "pinned": false
     },
     {
-      "code": "600150",
-      "name": "中国船舶",
-      "holding_period": "swing",
-      "cadence": "weekly",
-      "bucket": "balanced",
-      "buckets": [
-        "balanced"
-      ],
-      "industry": "船舶与海洋装备",
-      "first_seen": "2026-09-18",
-      "last_seen": "2026-09-18",
-      "hit_count": 1,
-      "latest_score": 75.4674,
-      "best_score": 75.4674,
-      "latest_rank": 2,
-      "price": 39.47,
-      "change_pct": 1.31,
-      "risk_level": "low",
-      "risk_flags": [
-        "rsi_overbought"
-      ],
-      "strategies": {
-        "shrink_pullback": {
-          "score": 75.4674,
-          "last_seen": "2026-09-18",
-          "bucket": "balanced"
-        }
-      },
-      "pinned": false
-    },
-    {
       "code": "300017",
       "name": "网宿科技",
       "holding_period": "short_term",
@@ -1532,6 +1490,40 @@
           "score": 73.327,
           "last_seen": "2026-09-18",
           "bucket": "balanced"
+        }
+      },
+      "pinned": false
+    },
+    {
+      "code": "600884",
+      "name": "杉杉股份",
+      "holding_period": "short_term",
+      "cadence": "daily",
+      "bucket": "aggressive",
+      "buckets": [
+        "aggressive"
+      ],
+      "industry": "光电子器件",
+      "first_seen": "2026-09-23",
+      "last_seen": "2026-09-23",
+      "hit_count": 1,
+      "latest_score": 73.7792,
+      "best_score": 73.7792,
+      "latest_rank": 2,
+      "price": 11.92,
+      "change_pct": 5.86,
+      "risk_level": "low",
+      "risk_flags": [],
+      "strategies": {
+        "capital_heat": {
+          "score": 73.7792,
+          "last_seen": "2026-09-23",
+          "bucket": "aggressive"
+        },
+        "theme_momentum": {
+          "score": 71.0641,
+          "last_seen": "2026-09-23",
+          "bucket": "aggressive"
         }
       },
       "pinned": false
