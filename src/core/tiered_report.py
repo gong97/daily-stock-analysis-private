@@ -30,6 +30,10 @@ _URGENCY_MARKERS = (
 
 _SUMMARY_ACTION_LABELS = {"add": "ADD", "cut": "CUT", "hold": "HOLD"}
 
+# CUT 桶里混着强度差很多的三种动作：清仓、减仓、只是预警。总览表只看一眼，
+# 必须把它们拆开，否则"预警"也会被读成"今天要卖"。
+_CUT_SUB_LABELS = {"sell": "清仓", "reduce": "减仓", "alert": "预警"}
+
 
 def _label(action: Optional[str], language: str) -> str:
     if not action:
@@ -194,10 +198,54 @@ def _summary_urgency_marker(dashboard: Dict[str, Any]) -> str:
     return "—"
 
 
-def _summary_key_price(bucket: str, deep: Any, dashboard: Dict[str, Any]) -> str:
-    """总览表的「关键价格」列：按动作分流，不同动作看不同的价位。"""
+def _summary_action_label(result: Any, bucket: str) -> str:
+    """ADD / HOLD 原样；CUT 附上细分动作，如 CUT·减仓。"""
+    label = _SUMMARY_ACTION_LABELS[bucket]
+    if bucket != "cut":
+        return label
+    sub = _CUT_SUB_LABELS.get(display_action_fields_for_result(result)["action"])
+    return f"{label}·{sub}" if sub else label
+
+
+def _summary_current_price(result: Any, dashboard: Dict[str, Any]) -> Optional[float]:
+    """总览表的现价：优先用行情快照（实时价 → 收盘价），LLM 回填的 current_price 只做兜底。"""
+    snapshot = getattr(result, "market_snapshot", None)
+    if isinstance(snapshot, dict):
+        for key in ("price", "close"):
+            try:
+                return float(snapshot.get(key))
+            except (TypeError, ValueError):
+                continue
+    return _current_price_of(result, dashboard)
+
+
+def _stop_breached(stop_loss: Any, current_price: Optional[float]) -> bool:
+    if stop_loss is None or current_price is None:
+        return False
+    try:
+        return current_price < float(stop_loss)
+    except (TypeError, ValueError):
+        return False
+
+
+def _summary_key_price(
+    bucket: str,
+    deep: Any,
+    dashboard: Dict[str, Any],
+    current_price: Optional[float] = None,
+) -> str:
+    """总览表的「关键价格」列：按动作分流，不同动作看不同的价位。
+
+    现价已低于止损位时追加「⚠️已跌破」——止损不再是等待条件，而是已经触发。
+    """
     sniper = extract_sniper_points(deep)
     price_position = dashboard.get("data_perspective", {}).get("price_position", {})
+
+    def _stop_text(stop_loss: Any) -> str:
+        text = f"< {_fmt_price(stop_loss)} 止损"
+        if _stop_breached(stop_loss, current_price):
+            text += " ⚠️已跌破"
+        return text
 
     if bucket == "add":
         ideal = sniper.get("ideal_buy")
@@ -213,7 +261,7 @@ def _summary_key_price(bucket: str, deep: Any, dashboard: Dict[str, Any]) -> str
     if bucket == "cut":
         stop_loss = sniper.get("stop_loss")
         if stop_loss is not None:
-            return f"< {_fmt_price(stop_loss)} 止损"
+            return _stop_text(stop_loss)
         return "—"
 
     # hold：优先给出「突破再买」的压力位，没有就给止损位兜底
@@ -222,7 +270,7 @@ def _summary_key_price(bucket: str, deep: Any, dashboard: Dict[str, Any]) -> str
         return f"> {_fmt_price(resistance)} 再买"
     stop_loss = sniper.get("stop_loss")
     if stop_loss is not None:
-        return f"< {_fmt_price(stop_loss)} 止损"
+        return _stop_text(stop_loss)
     return "—"
 
 
@@ -272,13 +320,16 @@ def render_decision_summary(
         bucket = _summary_action_bucket(result)
         dashboard = _dashboard_of(result)
         score = getattr(result, "sentiment_score", 0) or 0
+        current_price = _summary_current_price(result, dashboard)
         rows.append(
             {
                 "name": getattr(result, "name", ""),
                 "code": getattr(result, "code", ""),
                 "bucket": bucket,
+                "action_label": _summary_action_label(result, bucket),
                 "score": score,
-                "key_price": _summary_key_price(bucket, result, dashboard),
+                "current_price": _fmt_price(current_price),
+                "key_price": _summary_key_price(bucket, result, dashboard, current_price),
                 "urgency": _summary_urgency_marker(dashboard),
             }
         )
@@ -294,13 +345,12 @@ def render_decision_summary(
         lines.append(header)
         lines.append("")
 
-    lines.append("| 股票 | 动作 | 关键价格 | 紧迫度 |")
-    lines.append("| --- | --- | --- | --- |")
+    lines.append("| 股票 | 动作 | 现价 | 关键价格 | 紧迫度 |")
+    lines.append("| --- | --- | --- | --- | --- |")
     for row in rows:
-        action_label = _SUMMARY_ACTION_LABELS[row["bucket"]]
         lines.append(
-            f"| {row['name']} {row['code']} | {action_label} | "
-            f"{row['key_price']} | {row['urgency']} |"
+            f"| {row['name']} {row['code']} | {row['action_label']} | "
+            f"{row['current_price']} | {row['key_price']} | {row['urgency']} |"
         )
 
     return "\n".join(lines)

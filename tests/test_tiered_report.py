@@ -183,7 +183,9 @@ class TestRenderCandidateBlockNoDeepResult(unittest.TestCase):
         self.assertNotIn("🎯 执行计划", block)
 
 
-def _make_lite_result(*, code, name, action, score, dashboard=None, success=True):
+def _make_lite_result(
+    *, code, name, action, score, dashboard=None, success=True, market_snapshot=None
+):
     """构造一份 Tier 1（lite）结果：用于总览表测试。
 
     action 和 score 要落在同一个决策档位里（见 decision_scale.py 的分档），
@@ -202,6 +204,7 @@ def _make_lite_result(*, code, name, action, score, dashboard=None, success=True
         sentiment_score=score,
         guardrail_reason=None,
         downgrade_reason=None,
+        market_snapshot=market_snapshot,
         dashboard=dashboard if dashboard is not None else {},
     )
 
@@ -266,9 +269,9 @@ class TestRenderDecisionSummary(unittest.TestCase):
         self.assertIn("市场状态：震荡 · 需观察", summary)
         self.assertIn("市场评分：52/100", summary)
         self.assertIn("信号分化", summary)
-        self.assertIn("| 宁德时代 300750.SZ | ADD | ¥330.00 ~ ¥336.00 | 🔴 |", summary)
-        self.assertIn("| 兆易创新 603986.SH | HOLD | > ¥132.50 再买 | 🟡 |", summary)
-        self.assertIn("| 隆基绿能 601012.SH | CUT | < ¥17.80 止损 | 🔴 |", summary)
+        self.assertIn("| 宁德时代 300750.SZ | ADD | — | ¥330.00 ~ ¥336.00 | 🔴 |", summary)
+        self.assertIn("| 兆易创新 603986.SH | HOLD | — | > ¥132.50 再买 | 🟡 |", summary)
+        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | < ¥17.80 止损 | 🔴 |", summary)
 
         # 排序：CUT 排最前
         cut_pos = summary.index("隆基绿能")
@@ -297,7 +300,7 @@ class TestRenderDecisionSummary(unittest.TestCase):
 
         summary = render_decision_summary(outcome)
 
-        self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
+        self.assertIn("| 长江电力 600900.SH | HOLD | — | — | — |", summary)
         self.assertNotIn("N/A", summary)
         self.assertNotIn("None", summary)
 
@@ -312,7 +315,69 @@ class TestRenderDecisionSummary(unittest.TestCase):
         outcome = TieredAnalysisOutcome(lite_results=[result])
 
         summary = render_decision_summary(outcome)
-        self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
+        self.assertIn("| 长江电力 600900.SH | HOLD | — | — | — |", summary)
+
+    def test_cut_bucket_shows_sub_action(self):
+        rows = [
+            ("600001.SH", "甲", "sell", "CUT·清仓"),
+            ("600002.SH", "乙", "reduce", "CUT·减仓"),
+            ("600003.SH", "丙", "alert", "CUT·预警"),
+        ]
+        outcome = TieredAnalysisOutcome(
+            lite_results=[
+                _make_lite_result(code=code, name=name, action=action, score=30)
+                for code, name, action, _ in rows
+            ]
+        )
+
+        summary = render_decision_summary(outcome)
+
+        for code, name, _, label in rows:
+            self.assertIn(f"| {name} {code} | {label} |", summary)
+
+    def test_current_price_prefers_market_snapshot_over_llm(self):
+        result = _make_lite_result(
+            code="603986.SH",
+            name="兆易创新",
+            action="reduce",
+            score=30,
+            market_snapshot={"close": "352.10", "price": "N/A"},
+            dashboard={
+                "data_perspective": {"price_position": {"current_price": 999}},
+                "battle_plan": {"sniper_points": {"stop_loss": "止损位：345元"}},
+            },
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+
+        self.assertIn(
+            "| 兆易创新 603986.SH | CUT·减仓 | ¥352.10 | < ¥345.00 止损 | — |", summary
+        )
+
+    def test_current_price_falls_back_to_llm_value(self):
+        result = _make_lite_result(
+            code="603986.SH",
+            name="兆易创新",
+            action="reduce",
+            score=30,
+            dashboard={"data_perspective": {"price_position": {"current_price": 350.5}}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("| CUT·减仓 | ¥350.50 |", summary)
+
+    def test_breached_stop_is_flagged(self):
+        result = _make_lite_result(
+            code="603986.SH",
+            name="兆易创新",
+            action="sell",
+            score=20,
+            market_snapshot={"price": "340.00", "close": "352.10"},
+            dashboard={
+                "battle_plan": {"sniper_points": {"stop_loss": "止损位：345元"}},
+            },
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+
+        self.assertIn("| ¥340.00 | < ¥345.00 止损 ⚠️已跌破 |", summary)
 
     def test_no_successful_results_returns_empty_string(self):
         result = _make_lite_result(
