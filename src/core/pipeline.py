@@ -92,6 +92,10 @@ from src.services.decision_signal_extractor import (
 from src.services.decision_signal_summary import summarize_decision_signal
 from src.enums import ReportType
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
+from src.overheat_flags import (
+    LOOKBACK_CALENDAR_DAYS as OVERHEAT_LOOKBACK_CALENDAR_DAYS,
+    compute_overheat_flags,
+)
 from src.core.trading_calendar import (
     build_market_phase_context,
     get_effective_trading_date,
@@ -104,6 +108,10 @@ from bot.models import BotMessage
 
 
 logger = logging.getLogger(__name__)
+
+# 每只股票拉取的日线天数（交易日，数据源按日历日 ×2 估算）。
+# 100 天约 137 根：够过热风险旗标的 60 日高位 + 120 日量能常态，长假也有余量
+DAILY_FETCH_DAYS = 100
 
 
 def _share_image_payload(result: Any) -> Optional[Dict[str, Any]]:
@@ -387,7 +395,9 @@ class StockAnalysisPipeline:
 
             # 从数据源获取数据
             logger.info(f"{stock_name}({code}) 开始从数据源获取数据...")
-            df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
+            # 100 个交易日（按日历日 ×2 估算）：过热风险旗标要 60 日高位窗口 + 120 日量能常态。
+            # 新浪等源本来就整段下载再截取，取数时间与区间长短无关（2026-09-29 实测）
+            df, source_name = self.fetcher_manager.get_daily_data(code, days=DAILY_FETCH_DAYS)
 
             if df is None or df.empty:
                 return False, "获取数据为空"
@@ -583,6 +593,24 @@ class StockAnalysisPipeline:
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 趋势分析失败: {e}", exc_info=True)
 
+            # Step 3.1: 过热风险旗标——只用库里的完整日线（不拼实时估算行），窗口独立于趋势分析
+            overheat_flags: Optional[Dict[str, Any]] = None
+            try:
+                from src.services.history_loader import get_frozen_target_date
+                flag_end = get_frozen_target_date() or get_market_now(
+                    get_market_for_stock(normalize_stock_code(code))
+                ).date()
+                flag_start = flag_end - timedelta(days=OVERHEAT_LOOKBACK_CALENDAR_DAYS)
+                flag_bars = self.db.get_data_range(code, flag_start, flag_end)
+                if flag_bars:
+                    overheat_flags = compute_overheat_flags(
+                        pd.DataFrame([bar.to_dict() for bar in flag_bars]),
+                        circ_mv=getattr(realtime_quote, 'circ_mv', None) if realtime_quote else None,
+                        price=getattr(realtime_quote, 'price', None) if realtime_quote else None,
+                    )
+            except Exception as e:
+                logger.warning(f"{stock_name}({code}) 过热风险旗标计算失败: {e}")
+
             if use_agent:
                 logger.info(f"{stock_name}({code}) 启用 Agent 模式进行分析")
                 self._emit_progress(58, f"{stock_name}：正在切换 Agent 分析链路")
@@ -714,6 +742,8 @@ class StockAnalysisPipeline:
                 portfolio_context=portfolio_context,
             )
             enhanced_context["market_phase_context"] = market_phase_context_dict
+            if overheat_flags:
+                enhanced_context["overheat_flags"] = overheat_flags
             self._attach_daily_market_context(
                 enhanced_context,
                 daily_market_context,
@@ -3177,7 +3207,7 @@ class StockAnalysisPipeline:
         # === 批量预取实时行情（优化：避免每只股票都触发全量拉取）===
         # 只有股票数量 >= 5 时才进行预取，少量股票直接逐个查询更高效
         if len(stock_codes) >= 5:
-            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=30)
+            daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=DAILY_FETCH_DAYS)
             if daily_prefetch_count > 0:
                 logger.info(
                     "[prefetch] component=daily_kline_prefetch action=complete "

@@ -22,6 +22,7 @@ import litellm
 from json_repair import repair_json
 from litellm import Router
 
+from src.overheat_flags import render_overheat_flags_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -4027,6 +4028,11 @@ class GeminiAnalyzer:
 {chr(10).join('- ' + note for note in consistency_notes)}
 """
         
+        # 过热风险旗标：程序按历史检验口径算好的事实（src/overheat_flags.py）
+        overheat_section = render_overheat_flags_prompt(context.get('overheat_flags'))
+        if overheat_section:
+            prompt += overheat_section
+
         # 添加昨日对比数据
         if 'yesterday' in context:
             volume_change = context.get('volume_change_ratio', 'N/A')

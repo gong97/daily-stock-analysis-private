@@ -87,7 +87,7 @@ class TestConfiguredSkillsReachAnalyzerPrompt(unittest.TestCase):
         self.assertIn("成长质量策略", prompt)
         self.assertIn("事件驱动", prompt)
         self.assertIn("过热风险（Overheat Guard）", prompt)
-        self.assertIn("现价 / MA20 − 1 > 0.11", prompt)
+        self.assertIn("直接引用表格结论，不要自行重算", prompt)
         self.assertNotIn("默认技能基线（必须严格遵守）", prompt)
         self.assertNotIn("默认多头趋势", prompt)
 
