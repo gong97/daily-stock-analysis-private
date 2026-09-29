@@ -14,7 +14,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.analyzer import AnalysisResult
-from src.core.pipeline import StockAnalysisPipeline
+from src.core.pipeline import DAILY_FETCH_DAYS, StockAnalysisPipeline
 
 
 def _make_result(code: str) -> AnalysisResult:
@@ -76,7 +76,8 @@ class TestTickFlowPipelinePrefetch(unittest.TestCase):
 
         self.assertEqual(len(results), 5)
         self.assertEqual(events[0][0], "daily_prefetch")
-        self.assertEqual(events[0][2], 30)
+        # 预取与逐只拉取用同一个天数，预取的缓存才覆盖得住逐只请求
+        self.assertEqual(events[0][2], DAILY_FETCH_DAYS)
         self.assertEqual(events[1][0], "realtime_prefetch")
         self.assertEqual(events[2][0], "name_prefetch")
         self.assertTrue(all(event[0] != "process" for event in events[:3]))
