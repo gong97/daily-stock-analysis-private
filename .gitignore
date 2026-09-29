@@ -58,6 +58,8 @@ env/
 # 例外：全市场扫描的观察名单需要版本化，供日报流程和历史回溯消费
 # （见 .github/workflows/10-market-scan.yml 与 docs/screening-engine.md）
 !/data/watchlist/
+# 例外：分层分析的每日信号记录，供事后检验（见 src/core/signal_log.py）
+!/data/signal_log/
 /.llm_usage_hmac_secret
 **/.llm_usage_hmac_secret
 logs/

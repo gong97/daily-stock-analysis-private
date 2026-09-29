@@ -925,6 +925,15 @@ def run_full_analysis(
             )
             results = tiered_outcome.lite_results
 
+            # 信号记录：供事后检验，写失败不能影响当天邮件
+            try:
+                from src.core import signal_log
+
+                if signal_log.is_enabled():
+                    signal_log.append_signal_log(tiered_outcome)
+            except Exception as exc:
+                logger.warning("[signal_log] 写入信号记录失败，跳过: %s", exc)
+
             # 「今日重大变化」的历史基线：查询/解析失败都不能影响当天邮件
             # 发出——这段只是锦上添花，决策总表和卡片才是主体。
             try:

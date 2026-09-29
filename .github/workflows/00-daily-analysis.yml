@@ -36,6 +36,9 @@ jobs:
     environment: STOCK_LIST
     # 添加超时限制，防止任务卡死
     timeout-minutes: ${{ fromJSON(vars.ANALYSIS_TIMEOUT_MINUTES || '45') }}
+    # 提交每日信号记录（data/signal_log）需要写权限
+    permissions:
+      contents: write
     
     steps:
       - name: 随机延迟（避免固定时间访问）
@@ -413,6 +416,8 @@ jobs:
           TIER2_TOP_N: ${{ vars.TIER2_TOP_N || '3' }}
           TIER2_INCLUDE_CUT: ${{ vars.TIER2_INCLUDE_CUT || 'true' }}
           TIER_WATCHLIST_MIN_RAW_SCORE: ${{ vars.TIER_WATCHLIST_MIN_RAW_SCORE || '70' }}
+          # 每日信号记录：落盘到 data/signal_log，由下面的步骤提交，供事后检验
+          SIGNAL_LOG_ENABLED: 'true'
 
           REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
@@ -554,6 +559,32 @@ jobs:
             python main.py $FORCE_RUN_ARG
           fi
       
+      # 分析步骤失败时也提交：写入发生在推送邮件之前，已写下的记录就是当天发出去的判断
+      - name: 提交信号记录
+        if: always()
+        run: |
+          if [ ! -d data/signal_log ]; then
+            echo "本次没有信号记录（未启用分层分析或初筛全部失败）"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/signal_log
+          if git diff --staged --quiet; then
+            echo "信号记录无变化，跳过提交"
+            exit 0
+          fi
+          RUN_DATE="$(TZ='Asia/Shanghai' date '+%Y-%m-%d')"
+          git commit -m "chore: daily signal log (${RUN_DATE})"
+          # 分析期间可能有观察名单等其他提交；信号记录只由本 workflow 写，
+          # 且 concurrency 保证串行，rebase 不会在这些文件上冲突
+          if ! git pull --rebase origin "${GITHUB_REF_NAME}"; then
+            git rebase --abort || true
+            echo "::error::信号记录 rebase 失败"
+            exit 1
+          fi
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
       - name: 上传分析报告
         uses: actions/upload-artifact@v6
         if: always()
