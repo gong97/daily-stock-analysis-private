@@ -418,6 +418,9 @@ jobs:
           TIER_WATCHLIST_MIN_RAW_SCORE: ${{ vars.TIER_WATCHLIST_MIN_RAW_SCORE || '70' }}
           # 每日信号记录：落盘到 data/signal_log，由下面的步骤提交，供事后检验
           SIGNAL_LOG_ENABLED: 'true'
+          # 交易策略：只写进单次分析的提示词，不切 Agent 模式（Agent 每只股票多轮调用，45 分钟内跑不完）
+          AGENT_SKILLS: ${{ vars.AGENT_SKILLS }}
+          AGENT_SKILLS_AUTO_AGENT: 'false'
 
           REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}

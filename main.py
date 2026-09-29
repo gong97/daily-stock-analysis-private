@@ -930,7 +930,7 @@ def run_full_analysis(
                 from src.core import signal_log
 
                 if signal_log.is_enabled():
-                    signal_log.append_signal_log(tiered_outcome)
+                    signal_log.append_signal_log(tiered_outcome, config=config)
             except Exception as exc:
                 logger.warning("[signal_log] 写入信号记录失败，跳过: %s", exc)
 

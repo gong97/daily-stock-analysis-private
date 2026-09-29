@@ -129,6 +129,42 @@ class TestBuildSignalRecords(unittest.TestCase):
         self.assertEqual(records, [])
 
 
+class TestSettingsSnapshot(unittest.TestCase):
+    def test_resolves_active_skills_like_the_analyzer(self):
+        config = SimpleNamespace(
+            agent_skills=["growth_quality", "no_such_skill", "overheat_guard"],
+            agent_skill_dir=None,
+            llm_temperature=1.0,
+        )
+        with mock.patch.dict(os.environ, {"GITHUB_SHA": "abc123"}):
+            settings = signal_log.settings_snapshot(config)
+
+        self.assertEqual(
+            settings,
+            {"git_sha": "abc123", "skills": ["growth_quality", "overheat_guard"], "temperature": 1.0},
+        )
+
+    def test_empty_skills_record_the_default_fallback(self):
+        config = SimpleNamespace(agent_skills=[], agent_skill_dir=None, llm_temperature=0.7)
+        settings = signal_log.settings_snapshot(config)
+        self.assertEqual(settings["skills"], ["bull_trend"])
+        self.assertEqual(settings["temperature"], 0.7)
+
+    def test_records_carry_settings(self):
+        lite = _result(code="603986.SH", name="兆易创新", action="reduce", score=30)
+        config = SimpleNamespace(agent_skills=["overheat_guard"], agent_skill_dir=None, llm_temperature=1.0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = signal_log.append_signal_log(
+                TieredAnalysisOutcome(lite_results=[lite]),
+                config=config, directory=Path(tmp), run_at=RUN_AT,
+            )
+            record = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(record["schema"], 2)
+        self.assertEqual(record["settings"]["skills"], ["overheat_guard"])
+
+
 class TestAppendSignalLog(unittest.TestCase):
     def test_appends_to_monthly_file_without_dedup(self):
         lite = _result(code="603986.SH", name="兆易创新", action="reduce", score=30,

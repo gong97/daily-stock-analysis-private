@@ -1003,6 +1003,9 @@ class Config:
     _agent_mode_explicit: bool = False  # True when AGENT_MODE was explicitly set in env
     agent_max_steps: int = AGENT_MAX_STEPS_DEFAULT
     agent_skills: List[str] = field(default_factory=list)
+    # 配置了具体 AGENT_SKILLS 时是否自动切到 Agent 模式。关掉后策略只写进传统单次分析的提示词，
+    # 流程、耗时和费用不变（Agent 模式每只股票最多多轮调用模型）
+    agent_skills_auto_agent: bool = True
     agent_skill_dir: Optional[str] = None
     agent_nl_routing: bool = False  # Enable natural language routing in bot dispatcher
     agent_arch: str = "single"     # Agent architecture: 'single' (legacy) or 'multi' (orchestrator)
@@ -1920,6 +1923,7 @@ class Config:
                 minimum=1,
             ),
             agent_skills=[s.strip() for s in os.getenv('AGENT_SKILLS', '').split(',') if s.strip()],
+            agent_skills_auto_agent=parse_env_bool(os.getenv('AGENT_SKILLS_AUTO_AGENT'), default=True),
             agent_skill_dir=os.getenv('AGENT_SKILL_DIR') or os.getenv('AGENT_STRATEGY_DIR'),
             agent_nl_routing=os.getenv('AGENT_NL_ROUTING', 'false').lower() == 'true',
             agent_arch=os.getenv('AGENT_ARCH', 'single').lower(),

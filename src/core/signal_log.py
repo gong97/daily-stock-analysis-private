@@ -19,6 +19,11 @@ LLM 的判断又不能拿历史数据回放（模型知道后来发生了什么�
 开跑，行情快照里的 date 因此可能是「次日」甚至周六。所以这里不自己推断
 交易日，只记录 run_at_utc（真实运行时刻）和快照原样的日期；检验时以
 「run_at 之后第一个开盘」为买入点，不会偷看未来。
+
+设置快照
+--------
+每行带一份 settings：启用的策略、温度、代码版本（GITHUB_SHA，提示词原文可由它还原）。
+中途改设置不会污染样本，检验时按 settings 分组即可。
 """
 
 from __future__ import annotations
@@ -36,7 +41,7 @@ from src.utils.sniper_points import extract_sniper_points
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_DIR = Path(__file__).resolve().parents[2] / "data" / "signal_log"
 
 
@@ -102,10 +107,34 @@ def _judgement(result: Any) -> Dict[str, Any]:
     }
 
 
+def _active_skills(config: Any) -> Optional[List[str]]:
+    """实际生效的策略：走和分析时同一个解析入口，写错的策略名会被剔掉、空列表会回落到默认。"""
+    try:
+        from src.agent.factory import resolve_skill_prompt_state
+
+        return list(resolve_skill_prompt_state(config).skills_to_activate)
+    except Exception as exc:
+        logger.warning("[signal_log] 解析生效策略失败，记录配置原值: %s", exc)
+        configured = getattr(config, "agent_skills", None)
+        return list(configured) if configured else None
+
+
+def settings_snapshot(config: Any) -> Dict[str, Any]:
+    """影响判断的运行设置。模型名按初筛/复核分别记在各自的判断里，这里不重复。"""
+    if config is None:
+        return {"git_sha": os.getenv("GITHUB_SHA") or None}
+    return {
+        "git_sha": os.getenv("GITHUB_SHA") or None,
+        "skills": _active_skills(config),
+        "temperature": _float_or_none(getattr(config, "llm_temperature", None)),
+    }
+
+
 def build_signal_records(
     outcome: TieredAnalysisOutcome,
     *,
     run_at: Optional[datetime] = None,
+    settings: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """每只初筛成功的股票一行；进了深度复核的，复核结论放在 deep 里。"""
     run_at = (run_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -137,6 +166,7 @@ def build_signal_records(
                 "lite": _judgement(result),
                 "deep_side": candidate.side if candidate is not None else None,
                 "deep": deep,
+                "settings": settings,
             }
         )
     return records
@@ -145,12 +175,13 @@ def build_signal_records(
 def append_signal_log(
     outcome: TieredAnalysisOutcome,
     *,
+    config: Any = None,
     directory: Optional[Path] = None,
     run_at: Optional[datetime] = None,
 ) -> Optional[Path]:
     """追加到 <directory>/<运行月份 UTC>.jsonl，返回写入的文件；没有可写的行时返回 None。"""
     run_at = (run_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    records = build_signal_records(outcome, run_at=run_at)
+    records = build_signal_records(outcome, run_at=run_at, settings=settings_snapshot(config))
     if not records:
         return None
 

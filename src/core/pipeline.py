@@ -514,7 +514,8 @@ class StockAnalysisPipeline:
             if not use_agent:
                 # Auto-enable agent mode when specific skills are configured (e.g., scheduled task with strategy)
                 configured_skills = getattr(self.config, 'agent_skills', [])
-                if configured_skills and configured_skills != ['all']:
+                auto_agent = getattr(self.config, 'agent_skills_auto_agent', True)
+                if auto_agent and configured_skills and configured_skills != ['all']:
                     use_agent = True
                     logger.info(f"{stock_name}({code}) Auto-enabled agent mode due to configured skills: {configured_skills}")
 
