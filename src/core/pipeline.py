@@ -97,10 +97,12 @@ from src.overheat_flags import (
     compute_overheat_flags,
 )
 from src.core.trading_calendar import (
+    MarketPhase,
     build_market_phase_context,
     get_effective_trading_date,
     get_market_for_stock,
     get_market_now,
+    infer_market_phase,
     is_market_open,
 )
 from data_provider.us_index_mapping import is_us_stock_code
@@ -112,6 +114,20 @@ logger = logging.getLogger(__name__)
 # 每只股票拉取的日线天数（交易日，数据源按日历日 ×2 估算）。
 # 100 天约 137 根：够过热风险旗标的 60 日高位 + 120 日量能常态，长假也有余量
 DAILY_FETCH_DAYS = 100
+
+def _is_premarket(market: Optional[str], market_now: datetime) -> bool:
+    """今天的交易还没开始：此时「实时价」就是上一交易日收盘，库里也已有那根完整日线。
+
+    盘前叠加实时行情只会出错：给均线追加一根日期为今天、价格等于昨收的虚拟 K 线（昨收被算两次），
+    把提示词里的 today 改标成今天的估算值（上一交易日从 today/yesterday 里消失），
+    并让技术面被标成 partial、置信度不得为「高」。CI 定时任务实际在北京凌晨 2~5 点运行，正是盘前。
+    判断失败时按「不是盘前」处理，保持原有行为。
+    """
+    try:
+        return infer_market_phase(market, current_time=market_now) == MarketPhase.PREMARKET
+    except Exception:
+        return False
+
 
 # 个股情报搜索的维度（search_service.search_comprehensive_intel 里的 name）。
 # 只留两个，让 24 只持仓落在免费额度内：每天约 2N+8 次，每月约 1,160 次，
@@ -852,7 +868,7 @@ class StockAnalysisPipeline:
 
             # Step 7.6: chip_structure fallback (Issue #589) and unavailable collapse
             if result:
-                normalize_chip_structure_availability(result, chip_data)
+                normalize_chip_structure_availability(result, chip_data, disabled=self._chip_disabled())
 
             # Step 7.7: price_position fallback
             if result:
@@ -949,7 +965,16 @@ class StockAnalysisPipeline:
             logger.error(f"{stock_name}({code}) 分析失败: {e}")
             logger.exception(f"{stock_name}({code}) 详细错误信息:")
             return None
-    
+
+    def _chip_disabled(self) -> bool:
+        """筹码分布被配置关闭（ENABLE_CHIP_DISTRIBUTION=false）。
+
+        与「开着但这次没取到」不同：关闭时每天都肯定没有，提示词、数据块列表、报告卡片里的
+        「筹码数据缺失」全是噪音，模型还会据此在检查清单里加一条「筹码缺失无法验证」。
+        CI 上默认关闭（东方财富在 Actions 上不可达）。
+        """
+        return not getattr(self.config, "enable_chip_distribution", True)
+
     def _enhance_context(
         self,
         context: Dict[str, Any],
@@ -1020,7 +1045,9 @@ class StockAnalysisPipeline:
             # 移除 None 值以减少上下文大小
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
         
-        # 添加筹码分布
+        # 添加筹码分布；配置关闭时打标记，提示词和报告都不再提筹码（见 _chip_disabled）
+        if self._chip_disabled():
+            enhanced['chip_disabled'] = True
         if chip_data:
             current_price = getattr(realtime_quote, 'price', 0) if realtime_quote else 0
             enhanced['chip'] = {
@@ -1048,17 +1075,22 @@ class StockAnalysisPipeline:
             }
 
         # Issue #234：盘中分析使用实时 OHLC 与趋势 MA 覆盖 today。
-        # 防护条件：trend_result.ma5 > 0 表示 MA 计算已成功且数据量充足。
-        if realtime_quote and trend_result and trend_result.ma5 > 0:
+        # 防护条件：trend_result.ma5 > 0 表示 MA 计算已成功且数据量充足；盘前不覆盖（见 _is_premarket）。
+        overlay_market = get_market_for_stock(normalize_stock_code(enhanced.get('code', '')))
+        overlay_now = get_market_now(overlay_market)
+        if (
+            realtime_quote
+            and trend_result
+            and trend_result.ma5 > 0
+            and not _is_premarket(overlay_market, overlay_now)
+        ):
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
                 yesterday_close = None
                 if enhanced.get('yesterday') and isinstance(enhanced['yesterday'], dict):
                     yesterday_close = enhanced['yesterday'].get('close')
                 orig_today = enhanced.get('today') or {}
-                market_today = get_market_now(
-                    get_market_for_stock(normalize_stock_code(enhanced.get('code', '')))
-                ).date().isoformat()
+                market_today = overlay_now.date().isoformat()
                 source = getattr(realtime_quote, 'source', None)
                 source_name = getattr(source, 'value', source)
                 source_name = str(source_name) if source_name is not None else 'unknown'
@@ -1548,7 +1580,7 @@ class StockAnalysisPipeline:
                     )
             # chip_structure fallback (Issue #589), before save_analysis_history
             if result and chip_data is not None:
-                normalize_chip_structure_availability(result, chip_data)
+                normalize_chip_structure_availability(result, chip_data, disabled=self._chip_disabled())
 
             # price_position fallback (same as non-agent path Step 7.7)
             if result:
@@ -2552,9 +2584,13 @@ class StockAnalysisPipeline:
         )
         if not enable_realtime_tech:
             return df
-        market = get_market_for_stock(code)
-        market_today = get_market_now(market).date()
+        # 规范化：名单是「600900.SH」格式，不规范化时 market 为 None，日历检查被跳过
+        market = get_market_for_stock(normalize_stock_code(code))
+        market_now = get_market_now(market)
+        market_today = market_now.date()
         if market and not is_market_open(market, market_today):
+            return df
+        if _is_premarket(market, market_now):
             return df
 
         last_val = df['date'].max()
@@ -2890,6 +2926,7 @@ class StockAnalysisPipeline:
             metadata={
                 "query_id": query_id,
                 "trigger_source": self.query_source,
+                "chip_disabled": self._chip_disabled(),
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
         )
@@ -2940,6 +2977,7 @@ class StockAnalysisPipeline:
             metadata={
                 "query_id": query_id,
                 "trigger_source": self.query_source,
+                "chip_disabled": self._chip_disabled(),
             },
             portfolio_context=dict(portfolio_context) if isinstance(portfolio_context, dict) else None,
         )

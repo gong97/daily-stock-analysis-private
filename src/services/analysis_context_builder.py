@@ -91,7 +91,10 @@ class AnalysisContextBuilder:
         technical_block, technical_warnings = _build_technical_block(artifacts)
         blocks["technical"] = technical_block
         data_quality_warnings.extend(technical_warnings)
-        blocks["chip"] = _build_chip_block(artifacts)
+        # 配置关闭筹码时不列这个块：列成 missing 只会让模型在数据限制里写「筹码缺失」。
+        # 质量评分按缺失块计（与关闭前相同），不改变分数口径。
+        if not (artifacts.metadata or {}).get("chip_disabled"):
+            blocks["chip"] = _build_chip_block(artifacts)
         blocks["fundamentals"] = _build_fundamentals_block(artifacts)
         blocks["news"] = _build_news_block(artifacts)
         portfolio_block = _build_portfolio_block(artifacts)

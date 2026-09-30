@@ -900,9 +900,21 @@ def _mark_chip_structure_unavailable(result: "AnalysisResult", language: str) ->
     data_perspective["chip_unavailable_reason"] = get_chip_unavailable_text(language)
 
 
-def normalize_chip_structure_availability(result: "AnalysisResult", chip_data: Any) -> None:
-    """Fill valid chip metrics or collapse placeholder-only chip fields to one fallback line."""
+def normalize_chip_structure_availability(
+    result: "AnalysisResult", chip_data: Any, *, disabled: bool = False
+) -> None:
+    """Fill valid chip metrics or collapse placeholder-only chip fields to one fallback line.
+
+    disabled=True（配置关闭筹码）时直接删掉筹码字段：报告卡片不再渲染「筹码：数据不可用」。
+    """
     if not result:
+        return
+    if disabled:
+        dashboard = result.dashboard if isinstance(result.dashboard, dict) else {}
+        data_perspective = dashboard.get("data_perspective")
+        if isinstance(data_perspective, dict):
+            data_perspective.pop("chip_structure", None)
+            data_perspective.pop("chip_unavailable_reason", None)
         return
     language = getattr(result, "report_language", "zh")
     if _has_meaningful_chip_data(chip_data):
@@ -3606,7 +3618,9 @@ class GeminiAnalyzer:
                 result.market_snapshot = self._build_market_snapshot(context)
                 result.model_used = model_used
                 result.report_language = report_language
-                normalize_chip_structure_availability(result, context.get("chip"))
+                normalize_chip_structure_availability(
+                    result, context.get("chip"), disabled=bool(context.get("chip_disabled"))
+                )
 
                 # 内容完整性校验（可选）
                 if not config.report_integrity_enabled:
@@ -3974,6 +3988,9 @@ class GeminiAnalyzer:
 | 70%筹码集中度 | {chip.get('concentration_70', 0):.2%} | |
 | 筹码状态 | {chip.get('chip_status', unknown_text)} | |
 """
+        elif context.get('chip_disabled'):
+            # 配置关闭筹码：整段不写。写「不可用」反而让模型在数据限制、检查清单里反复提它
+            pass
         else:
             chip_unavailable_text = get_chip_unavailable_text(report_language)
             chip_instruction = (
