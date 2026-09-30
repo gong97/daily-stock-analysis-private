@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Sequence, Tuple
 from itertools import cycle
 from urllib.parse import parse_qsl, unquote, urlparse
 import requests
@@ -4392,21 +4392,24 @@ class SearchService:
         self,
         stock_code: str,
         stock_name: str,
-        max_searches: int = 3
+        max_searches: int = 3,
+        dimensions: Optional[Sequence[str]] = None,
     ) -> Dict[str, SearchResponse]:
         """
         多维度情报搜索（同时使用多个引擎、多个维度）
-        
+
         搜索维度：
         1. 最新消息 - 近期新闻动态
         2. 风险排查 - 减持、处罚、利空
         3. 业绩预期 - 年报预告、业绩快报
-        
+
         Args:
             stock_code: 股票代码
             stock_name: 股票名称
             max_searches: 最大搜索次数
-            
+            dimensions: 只搜这些维度（按 name 挑选，保持下面列表里的先后）。
+                None 表示全部维度，按顺序取前 max_searches 个。
+
         Returns:
             {维度名称: SearchResponse} 字典
         """
@@ -4529,6 +4532,10 @@ class SearchService:
                 },
             ]
         
+        if dimensions is not None:
+            wanted = set(dimensions)
+            search_dimensions = [d for d in search_dimensions if d['name'] in wanted]
+
         search_days = self._effective_news_window_days()
         target_per_dimension = 3
         provider_max_results = self._provider_request_size(target_per_dimension)

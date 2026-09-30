@@ -113,6 +113,10 @@ logger = logging.getLogger(__name__)
 # 100 天约 137 根：够过热风险旗标的 60 日高位 + 120 日量能常态，长假也有余量
 DAILY_FETCH_DAYS = 100
 
+# 个股情报搜索的维度（search_service.search_comprehensive_intel 里的 name）。
+# 海外股票没有「公司公告」维度，只会搜前两个。
+INTEL_SEARCH_DIMENSIONS = ("latest_news", "risk_check", "announcements")
+
 
 def _share_image_payload(result: Any) -> Optional[Dict[str, Any]]:
     """Return structured poster data when the result exposes the real contract."""
@@ -642,11 +646,14 @@ class StockAnalysisPipeline:
             if self.search_service is not None and self.search_service.is_available:
                 logger.info(f"{stock_name}({code}) 开始多维度情报搜索...")
 
-                # 使用多维度搜索（覆盖全部6个维度，避免尾部维度被截断）
+                # 只搜三个维度（2026-09-30 从 6 个减下来，搜索量减半）：
+                # 机构分析、行业分析是 180 天窗口，天天重搜价值低；业绩预期已由结构化财报覆盖。
+                # 免费额度（Tavily 约 500 次/月、SerpAPI 250 次/月）按 6 维度约一周就用完。
                 intel_results = self.search_service.search_comprehensive_intel(
                     stock_code=code,
                     stock_name=stock_name,
-                    max_searches=6
+                    max_searches=len(INTEL_SEARCH_DIMENSIONS),
+                    dimensions=INTEL_SEARCH_DIMENSIONS,
                 )
 
                 # 格式化情报报告

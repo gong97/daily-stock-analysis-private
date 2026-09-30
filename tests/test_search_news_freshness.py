@@ -2106,6 +2106,36 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             ["announcement_item"],
         )
 
+    def test_dimensions_filter_selects_by_name_and_keeps_order(self) -> None:
+        """日报只搜三个维度：按 name 挑选，不受列表位置影响，其余维度一次都不发请求。"""
+        fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        fresh_text = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        service, mock_search = self._create_service_with_mock_provider(
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        mock_search.side_effect = [
+            _response([_result("latest_news", fresh_text)]),
+            _response([_result("risk_check", fresh_text)]),
+            _response([_result("announcement_item", fresh_text)]),
+        ]
+
+        with patch("src.search_service.time.sleep"):
+            intel = service.search_comprehensive_intel(
+                stock_code="600519",
+                stock_name="贵州茅台",
+                max_searches=3,
+                dimensions=("latest_news", "risk_check", "announcements"),
+            )
+
+        self.assertEqual(list(intel), ["latest_news", "risk_check", "announcements"])
+        self.assertEqual(mock_search.call_count, 3)
+        queries = [call.args[0] for call in mock_search.call_args_list]
+        self.assertIn("停牌", queries[1])
+        self.assertIn("公司公告", queries[2])
+        self.assertFalse(any("研报" in q or "所在行业" in q for q in queries))
+
     def test_announcements_dimension_uses_news_topic_and_strict_filter(self) -> None:
         """announcements uses tavily_topic='news' and strict_freshness=True."""
         fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
