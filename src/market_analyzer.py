@@ -103,6 +103,8 @@ class MarketOverview:
     bottom_sectors: List[Dict] = field(default_factory=list)  # 跌幅前5板块
     top_concepts: List[Dict] = field(default_factory=list)    # 涨幅前5概念
     bottom_concepts: List[Dict] = field(default_factory=list) # 跌幅前5概念
+    # 大盘估值背景（乐咕乐股，仅 A 股）：{"indicators": [...], "errors": [...], "lookback_years": 10}
+    valuation_context: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -443,7 +445,11 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             self._get_sector_rankings(overview)
             self._get_concept_rankings(overview)
         
-        # 4. 获取北向资金（可选）
+        # 4. 大盘估值背景（乐咕乐股，仅 A 股；取不到不影响复盘）
+        if self.region == "cn":
+            self._get_market_valuation(overview)
+
+        # 5. 获取北向资金（可选）
         # self._get_north_flow(overview)
         
         return overview
@@ -545,6 +551,21 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
         except Exception as e:
             logger.error("[大盘] %s action=get_sector_rankings status=failed error=%s", self._log_context(), e)
+
+    def _get_market_valuation(self, overview: MarketOverview):
+        try:
+            from src.market_valuation_lg import fetch_market_valuation
+
+            logger.info("[大盘] %s action=get_market_valuation status=start", self._log_context())
+            overview.valuation_context = fetch_market_valuation()
+            logger.info(
+                "[大盘] %s action=get_market_valuation status=done indicators=%d errors=%s",
+                self._log_context(),
+                len(overview.valuation_context.get("indicators") or []),
+                overview.valuation_context.get("errors"),
+            )
+        except Exception as e:
+            logger.warning("[大盘] %s action=get_market_valuation status=failed error=%s", self._log_context(), e)
 
     def _get_concept_rankings(self, overview: MarketOverview):
         """获取概念/题材涨跌榜（fail-open）。"""
@@ -1450,6 +1471,9 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         stats_block = ""
         sector_block = ""
         data_limits_block = ""
+        # 大盘估值背景只在中文模板里写（A 股专用数据）
+        from src.market_valuation_lg import render_market_valuation_block
+        valuation_block = render_market_valuation_block(overview.valuation_context)
         if review_language == "en":
             if self.profile.has_market_stats:
                 stats_block = f"""## Market Breadth
@@ -1622,6 +1646,8 @@ Output the report content directly, no extra commentary.
 {stats_block}
 
 {sector_block}
+
+{valuation_block}
 
 {data_limits_block}
 
