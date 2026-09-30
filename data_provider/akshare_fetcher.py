@@ -2012,8 +2012,13 @@ class AkshareFetcher(BaseFetcher):
         获取行业板块涨跌榜
 
         数据源优先级：
-        1. 东财接口 (ak.stock_board_industry_name_em)
-        2. 新浪接口 (ak.stock_sector_spot)
+        1. 同花顺行业汇总 (ak.stock_board_industry_summary_ths)
+        2. 东财接口 (ak.stock_board_industry_name_em)
+        3. 新浪接口 (ak.stock_sector_spot)
+
+        同花顺放最前（2026-09-30）：东财在 GitHub Actions 上被封，失败要耗约 7 秒，加上新浪前的限速，
+        个股分析里 8 秒的热点取数每晚超时 27 次；同花顺实测 Actions 可达、约 3~5 秒，行业名也比
+        新浪的证监会分类（如「新闻和出版业」）常用。
         """
         import akshare as ak
 
@@ -2034,8 +2039,19 @@ class AkshareFetcher(BaseFetcher):
                 for _, row in bottom.iterrows()
             ]
             return top_sectors, bottom_sectors
-        
-        # 优先东财接口
+
+        # 优先同花顺行业汇总
+        try:
+            self._set_random_user_agent()
+            logger.info("[API调用] ak.stock_board_industry_summary_ths() 获取板块排行(同花顺)...")
+            df = ak.stock_board_industry_summary_ths()
+            if df is not None and not df.empty and {'板块', '涨跌幅'} <= set(df.columns):
+                return _get_rank_top_n(df, '涨跌幅', '板块', n)
+            logger.warning("[Akshare] 同花顺行业板块汇总为空或缺列，尝试东财接口")
+        except Exception as e:
+            logger.warning(f"[Akshare] 同花顺接口获取行业板块排行失败: {e}，尝试东财接口")
+
+        # 其次东财接口
         try:
             self._set_random_user_agent()
             self._enforce_rate_limit()
