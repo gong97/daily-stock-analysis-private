@@ -900,6 +900,86 @@ def _mark_chip_structure_unavailable(result: "AnalysisResult", language: str) ->
     data_perspective["chip_unavailable_reason"] = get_chip_unavailable_text(language)
 
 
+def _fundamental_block_data(fundamental_context: Any, key: str) -> Dict[str, Any]:
+    if not isinstance(fundamental_context, dict):
+        return {}
+    block = fundamental_context.get(key)
+    if not isinstance(block, dict) or block.get("status") != "ok":
+        return {}
+    data = block.get("data")
+    return data if isinstance(data, dict) else {}
+
+
+def _fmt_num(value: Any, spec: str = ".2f") -> str:
+    v = _safe_float(value, default=math.nan)
+    return f"{v:{spec}}" if math.isfinite(v) else "N/A"
+
+
+def _render_profit_forecast_section(fundamental_context: Any, current_price: float) -> str:
+    """机构盈利预测表：每股收益一致预期 + 按现价折算的预测市盈率。"""
+    rows = _fundamental_block_data(fundamental_context, "profit_forecast").get("rows") or []
+    if not rows:
+        return ""
+    lines = [
+        "",
+        "### 机构盈利预测（同花顺一致预期，每股收益）",
+        "| 年度 | 机构数 | 最低 | 平均 | 最高 | 行业平均 | 预测市盈率（现价/平均） |",
+        "|------|------|------|------|------|------|------|",
+    ]
+    for row in rows:
+        mean = _safe_float(row.get("eps_mean"), default=math.nan)
+        forward_pe = (
+            f"{current_price / mean:.1f}"
+            if math.isfinite(current_price) and math.isfinite(mean) and mean > 0
+            else "N/A"
+        )
+        lines.append(
+            f"| {row.get('year')} | {row.get('institutions') or 'N/A'} | {_fmt_num(row.get('eps_min'))} | "
+            f"{_fmt_num(row.get('eps_mean'))} | {_fmt_num(row.get('eps_max'))} | "
+            f"{_fmt_num(row.get('industry_avg'))} | {forward_pe} |"
+        )
+    lines.append("")
+    lines.append("> 一致预期是券商分析师的平均看法，本身常偏乐观；机构数少于 3 家时参考价值有限。")
+    return "\n".join(lines) + "\n"
+
+
+def _render_holder_changes_section(fundamental_context: Any) -> str:
+    """股东/高管增减持摘要。增持、减持分开写，不给净额（询价转让时净额为 0，会掩盖大股东减持）。"""
+    data = _fundamental_block_data(fundamental_context, "holder_changes")
+    if not data:
+        return ""
+    days = data.get("lookback_days", 180)
+
+    def _shares(v: Any) -> str:
+        n = _safe_float(v, default=0.0)
+        return f"{n / 1e8:.2f} 亿股" if n >= 1e8 else f"{n / 1e4:.2f} 万股"
+
+    lines = ["", f"### 股东/高管增减持（近{days}天，同花顺）"]
+    for label, key in (("股东", "shareholder"), ("高管", "management")):
+        part = data.get(key) or {}
+        rc, ic = int(part.get("reduce_count") or 0), int(part.get("increase_count") or 0)
+        if rc == 0 and ic == 0:
+            lines.append(f"- {label}：无增减持记录")
+            continue
+        lines.append(
+            f"- {label}：减持 {rc} 次共 {_shares(part.get('reduce_shares'))}；"
+            f"增持 {ic} 次共 {_shares(part.get('increase_shares'))}"
+        )
+        for event in (part.get("events") or [])[:5]:
+            price = _fmt_num(event.get("avg_price"))
+            via = event.get("via") or "未披露"
+            lines.append(
+                f"  - {event.get('date')} {event.get('who')} {event.get('change')}（均价 {price}，{via}）"
+            )
+    lines.append("")
+    lines.append(
+        "> 重点看减持方与规模：控股股东、实控人或高管集中减持是风险信号。询价转让、大宗交易中的"
+        "接盘方会显示为「增持」，不代表看好。同一人可能同时出现在股东、高管两栏（如实控人兼董事长），"
+        "两栏数量不可相加。"
+    )
+    return "\n".join(lines) + "\n"
+
+
 def normalize_chip_structure_availability(
     result: "AnalysisResult", chip_data: Any, *, disabled: bool = False
 ) -> None:
@@ -3839,7 +3919,9 @@ class GeminiAnalyzer:
         if isinstance(financial_report, dict) or isinstance(dividend_metrics, dict):
             financial_report = financial_report if isinstance(financial_report, dict) else {}
             dividend_metrics = dividend_metrics if isinstance(dividend_metrics, dict) else {}
-            ttm_yield = dividend_metrics.get("ttm_dividend_yield_pct", "N/A")
+            # 股息率是百分数（0.2119 即 0.21%），不带单位时容易被读成 21%
+            ttm_yield_raw = _safe_float(dividend_metrics.get("ttm_dividend_yield_pct"), default=math.nan)
+            ttm_yield = f"{ttm_yield_raw:.2f}%" if math.isfinite(ttm_yield_raw) else "N/A"
             ttm_cash = dividend_metrics.get("ttm_cash_dividend_per_share", "N/A")
             ttm_count = dividend_metrics.get("ttm_event_count", "N/A")
             report_date = financial_report.get("report_date", "N/A")
@@ -3886,6 +3968,15 @@ class GeminiAnalyzer:
 
 > 若上述字段为 N/A 或缺失，请明确写“数据缺失，无法判断”，禁止编造。
 """
+
+        # 同花顺：机构盈利预测、股东/高管增减持（data_provider.base 单独取数；取不到时整段不写）
+        current_price_for_pe = _safe_float(
+            (context.get("realtime") or {}).get("price")
+            or (context.get("today") or {}).get("close"),
+            default=math.nan,
+        )
+        prompt += _render_profit_forecast_section(fundamental_context, current_price_for_pe)
+        prompt += _render_holder_changes_section(fundamental_context)
 
         capital_flow_block = (
             fundamental_context.get("capital_flow", {})

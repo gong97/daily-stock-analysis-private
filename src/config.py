@@ -1240,6 +1240,9 @@ class Config:
     fundamental_fetch_timeout_seconds: float = 8.0
     # 单能力失败重试次数（已包含首次）
     fundamental_retry_max: int = 1
+    # 基本面「整包」（业绩预告、分红、十大股东等，均走东方财富）。CI 上每次 8 秒超时一无所获，
+    # workflow 里关掉；分红、机构预测、增减持已改由同花顺单独取（data_provider.base）
+    fundamental_bundle_enabled: bool = True
     # 基本面上下文短 TTL（秒）
     fundamental_cache_ttl_seconds: int = 120
     # 基本面缓存最大条目数（避免长时间运行内存增长）
@@ -2232,6 +2235,7 @@ class Config:
                 minimum=0.0,
             ),
             fundamental_retry_max=parse_env_int(os.getenv('FUNDAMENTAL_RETRY_MAX'), 1, field_name='FUNDAMENTAL_RETRY_MAX', minimum=0),
+            fundamental_bundle_enabled=parse_env_bool(os.getenv('FUNDAMENTAL_BUNDLE_ENABLED'), default=True),
             fundamental_cache_ttl_seconds=parse_env_int(
                 os.getenv('FUNDAMENTAL_CACHE_TTL_SECONDS'),
                 120,

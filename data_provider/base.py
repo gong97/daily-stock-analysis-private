@@ -2606,6 +2606,51 @@ class DataFetcherManager:
             return None, str(error_holder["value"]), int((time.time() - start) * 1000)
         return result_holder.get("value"), None, int((time.time() - start) * 1000)
 
+    def _run_optional_adapter_call(
+        self,
+        task: Callable[[], Any],
+        timeout_seconds: float,
+        task_name: str,
+    ) -> Tuple[Dict[str, Any], List[str], int]:
+        """单独限时调用一个补充数据接口，返回 (payload, errors, 耗时毫秒)；失败或超时时 payload 为空。
+
+        错误原文一律保留在 errors 里——资金流、财报都吃过「失败被伪装成没数据」的亏。
+        """
+        if timeout_seconds <= 0:
+            return {}, [f"{task_name} skipped: fundamental stage budget exhausted"], 0
+        payload, err_msg, cost_ms = self._run_with_retry(task, timeout_seconds, task_name)
+        if not isinstance(payload, dict):
+            return {}, [err_msg or f"{task_name} failed"], cost_ms
+        errors = [str(e) for e in payload.get("errors", [])]
+        if err_msg:
+            errors.append(err_msg)
+        return payload, errors, cost_ms
+
+    def _build_ths_block(
+        self,
+        task: Callable[[], Any],
+        timeout_seconds: float,
+        task_name: str,
+        extract: Callable[[Dict[str, Any]], Dict[str, Any]],
+        consume_budget: Callable[[int], None],
+    ) -> Dict[str, Any]:
+        """同花顺补充数据块。取到数据为 ok；只是「没有数据」（如无机构覆盖）为 not_supported；其余为 failed。"""
+        payload, errors, cost_ms = self._run_optional_adapter_call(task, timeout_seconds, task_name)
+        consume_budget(cost_ms)
+        data = extract(payload) if payload else {}
+        if data:
+            status = "ok"
+        elif errors and all(str(e).endswith(":empty") for e in errors):
+            status = "not_supported"
+        else:
+            status = "failed"
+        return self._build_fundamental_block(
+            status,
+            data,
+            self._normalize_source_chain(payload.get("source_chain", []), task_name, status, cost_ms),
+            errors,
+        )
+
     def _run_with_retry(
         self,
         task: Callable[[], Any],
@@ -3169,6 +3214,8 @@ class DataFetcherManager:
             "capital_flow": {},
             "dragon_tiger": {},
             "boards": {},
+            "profit_forecast": {},
+            "holder_changes": {},
             "coverage": {},
             "source_chain": [],
             "errors": [],
@@ -3241,10 +3288,32 @@ class DataFetcherManager:
             fin_ms,
         )
 
+        # 同花顺分红：整包里的分红接口走东方财富（Actions 上被封），且整包本身常超时
+        div_summary, div_errors, div_ms = self._run_optional_adapter_call(
+            lambda: self._fundamental_adapter.get_dividend_ths(stock_code),
+            min(fetch_timeout, remaining_seconds),
+            "fundamental_dividend_ths",
+        )
+        _consume_budget(div_ms)
+        ths_dividend = div_summary.get("dividend") or {}
+        div_chain = self._normalize_source_chain(
+            div_summary.get("source_chain", []),
+            "fundamental_dividend_ths",
+            "ok" if ths_dividend else "failed",
+            div_ms,
+        )
+
         # growth / earnings / institution (one AkShare call; 财务摘要已在上面取过)
-        if remaining_seconds <= 0:
-            bundle_status = "failed"
+        # FUNDAMENTAL_BUNDLE_ENABLED=false 时跳过：整包里的业绩预告、分红、十大股东等都走东方财富，
+        # CI 上每次跑满 8 秒超时却一无所获；分红、机构预测、增减持已改由同花顺单独取。
+        if not getattr(config, "fundamental_bundle_enabled", True):
+            bundle_status = "not_supported"
             bundle_payload: Dict[str, Any] = {}
+            bundle_errors = []
+            bundle_ms = 0
+        elif remaining_seconds <= 0:
+            bundle_status = "failed"
+            bundle_payload = {}
             bundle_errors = ["fundamental stage timeout"]
             bundle_ms = 0
         else:
@@ -3297,6 +3366,8 @@ class DataFetcherManager:
         fin_report = (fin_summary.get("earnings") or {}).get("financial_report")
         if fin_report and not earnings_payload.get("financial_report"):
             earnings_payload["financial_report"] = fin_report
+        if ths_dividend and not earnings_payload.get("dividend"):
+            earnings_payload["dividend"] = dict(ths_dividend)
 
         # Derive TTM dividend yield from already-fetched quote price; avoid extra quote calls.
         earnings_extra_errors: List[str] = []
@@ -3335,7 +3406,7 @@ class DataFetcherManager:
         adapter_errors = list(bundle_payload.get("errors", [])) if isinstance(bundle_payload, dict) else []
         adapter_errors.extend(bundle_errors)
         growth_errors = fin_errors + adapter_errors
-        earnings_errors = fin_errors + adapter_errors
+        earnings_errors = fin_errors + div_errors + adapter_errors
         earnings_errors.extend(earnings_extra_errors)
         institution_errors = list(adapter_errors)
 
@@ -3352,7 +3423,7 @@ class DataFetcherManager:
         result_ctx["earnings"] = self._build_fundamental_block(
             earnings_status,
             earnings_payload,
-            fin_chain + bundle_chain,
+            fin_chain + div_chain + bundle_chain,
             earnings_errors,
         )
         result_ctx["institution"] = self._build_fundamental_block(
@@ -3400,6 +3471,23 @@ class DataFetcherManager:
             )
             _consume_budget(int((time.time() - dragon_tiger_start) * 1000))
 
+            # 同花顺机构盈利预测、股东/高管增减持：排在资金流与龙虎榜之后（资金流供结论改写规则用，
+            # 不能被挤掉），板块之前（板块走东方财富，CI 上本来取不到）。不计入整体 status。
+            result_ctx["profit_forecast"] = self._build_ths_block(
+                lambda: self._fundamental_adapter.get_profit_forecast_ths(stock_code),
+                min(fetch_timeout, remaining_seconds),
+                "profit_forecast_ths",
+                lambda payload: {"rows": payload["rows"]} if payload.get("rows") else {},
+                _consume_budget,
+            )
+            result_ctx["holder_changes"] = self._build_ths_block(
+                lambda: self._fundamental_adapter.get_holder_changes_ths(stock_code),
+                min(fetch_timeout, remaining_seconds),
+                "holder_changes_ths",
+                lambda payload: payload.get("summary") or {},
+                _consume_budget,
+            )
+
             result_ctx["boards"] = self.get_board_context(
                 stock_code,
                 budget_seconds=min(fetch_timeout, remaining_seconds),
@@ -3423,9 +3511,11 @@ class DataFetcherManager:
             "capital_flow",
             "dragon_tiger",
             "boards",
+            "profit_forecast",
+            "holder_changes",
         ):
-            result_ctx["errors"].extend(result_ctx[block].get("errors", []))
-            result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
+            result_ctx["errors"].extend(result_ctx.get(block, {}).get("errors", []))
+            result_ctx["source_chain"].extend(result_ctx.get(block, {}).get("source_chain", []))
 
         if is_etf:
             # Keep ETF downgrade semantics for overall status even when valuation is available.

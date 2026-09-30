@@ -450,6 +450,9 @@ jobs:
           FUNDAMENTAL_STAGE_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || '25' }}
           # 单块取数超时，需 <= 上面的总预算，否则一块就能吃光全部预算。
           FUNDAMENTAL_FETCH_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || '8' }}
+          # 基本面整包全走东方财富（Actions 上被封），每次跑满 8 秒超时；关掉后分红、机构预测、
+          # 增减持由同花顺单独取（2026-09-30 实测 Actions 可达）
+          FUNDAMENTAL_BUNDLE_ENABLED: ${{ vars.FUNDAMENTAL_BUNDLE_ENABLED || 'false' }}
           # 实时行情数据源优先级（腾讯有量比且稳定，推荐首选）
           # 可选值: tencent, akshare_sina, efinance, akshare_em, tickflow, tushare
           # 如果有 TickFlow 或 Tushare Pro，可按权限把 tickflow / tushare 放在更靠前位置

@@ -40,13 +40,62 @@ class _DummyBoardFetcher:
 
 class TestFundamentalContext(unittest.TestCase):
     def setUp(self) -> None:
-        # 财务摘要从 2026-09-30 起单独取数；各用例默认给空结果，避免单元测试真的访问新浪
-        patcher = patch(
-            "data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_financial_summary",
-            return_value={"growth": {}, "earnings": {}, "source_chain": [], "errors": []},
+        # 财务摘要、同花顺分红/盈利预测/增减持从 2026-09-30 起单独取数；
+        # 各用例默认给空结果，避免单元测试真的访问新浪、同花顺
+        empty = {"source_chain": [], "errors": []}
+        for name, value in (
+            ("get_financial_summary", {"growth": {}, "earnings": {}, **empty}),
+            ("get_dividend_ths", {"dividend": {}, **empty}),
+            ("get_profit_forecast_ths", {"rows": [], **empty}),
+            ("get_holder_changes_ths", {"summary": {}, **empty}),
+        ):
+            patcher = patch(
+                f"data_provider.fundamental_adapter.AkshareFundamentalAdapter.{name}",
+                return_value=value,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_ths_blocks_and_bundle_switch(self) -> None:
+        """同花顺分红进 earnings（可算股息率）；盈利预测、增减持成为独立块；整包可关。"""
+        manager = DataFetcherManager(fetchers=[])
+        cfg = SimpleNamespace(
+            enable_fundamental_pipeline=True,
+            fundamental_cache_ttl_seconds=0,
+            fundamental_stage_timeout_seconds=5.0,
+            fundamental_fetch_timeout_seconds=1.0,
+            fundamental_retry_max=1,
+            fundamental_bundle_enabled=False,
         )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        quote = SimpleNamespace(pe_ratio=20.0, pb_ratio=3.0, total_mv=1e11, circ_mv=1e11, price=28.5,
+                                source=SimpleNamespace(value="tencent"))
+        dividend = {"events": [], "ttm_event_count": 2, "ttm_cash_dividend_per_share": 1.0,
+                    "coverage": "cash_dividend_pre_tax", "as_of": "2026-09-30"}
+        forecast_rows = [{"year": 2026, "institutions": 21, "eps_min": 1.41, "eps_mean": 1.47,
+                          "eps_max": 1.53, "industry_avg": 0.58}]
+        with patch("src.config.get_config", return_value=cfg), \
+                patch.object(manager, "get_realtime_quote", return_value=quote), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_dividend_ths",
+                      return_value={"dividend": dividend, "source_chain": ["dividend:stock_fhps_detail_ths"], "errors": []}), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_profit_forecast_ths",
+                      return_value={"rows": forecast_rows, "source_chain": [], "errors": []}), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_holder_changes_ths",
+                      return_value={"summary": {}, "source_chain": [], "errors": ["stock_shareholder_change_ths:empty"]}), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_fundamental_bundle") as bundle, \
+                patch.object(manager, "get_capital_flow_context", return_value={"status": "partial", "source_chain": []}), \
+                patch.object(manager, "get_dragon_tiger_context", return_value={"status": "partial", "source_chain": []}), \
+                patch.object(manager, "get_board_context", return_value={"status": "partial", "source_chain": []}):
+            ctx = manager.get_fundamental_context("600900")
+
+        bundle.assert_not_called()
+        div = ctx["earnings"]["data"]["dividend"]
+        self.assertAlmostEqual(div["ttm_dividend_yield_pct"], 1.0 / 28.5 * 100, places=3)
+        self.assertEqual(ctx["profit_forecast"]["status"], "ok")
+        self.assertEqual(ctx["profit_forecast"]["data"]["rows"], forecast_rows)
+        # 只是「没有记录」→ not_supported，不算失败
+        self.assertEqual(ctx["holder_changes"]["status"], "not_supported")
+        # 新块不进入原有整体 coverage，口径不变
+        self.assertNotIn("profit_forecast", ctx["coverage"])
 
     def test_financial_summary_survives_bundle_timeout(self) -> None:
         """整包超时（线上常态）时，单独限时取到的财报仍要进入 growth / earnings。"""

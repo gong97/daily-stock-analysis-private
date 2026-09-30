@@ -213,7 +213,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                     "net_profit_parent": 6.856786e9,
                     "operating_cash_flow": -5.2e8,
                     "roe": 23.13,
-                }}},
+                }, "dividend": {"ttm_cash_dividend_per_share": 0.75, "ttm_dividend_yield_pct": 0.2119,
+                                "ttm_event_count": 1}}},
                 "growth": {"data": {"revenue_yoy": 178.6723, "net_profit_yoy": 1091.499, "gross_margin": None}},
             },
         }
@@ -227,6 +228,55 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("| 经营现金流 | -5.20 亿元 |", prompt)
         self.assertIn("| ROE | 23.13% | 报告期累计，季报/中报未年化", prompt)
         self.assertIn("| 毛利率 | N/A |", prompt)
+        self.assertIn("| TTM 股息率 | 0.21% |", prompt)  # 百分数带单位，不再是裸的 0.2119
+
+    def test_prompt_renders_ths_forecast_and_holder_changes(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        context = {
+            "code": "603986",
+            "stock_name": "兆易创新",
+            "date": "2026-09-29",
+            "today": {"close": 367.57},
+            "fundamental_context": {
+                "profit_forecast": {"status": "ok", "data": {"rows": [
+                    {"year": 2026, "institutions": 30, "eps_min": 13.5, "eps_mean": 14.97,
+                     "eps_max": 16.2, "industry_avg": 1.1},
+                ]}},
+                "holder_changes": {"status": "ok", "data": {"lookback_days": 180, "shareholder": {
+                    "reduce_count": 1, "reduce_shares": 58000000.0, "increase_count": 0, "increase_shares": 0.0,
+                    "events": [{"date": "2026-04-23", "who": "某合伙企业", "change": "减持5800.00万",
+                                "shares": -58000000.0, "avg_price": 410.34, "via": "询价转让"}],
+                }, "management": {"reduce_count": 0, "increase_count": 0, "events": []}}},
+            },
+        }
+        fake_cfg = SimpleNamespace(news_max_age_days=30, news_strategy_profile="medium")
+        with patch("src.analyzer.get_config", return_value=fake_cfg):
+            prompt = analyzer._format_prompt(context, "兆易创新", news_context="news")
+
+        self.assertIn("### 机构盈利预测（同花顺一致预期，每股收益）", prompt)
+        self.assertIn("| 2026 | 30 | 13.50 | 14.97 | 16.20 | 1.10 | 24.6 |", prompt)  # 367.57/14.97
+        self.assertIn("### 股东/高管增减持（近180天，同花顺）", prompt)
+        self.assertIn("- 股东：减持 1 次共 5800.00 万股；增持 0 次共 0.00 万股", prompt)
+        self.assertIn("2026-04-23 某合伙企业 减持5800.00万（均价 410.34，询价转让）", prompt)
+        self.assertIn("- 高管：无增减持记录", prompt)
+
+    def test_prompt_skips_ths_sections_when_blocks_not_ok(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+        context = {
+            "code": "600900", "stock_name": "长江电力", "date": "2026-09-29", "today": {},
+            "fundamental_context": {
+                "profit_forecast": {"status": "failed", "data": {}, "errors": ["timeout"]},
+                "holder_changes": {"status": "not_supported", "data": {}},
+            },
+        }
+        fake_cfg = SimpleNamespace(news_max_age_days=30, news_strategy_profile="medium")
+        with patch("src.analyzer.get_config", return_value=fake_cfg):
+            prompt = analyzer._format_prompt(context, "长江电力", news_context="news")
+        self.assertNotIn("机构盈利预测", prompt)
+        self.assertNotIn("股东/高管增减持", prompt)
 
     def test_prompt_includes_capital_flow_as_operation_filter(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):

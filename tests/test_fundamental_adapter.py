@@ -19,6 +19,10 @@ from data_provider.fundamental_adapter import (
     _extract_latest_row,
     _parse_dividend_plan_to_per_share,
     _parse_financial_abstract_wide,
+    _build_dividend_payload_ths,
+    _parse_profit_forecast_ths,
+    _parse_share_change,
+    _summarize_holder_changes_ths,
 )
 
 
@@ -186,6 +190,73 @@ class TestFundamentalAdapter(unittest.TestCase):
         self.assertAlmostEqual(result["growth"]["revenue_yoy"], 178.6723)
         self.assertAlmostEqual(result["growth"]["net_profit_yoy"], 1091.499)
         self.assertIn("growth:stock_financial_abstract", result["source_chain"])
+
+    def test_ths_dividend_uses_exact_columns_and_ttm_window(self) -> None:
+        """同花顺分红表：「股东大会预案公告日期」排在「分红方案说明」前面，通用关键词解析会取错列。"""
+        from datetime import date
+        df = pd.DataFrame(
+            [
+                ("2024年报", "2025-04-20", "2025-07-10", "10派8.2元(含税)", "2025-07-18", "实施方案"),
+                ("2025三季报", "2026-01-20", "2026-02-05", "10派2.1元(含税)", "2026-02-12", "实施方案"),
+                ("2025年报", "2026-05-20", "2026-07-10", "10派7.9元(含税)", "2026-07-17", "实施方案"),
+                ("2026中报", None, None, "不分配不转增", None, "董事会预案"),
+            ],
+            columns=["报告期", "股东大会预案公告日期", "实施公告日", "分红方案说明", "A股除权除息日", "方案进度"],
+        )
+        self.assertEqual(_build_dividend_payload(df, "600900"), {})  # 通用解析在这张表上取不到
+        payload = _build_dividend_payload_ths(df, now_date=date(2026, 9, 30))
+        self.assertEqual(payload["ttm_event_count"], 2)  # 2025-07-18 在 TTM 窗口外
+        self.assertAlmostEqual(payload["ttm_cash_dividend_per_share"], 1.0)
+        self.assertEqual(payload["events"][0]["event_date"], "2026-07-17")
+
+    def test_ths_dividend_skips_future_ex_date(self) -> None:
+        from datetime import date
+        df = pd.DataFrame(
+            [("2026中报", "10派3元(含税)", "2026-10-20", "实施方案")],
+            columns=["报告期", "分红方案说明", "A股除权除息日", "方案进度"],
+        )
+        self.assertEqual(_build_dividend_payload_ths(df, now_date=date(2026, 9, 30)), {})
+
+    def test_ths_profit_forecast_rows(self) -> None:
+        df = pd.DataFrame(
+            [(2027, 36, 23.77, 25.97, 29.99, 3.29), (2026, 36, 19.65, 20.81, 22.14, 2.50)],
+            columns=["年度", "预测机构数", "最小值", "均值", "最大值", "行业平均数"],
+        )
+        rows = _parse_profit_forecast_ths(df)
+        self.assertEqual([r["year"] for r in rows], [2026, 2027])
+        self.assertEqual(rows[0], {"year": 2026, "institutions": 36, "eps_min": 19.65,
+                                   "eps_mean": 20.81, "eps_max": 22.14, "industry_avg": 2.50})
+
+    def test_parse_share_change_units(self) -> None:
+        self.assertEqual(_parse_share_change("减持1062.50万"), -10625000.0)
+        self.assertEqual(_parse_share_change("增持1.66亿"), 166000000.0)
+        self.assertEqual(_parse_share_change("增持7000.00"), 7000.0)
+        self.assertIsNone(_parse_share_change("--"))
+
+    def test_holder_changes_keep_reduce_and_increase_separate(self) -> None:
+        """询价转让：大股东减持、机构按同价接盘，净额为 0——必须分开计，否则减持被抹掉。"""
+        from datetime import date
+        holder = pd.DataFrame(
+            [
+                ("2026-06-01", "黄某", "减持4563.24万", "376.12", "询价转让"),
+                ("2026-06-01", "某基金", "增持4563.24万", "376.12", "询价转让"),
+                ("2020-06-12", "旧股东", "减持100.00万", "141.98", "二级市场"),  # 窗口外
+            ],
+            columns=["公告日期", "变动股东", "变动数量", "交易均价", "变动途径"],
+        )
+        mgmt = pd.DataFrame(
+            [("2026-08-01", "张三", "减持2.00万", "未披露", "竞价交易")],
+            columns=["变动日期", "变动人", "变动数量", "交易均价", "股份变动途径"],
+        )
+        summary = _summarize_holder_changes_ths(holder, mgmt, now_date=date(2026, 9, 30), lookback_days=180)
+        sh = summary["shareholder"]
+        self.assertEqual((sh["reduce_count"], sh["increase_count"]), (1, 1))
+        self.assertAlmostEqual(sh["reduce_shares"], 45632400.0)
+        self.assertEqual(sh["events"][0]["who"], "黄某")  # 减持排在前面
+        self.assertEqual(sh["events"][0]["via"], "询价转让")
+        mg = summary["management"]
+        self.assertEqual(mg["reduce_count"], 1)
+        self.assertIsNone(mg["events"][0]["avg_price"])  # 「未披露」
 
     def test_build_dividend_payload_returns_empty_when_code_not_matched(self) -> None:
         now = datetime.now().strftime("%Y-%m-%d")

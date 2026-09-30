@@ -337,6 +337,170 @@ def _parse_financial_abstract_wide(df: pd.DataFrame) -> Optional[Dict[str, Any]]
     return {"report_date": _normalize_report_date(latest), **values}
 
 
+# ---------------------------------------------------------------------------
+# 同花顺（10jqka）：分红、机构盈利预测、股东/高管增减持
+# 2026-09-30 在 GitHub Actions 上实测可达（东方财富在 Actions 上被封）。列名按真实返回逐字取，
+# 不走 _pick_by_keywords：同花顺分红表里「股东大会预案公告日期」排在「分红方案说明」前面，
+# 关键词「预案」会先命中那一列日期，通用解析因此一条都取不到。
+# ---------------------------------------------------------------------------
+
+
+def _build_dividend_payload_ths(
+    df: pd.DataFrame,
+    *,
+    now_date: Optional[Any] = None,
+    max_events: int = 5,
+) -> Dict[str, Any]:
+    """ak.stock_fhps_detail_ths → 与 _build_dividend_payload 相同结构的分红摘要。
+
+    只算已除息的现金分红（除权除息日不晚于今天）；「不分配不转增」和未实施的预案跳过。
+    """
+    if df is None or df.empty or "分红方案说明" not in df.columns:
+        return {}
+    today = now_date or datetime.now().date()
+    ttm_start = today - timedelta(days=365)
+
+    events: List[Dict[str, Any]] = []
+    seen = set()
+    for _, row in df.iterrows():
+        per_share = _parse_dividend_plan_to_per_share(row.get("分红方案说明"))
+        if per_share is None or per_share <= 0:
+            continue
+        ex_dt = _safe_datetime(row.get("A股除权除息日"))
+        if ex_dt is None or ex_dt.date() > today:
+            continue
+        record_dt = _safe_datetime(row.get("A股股权登记日"))
+        announce_dt = _safe_datetime(row.get("实施公告日"))
+        key = (ex_dt.date().isoformat(), round(per_share, 6))
+        if key in seen:
+            continue
+        seen.add(key)
+        events.append({
+            "event_date": ex_dt.date().isoformat(),
+            "ex_dividend_date": ex_dt.date().isoformat(),
+            "record_date": record_dt.date().isoformat() if record_dt else None,
+            "announcement_date": announce_dt.date().isoformat() if announce_dt else None,
+            "cash_dividend_per_share": round(per_share, 6),
+            "is_pre_tax": True,
+        })
+    if not events:
+        return {}
+
+    events.sort(key=lambda item: item["event_date"], reverse=True)
+    ttm = [e for e in events if ttm_start <= datetime.fromisoformat(e["event_date"]).date() <= today]
+    return {
+        "events": events[:max(1, max_events)],
+        "ttm_event_count": len(ttm),
+        "ttm_cash_dividend_per_share": round(sum(e["cash_dividend_per_share"] for e in ttm), 6) if ttm else None,
+        "coverage": "cash_dividend_pre_tax",
+        "as_of": today.isoformat(),
+        "source": "stock_fhps_detail_ths",
+    }
+
+
+def _parse_profit_forecast_ths(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """ak.stock_profit_forecast_ths(indicator="预测年报每股收益") → 按年度的每股收益一致预期。"""
+    if df is None or df.empty or "年度" not in df.columns:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for _, row in df.iterrows():
+        year = _finite_float(row.get("年度"))
+        mean = _finite_float(row.get("均值"))
+        if year is None or mean is None:
+            continue
+        institutions = _finite_float(row.get("预测机构数"))
+        rows.append({
+            "year": int(year),
+            "institutions": int(institutions) if institutions is not None else None,
+            "eps_min": _finite_float(row.get("最小值")),
+            "eps_mean": mean,
+            "eps_max": _finite_float(row.get("最大值")),
+            "industry_avg": _finite_float(row.get("行业平均数")),
+        })
+    return sorted(rows, key=lambda r: r["year"])
+
+
+_SHARE_CHANGE_RE = re.compile(r"^(增持|减持)\s*([0-9.]+)\s*(亿|万)?")
+
+
+def _parse_share_change(text: Any) -> Optional[float]:
+    """「减持1062.50万」→ -10625000.0；「增持1.66亿」→ 166000000.0；认不出返回 None。"""
+    m = _SHARE_CHANGE_RE.match(_safe_str(text))
+    if not m:
+        return None
+    qty = float(m.group(2)) * {"亿": 1e8, "万": 1e4}.get(m.group(3) or "", 1.0)
+    return -qty if m.group(1) == "减持" else qty
+
+
+def _summarize_share_changes(
+    df: Optional[pd.DataFrame],
+    *,
+    date_col: str,
+    who_col: str,
+    via_col: str,
+    now_date: Any,
+    lookback_days: int,
+    max_events: int = 5,
+) -> Dict[str, Any]:
+    """增持、减持分开计。不给「净变动」：询价转让时大股东减持、一批机构按同价接盘，
+    净额恰好为 0，会把真正的风险信号（谁在卖、卖了多少）抹掉（宁德时代 2025-11-24 即如此）。
+    明细里减持排在前面。
+    """
+    summary: Dict[str, Any] = {
+        "reduce_count": 0, "reduce_shares": 0.0, "increase_count": 0, "increase_shares": 0.0, "events": [],
+    }
+    if df is None or df.empty or date_col not in df.columns or "变动数量" not in df.columns:
+        return summary
+    start = now_date - timedelta(days=lookback_days)
+    events: List[Dict[str, Any]] = []
+    for _, row in df.iterrows():
+        dt = _safe_datetime(row.get(date_col))
+        shares = _parse_share_change(row.get("变动数量"))
+        if dt is None or shares is None or not (start <= dt.date() <= now_date):
+            continue
+        events.append({
+            "date": dt.date().isoformat(),
+            "who": _safe_str(row.get(who_col)),
+            "change": _safe_str(row.get("变动数量")),
+            "shares": shares,
+            "avg_price": _finite_float(row.get("交易均价")),
+            "via": _safe_str(row.get(via_col)),
+        })
+    reduces = sorted((e for e in events if e["shares"] < 0), key=lambda e: e["date"], reverse=True)
+    increases = sorted((e for e in events if e["shares"] > 0), key=lambda e: e["date"], reverse=True)
+    summary.update({
+        "reduce_count": len(reduces),
+        "reduce_shares": -sum(e["shares"] for e in reduces),
+        "increase_count": len(increases),
+        "increase_shares": sum(e["shares"] for e in increases),
+        "events": (reduces + increases)[:max_events],
+    })
+    return summary
+
+
+def _summarize_holder_changes_ths(
+    holder_df: Optional[pd.DataFrame],
+    mgmt_df: Optional[pd.DataFrame],
+    *,
+    now_date: Optional[Any] = None,
+    lookback_days: int = 180,
+) -> Dict[str, Any]:
+    """股东（stock_shareholder_change_ths）与高管（stock_management_change_ths）近 N 天增减持摘要。"""
+    today = now_date or datetime.now().date()
+    return {
+        "lookback_days": lookback_days,
+        "as_of": today.isoformat(),
+        "shareholder": _summarize_share_changes(
+            holder_df, date_col="公告日期", who_col="变动股东", via_col="变动途径",
+            now_date=today, lookback_days=lookback_days,
+        ),
+        "management": _summarize_share_changes(
+            mgmt_df, date_col="变动日期", who_col="变动人", via_col="股份变动途径",
+            now_date=today, lookback_days=lookback_days,
+        ),
+    }
+
+
 class AkshareFundamentalAdapter:
     """AkShare adapter for fundamentals, capital flow and dragon-tiger signals."""
 
@@ -374,6 +538,40 @@ class AkshareFundamentalAdapter:
         result: Dict[str, Any] = {"growth": {}, "earnings": {}, "source_chain": [], "errors": []}
         self._fill_financial_summary(result, stock_code)
         return result
+
+    def get_dividend_ths(self, stock_code: str) -> Dict[str, Any]:
+        """同花顺分红 → {"dividend": {...}, "source_chain": [...], "errors": [...]}。"""
+        df, source, errors = self._call_df_candidates([("stock_fhps_detail_ths", {"symbol": stock_code})])
+        payload = _build_dividend_payload_ths(df) if df is not None else {}
+        return {
+            "dividend": payload,
+            "source_chain": [f"dividend:{source}"] if payload else [],
+            "errors": errors if df is not None or errors else ["stock_fhps_detail_ths:empty"],
+        }
+
+    def get_profit_forecast_ths(self, stock_code: str) -> Dict[str, Any]:
+        """同花顺机构盈利预测（每股收益一致预期）。"""
+        df, source, errors = self._call_df_candidates([
+            ("stock_profit_forecast_ths", {"symbol": stock_code, "indicator": "预测年报每股收益"}),
+        ])
+        rows = _parse_profit_forecast_ths(df) if df is not None else []
+        return {
+            "rows": rows,
+            "source_chain": [f"profit_forecast:{source}"] if rows else [],
+            "errors": errors if df is not None or errors else ["stock_profit_forecast_ths:empty"],
+        }
+
+    def get_holder_changes_ths(self, stock_code: str, lookback_days: int = 180) -> Dict[str, Any]:
+        """同花顺股东与高管增减持，近 lookback_days 天。任一张表取不到时另一张照常汇总。"""
+        holder_df, holder_src, holder_err = self._call_df_candidates(
+            [("stock_shareholder_change_ths", {"symbol": stock_code})]
+        )
+        mgmt_df, mgmt_src, mgmt_err = self._call_df_candidates(
+            [("stock_management_change_ths", {"symbol": stock_code})]
+        )
+        summary = _summarize_holder_changes_ths(holder_df, mgmt_df, lookback_days=lookback_days)
+        chain = [f"holder_changes:{s}" for s in (holder_src, mgmt_src) if s]
+        return {"summary": summary if chain else {}, "source_chain": chain, "errors": holder_err + mgmt_err}
 
     def _fill_financial_summary(self, result: Dict[str, Any], stock_code: str) -> None:
         fin_df, fin_source, fin_errors = self._call_df_candidates([
