@@ -15,7 +15,7 @@ if "newspaper" not in sys.modules:
     mock_np.Config = MagicMock()
     sys.modules["newspaper"] = mock_np
 
-from src.search_service import SerpAPISearchProvider
+from src.search_service import SearchService, SerpAPISearchProvider
 
 
 class _FakeGoogleSearch:
@@ -47,6 +47,24 @@ class TestSerpAPISearchProvider(unittest.TestCase):
         _FakeGoogleSearch.reset()
         _FakeGoogleSearch.response_payload = payload
         return patch.dict(sys.modules, {"serpapi": _fake_serpapi_module()})
+
+    def test_api_error_is_reported_as_failure(self) -> None:
+        """额度用完时 SerpAPI 只返回 {"error": ...}；以前被当成「成功、0 条」，不会换引擎。"""
+        provider = SerpAPISearchProvider(["dummy_key"])
+        with self._patch_serpapi({"error": "Your account has run out of searches."}):
+            resp = provider.search("阿里巴巴 财报", max_results=3)
+
+        self.assertFalse(resp.success)
+        self.assertIn("run out of searches", resp.error_message)
+        self.assertTrue(SearchService._is_fatal_provider_error(resp))
+
+    def test_no_results_error_is_not_a_failure(self) -> None:
+        provider = SerpAPISearchProvider(["dummy_key"])
+        with self._patch_serpapi({"error": "Google hasn't returned any results for this query."}):
+            resp = provider.search("冷门查询", max_results=3)
+
+        self.assertTrue(resp.success)
+        self.assertEqual(resp.results, [])
 
     def test_provider_skips_body_fetch_when_snippet_is_sufficient(self) -> None:
         provider = SerpAPISearchProvider(["dummy_key"])

@@ -114,8 +114,10 @@ logger = logging.getLogger(__name__)
 DAILY_FETCH_DAYS = 100
 
 # 个股情报搜索的维度（search_service.search_comprehensive_intel 里的 name）。
-# 海外股票没有「公司公告」维度，只会搜前两个。
-INTEL_SEARCH_DIMENSIONS = ("latest_news", "risk_check", "announcements")
+# 只留两个，让 24 只持仓落在免费额度内：每天约 2N+8 次，每月约 1,160 次，
+# 低于 Tavily basic 1,000 + SerpAPI 250。「公司公告」不走网络搜索——报告里的公告来自
+# 巨潮公告接口（announcement_service），那条渠道在 CI 上一直可用。
+INTEL_SEARCH_DIMENSIONS = ("latest_news", "risk_check")
 
 
 def _share_image_payload(result: Any) -> Optional[Dict[str, Any]]:
@@ -646,9 +648,9 @@ class StockAnalysisPipeline:
             if self.search_service is not None and self.search_service.is_available:
                 logger.info(f"{stock_name}({code}) 开始多维度情报搜索...")
 
-                # 只搜三个维度（2026-09-30 从 6 个减下来，搜索量减半）：
-                # 机构分析、行业分析是 180 天窗口，天天重搜价值低；业绩预期已由结构化财报覆盖。
-                # 免费额度（Tavily 约 500 次/月、SerpAPI 250 次/月）按 6 维度约一周就用完。
+                # 只搜 INTEL_SEARCH_DIMENSIONS（2026-09-30 从 6 个减到 2 个）：
+                # 机构分析、行业分析是 180 天窗口，天天重搜价值低；业绩预期已由结构化财报覆盖；
+                # 公司公告由巨潮接口提供。6 维度时免费额度约一周就用完。
                 intel_results = self.search_service.search_comprehensive_intel(
                     stock_code=code,
                     stock_name=stock_name,

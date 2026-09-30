@@ -3,6 +3,7 @@
 Regression tests for Tavily news-mode date mapping (Issue #782).
 """
 
+import os
 import sys
 import unittest
 from datetime import datetime, timezone
@@ -54,7 +55,9 @@ class TestTavilySearchProvider(unittest.TestCase):
 
     def test_provider_uses_news_topic_when_explicitly_requested(self) -> None:
         published_text = "2026-03-20T09:30:00Z"
-        provider = TavilySearchProvider(["dummy_key"])
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TAVILY_SEARCH_DEPTH", None)
+            provider = TavilySearchProvider(["dummy_key"])
 
         with self._patch_tavily(
             {
@@ -76,10 +79,28 @@ class TestTavilySearchProvider(unittest.TestCase):
         self.assertEqual(_FakeTavilyClient.search_calls[0]["topic"], "news")
         self.assertEqual(_FakeTavilyClient.search_calls[0]["days"], 3)
         self.assertEqual(_FakeTavilyClient.search_calls[0]["max_results"], 5)
-        self.assertEqual(_FakeTavilyClient.search_calls[0]["search_depth"], "advanced")
+        # 2026-09-30 起默认 basic（每次 1 credit），见 TavilySearchProvider._SEARCH_DEPTHS
+        self.assertEqual(_FakeTavilyClient.search_calls[0]["search_depth"], "basic")
         self.assertEqual(len(resp.results), 1)
         self.assertEqual(resp.results[0].published_date, published_text)
         self.assertEqual(resp.results[0].url, "https://example.com/alibaba-earnings")
+
+    def test_search_depth_env_override_and_fallback(self) -> None:
+        with patch.dict(os.environ, {"TAVILY_SEARCH_DEPTH": "Advanced"}):
+            self.assertEqual(TavilySearchProvider(["k"]).search_depth, "advanced")
+        with patch.dict(os.environ, {"TAVILY_SEARCH_DEPTH": ""}):
+            self.assertEqual(TavilySearchProvider(["k"]).search_depth, "basic")
+        with patch.dict(os.environ, {"TAVILY_SEARCH_DEPTH": "deep"}):
+            self.assertEqual(TavilySearchProvider(["k"]).search_depth, "basic")
+        self.assertEqual(TavilySearchProvider(["k"], search_depth="advanced").search_depth, "advanced")
+
+    def test_usage_limit_error_trips_circuit_breaker(self) -> None:
+        from src.search_service import SearchResponse
+        resp = SearchResponse(
+            query="q", results=[], provider="Tavily", success=False,
+            error_message="This request exceeds your plan's set usage limit. Please upgrade your plan",
+        )
+        self.assertTrue(SearchService._is_fatal_provider_error(resp))
 
     def test_provider_supports_publishedDate_variant(self) -> None:
         provider = TavilySearchProvider(["dummy_key"])

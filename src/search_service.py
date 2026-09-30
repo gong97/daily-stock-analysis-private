@@ -13,6 +13,7 @@ A股自选股智能分析系统 - 搜索服务模块
 
 import logging
 import multiprocessing
+import os
 import re
 import threading
 import time
@@ -420,9 +421,15 @@ class TavilySearchProvider(BaseSearchProvider):
     
     文档：https://docs.tavily.com/
     """
-    
-    def __init__(self, api_keys: List[str]):
+
+    # basic 每次 1 credit，advanced 每次 2 credits；免费额度每月 1,000 credits。
+    # 2026-09-30 起默认 basic：advanced 时免费额度约 500 次，按日志 9-01 重置、9-09 就用完了。
+    _SEARCH_DEPTHS = ("basic", "advanced")
+
+    def __init__(self, api_keys: List[str], search_depth: Optional[str] = None):
         super().__init__(api_keys, "Tavily")
+        depth = (search_depth if search_depth is not None else os.getenv("TAVILY_SEARCH_DEPTH", "")).strip().lower()
+        self.search_depth = depth if depth in self._SEARCH_DEPTHS else "basic"
     
     def _do_search(
         self,
@@ -447,10 +454,10 @@ class TavilySearchProvider(BaseSearchProvider):
         try:
             client = TavilyClient(api_key=api_key)
             
-            # 执行搜索（优化：使用advanced深度、限制最近几天）
+            # 执行搜索（限制最近几天；深度见 _SEARCH_DEPTHS 的说明）
             search_kwargs: Dict[str, Any] = {
                 "query": query,
-                "search_depth": "advanced",  # advanced 获取更多结果
+                "search_depth": self.search_depth,
                 "max_results": max_results,
                 "include_answer": False,
                 "include_raw_content": False,
@@ -652,9 +659,25 @@ class SerpAPISearchProvider(BaseSearchProvider):
             
             search = GoogleSearch(params)
             response = search.get_dict()
-            
+
             # 记录原始响应到日志
             logger.debug(f"[SerpAPI] 原始响应 keys: {response.keys()}")
+
+            # 失败时 SerpAPI 返回 {"error": "..."}（额度用完、Key 无效等）。以前不看这个键，
+            # 报错被当成「成功、0 条」，不会换引擎重试：2026-09-29 一晚 107/107 次都是这样。
+            api_error = response.get("error")
+            if api_error:
+                if "hasn't returned any results" in str(api_error).lower():
+                    # 真的没搜到，不是故障
+                    return SearchResponse(query=query, results=[], provider=self.name, success=True)
+                logger.warning(f"[SerpAPI] 接口返回错误: {api_error}")
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider=self.name,
+                    success=False,
+                    error_message=f"SerpAPI 错误: {api_error}",
+                )
             
             # 解析结果
             results = []
@@ -2266,6 +2289,11 @@ class SearchService:
         "未配置 api key",
         "余额不足",
         "insufficient balance",
+        # 月度额度用完：Tavily「exceeds your plan's set usage limit」、SerpAPI「run out of searches」。
+        # 以前不熔断，额度用完后每个维度仍先试它，白占 2 次换引擎机会中的 1 次。
+        "exceeds your plan",
+        "usage limit",
+        "run out of searches",
         "unauthorized",
         "forbidden",
         "http 401",

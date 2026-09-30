@@ -307,6 +307,8 @@ jobs:
           ANSPIRE_LLM_ENABLED: ${{ vars.ANSPIRE_LLM_ENABLED || secrets.ANSPIRE_LLM_ENABLED }}
           BOCHA_API_KEYS: ${{ secrets.BOCHA_API_KEYS }}
           TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
+          # 搜索深度：留空即 basic（每次 1 credit）；advanced 每次 2 credits，免费额度减半
+          TAVILY_SEARCH_DEPTH: ${{ vars.TAVILY_SEARCH_DEPTH }}
           SERPAPI_API_KEYS: ${{ secrets.SERPAPI_API_KEYS }}
           MINIMAX_API_KEYS: ${{ secrets.MINIMAX_API_KEYS }}
           BRAVE_API_KEYS: ${{ secrets.BRAVE_API_KEYS }}
