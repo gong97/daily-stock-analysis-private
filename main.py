@@ -73,12 +73,16 @@ from src.webui_frontend import prepare_webui_frontend_assets
 from src.config import get_config, Config
 from src.logging_config import setup_logging
 from src.brokers.futu.portfolio import FutuPortfolioError
-from data_provider.base import canonical_stock_code
+from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.services.stock_list_parser import split_stock_list
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 
 
 logger = logging.getLogger(__name__)
+
+# 交易日检查：当地时间 9 点前开跑的算前一天。定时任务名义北京 23:00，实际常拖到次日凌晨
+# 2~5 点；按「当天」判断会把周五的运行当成周六跳过，节假日前最后一个交易日也会被跳过。
+TRADING_DAY_CUTOFF_HOUR = 9
 _RUNTIME_ENV_FILE_KEYS = set()
 _PUBLIC_BIND_HOSTS = frozenset({"0.0.0.0", "::", "[::]", "*"})
 
@@ -466,10 +470,12 @@ def _compute_trading_day_filter(
         compute_effective_region,
     )
 
-    open_markets = get_open_markets_today()
+    open_markets = get_open_markets_today(session_cutoff_hour=TRADING_DAY_CUTOFF_HOUR)
     filtered_codes = []
     for code in stock_codes:
-        mkt = get_market_for_stock(code)
+        # 名单是「600900.SH」格式，get_market_for_stock 只认裸代码，不规范化会返回 None
+        # 被当成未知市场放行——节假日照常全量运行（2026-09-25 中秋即如此）
+        mkt = get_market_for_stock(normalize_stock_code(code))
         if mkt in open_markets or mkt is None:
             filtered_codes.append(code)
 
@@ -1621,7 +1627,7 @@ def main() -> int:
             effective_region = None
             if not getattr(args, 'force_run', False) and getattr(config, 'trading_day_check_enabled', True):
                 from src.core.trading_calendar import get_open_markets_today, compute_effective_region as _compute_region
-                open_markets = get_open_markets_today()
+                open_markets = get_open_markets_today(session_cutoff_hour=TRADING_DAY_CUTOFF_HOUR)
                 effective_region = _compute_region(
                     getattr(config, 'market_review_region', 'cn') or 'cn', open_markets
                 )

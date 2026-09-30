@@ -579,9 +579,14 @@ def build_market_phase_context(
     )
 
 
-def get_open_markets_today() -> Set[str]:
+def get_open_markets_today(session_cutoff_hour: Optional[int] = None) -> Set[str]:
     """
     Get markets that are open today (by each market's local timezone).
+
+    Args:
+        session_cutoff_hour: 当地时间早于这个小时，按「前一天」判断。日报定时任务名义上是
+            北京 23:00，实际常被 GitHub 推迟到次日凌晨 2~5 点；不设这个参数时，周五的运行会被
+            当成周六而跳过。None 表示按当地日期判断（盘中预警、bot 等实时场景）。
 
     Returns:
         Set of market keys that are trading today
@@ -592,7 +597,10 @@ def get_open_markets_today() -> Set[str]:
     for mkt, tz_name in MARKET_TIMEZONE.items():
         try:
             tz = ZoneInfo(tz_name)
-            today = datetime.now(tz).date()
+            now_local = datetime.now(tz)
+            if session_cutoff_hour is not None and now_local.hour < session_cutoff_hour:
+                now_local -= timedelta(days=1)
+            today = now_local.date()
             if is_market_open(mkt, today):
                 result.add(mkt)
         except Exception as e:
