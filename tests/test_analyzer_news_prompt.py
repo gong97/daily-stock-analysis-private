@@ -257,10 +257,36 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertIn("### 机构盈利预测（同花顺一致预期，每股收益）", prompt)
         self.assertIn("| 2026 | 30 | 13.50 | 14.97 | 16.20 | 1.10 | 24.6 |", prompt)  # 367.57/14.97
-        self.assertIn("### 股东/高管增减持（近180天，同花顺）", prompt)
-        self.assertIn("- 股东：减持 1 次共 5800.00 万股；增持 0 次共 0.00 万股", prompt)
-        self.assertIn("2026-04-23 某合伙企业 减持5800.00万（均价 410.34，询价转让）", prompt)
+        self.assertIn("### 高管增减持（近180天，同花顺）", prompt)
+        self.assertNotIn("- 股东：", prompt)  # 股东减持检验无效，不再列出
+        self.assertNotIn("某合伙企业", prompt)
         self.assertIn("- 高管：无增减持记录", prompt)
+        self.assertNotIn("- **弱参考：近期高管减持**", prompt)
+        self.assertIn("股东减持公告之后并不跑输", prompt)
+
+    def test_prompt_flags_recent_management_selling_as_weak_reference(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+        recent = [{"date": f"2026-09-{d}", "who": f"人{d}", "role": "董事" if d == "25" else "",
+                   "change": "减持2.00万", "via": "竞价交易"} for d in ("25", "24", "23", "22")]
+        context = {
+            "code": "600803", "stock_name": "新奥股份", "date": "2026-09-30", "today": {"close": 20.0},
+            "fundamental_context": {"holder_changes": {"status": "ok", "data": {
+                "lookback_days": 180, "management_recent_selling": recent,
+                "shareholder": {"reduce_count": 0, "increase_count": 0, "events": []},
+                "management": {"reduce_count": 4, "reduce_shares": 80000.0, "increase_count": 0,
+                               "increase_shares": 0.0, "events": []},
+            }}},
+        }
+        fake_cfg = SimpleNamespace(news_max_age_days=30, news_strategy_profile="medium")
+        with patch("src.analyzer.get_config", return_value=fake_cfg):
+            prompt = analyzer._format_prompt(context, "新奥股份", news_context="news")
+        self.assertIn(
+            "- **弱参考：近期高管减持**（程序按历史检验口径判定）：2026-09-25 人25（董事） 减持2.00万（竞价交易）；"
+            "2026-09-24 人24 减持2.00万（竞价交易）；2026-09-23 人23 减持2.00万（竞价交易） 等 4 笔",
+            prompt,
+        )
+        self.assertIn("不能作为下调评级", prompt)
 
     def test_prompt_skips_ths_sections_when_blocks_not_ok(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
@@ -276,7 +302,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         with patch("src.analyzer.get_config", return_value=fake_cfg):
             prompt = analyzer._format_prompt(context, "长江电力", news_context="news")
         self.assertNotIn("机构盈利预测", prompt)
-        self.assertNotIn("股东/高管增减持", prompt)
+        self.assertNotIn("高管增减持", prompt)
 
     def test_prompt_includes_capital_flow_as_operation_filter(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):

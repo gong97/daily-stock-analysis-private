@@ -258,6 +258,30 @@ class TestFundamentalAdapter(unittest.TestCase):
         self.assertEqual(mg["reduce_count"], 1)
         self.assertIsNone(mg["events"][0]["avg_price"])  # 「未披露」
 
+    def test_recent_management_selling_window(self) -> None:
+        """事件日 T = 变动日期 + 2 个交易日，T 起第 10 个交易日还提示、第 11 个不提示；只看高管减持。
+        2026 年 8 月没有节假日，交易所日历与退回的工作日结果相同。"""
+        from datetime import date
+        cols = ["变动日期", "变动人", "与公司高管关系", "变动数量", "交易均价", "剩余股数", "股份变动途径"]
+        mgmt = pd.DataFrame(
+            [
+                ("2026-08-14", "在窗口", "董事", "减持2.00万", "10.0", "1万", "二级市场买卖"),  # 到 8-31 共 12 个交易日
+                ("2026-08-13", "出窗口", "董事", "减持2.00万", "10.0", "1万", "二级市场买卖"),  # 13 个
+                ("2026-08-28", "增持的", "监事", "增持1.00万", "10.0", "1万", "二级市场买卖"),
+                ("2026-08-27", "", "", "减持3.00万", "10.0", "1万", "竞价交易"),
+            ],
+            columns=cols,
+        )
+        holder = pd.DataFrame(
+            [("2026-08-28", "大股东", "减持100.00万", "10.0", "二级市场")],
+            columns=["公告日期", "变动股东", "变动数量", "交易均价", "变动途径"],
+        )
+        summary = _summarize_holder_changes_ths(holder, mgmt, now_date=date(2026, 8, 31))
+        recent = summary["management_recent_selling"]
+        self.assertEqual([e["date"] for e in recent], ["2026-08-27", "2026-08-14"])  # 股东减持不算
+        self.assertEqual((recent[1]["who"], recent[1]["role"]), ("在窗口", "董事"))
+        self.assertEqual(_summarize_holder_changes_ths(None, None)["management_recent_selling"], [])
+
     def test_build_dividend_payload_returns_empty_when_code_not_matched(self) -> None:
         now = datetime.now().strftime("%Y-%m-%d")
         df = pd.DataFrame(

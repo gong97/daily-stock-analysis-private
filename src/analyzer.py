@@ -518,12 +518,12 @@ _RISK_WARNING_PLACEHOLDER_TEXTS = {
     "无",
 }
 
+# 不含「减持」（2026-09-30 起）：Macd-Qlib-Analyzer scripts/insider_selling_veto.py 检验里股东减持公告无效，
+# 高管减持有效但只作「弱参考」提示、不参与决策。写成「重大利空」「重大…风险」的仍由前两条和兜底规则命中。
 _STRUCTURAL_RISK_PHRASE_HINTS = (
     "重大利空",
     "重大风险",
     "关键风险",
-    "减持",
-    "高位减持",
     "退市",
     "退市风险",
     "停牌",
@@ -944,7 +944,11 @@ def _render_profit_forecast_section(fundamental_context: Any, current_price: flo
 
 
 def _render_holder_changes_section(fundamental_context: Any) -> str:
-    """股东/高管增减持摘要。增持、减持分开写，不给净额（询价转让时净额为 0，会掩盖大股东减持）。"""
+    """高管增减持摘要。增持、减持分开写，不给净额。
+
+    只列高管：2026-09-30 检验（Macd-Qlib-Analyzer scripts/insider_selling_veto.py）高管减持有效、
+    股东减持公告无效，股东表已不再取。
+    """
     data = _fundamental_block_data(fundamental_context, "holder_changes")
     if not data:
         return ""
@@ -954,15 +958,23 @@ def _render_holder_changes_section(fundamental_context: Any) -> str:
         n = _safe_float(v, default=0.0)
         return f"{n / 1e8:.2f} 亿股" if n >= 1e8 else f"{n / 1e4:.2f} 万股"
 
-    lines = ["", f"### 股东/高管增减持（近{days}天，同花顺）"]
-    for label, key in (("股东", "shareholder"), ("高管", "management")):
-        part = data.get(key) or {}
-        rc, ic = int(part.get("reduce_count") or 0), int(part.get("increase_count") or 0)
-        if rc == 0 and ic == 0:
-            lines.append(f"- {label}：无增减持记录")
-            continue
+    lines = ["", f"### 高管增减持（近{days}天，同花顺）"]
+    recent = data.get("management_recent_selling") or []
+    if recent:
+        shown = "；".join(
+            f"{e.get('date')} {e.get('who')}{'（' + e['role'] + '）' if e.get('role') else ''}"
+            f" {e.get('change')}（{e.get('via') or '未披露'}）"
+            for e in recent[:3]
+        )
+        more = f" 等 {len(recent)} 笔" if len(recent) > 3 else ""
+        lines.append(f"- **弱参考：近期高管减持**（程序按历史检验口径判定）：{shown}{more}")
+    part = data.get("management") or {}
+    rc, ic = int(part.get("reduce_count") or 0), int(part.get("increase_count") or 0)
+    if rc == 0 and ic == 0:
+        lines.append("- 高管：无增减持记录")
+    else:
         lines.append(
-            f"- {label}：减持 {rc} 次共 {_shares(part.get('reduce_shares'))}；"
+            f"- 高管：减持 {rc} 次共 {_shares(part.get('reduce_shares'))}；"
             f"增持 {ic} 次共 {_shares(part.get('increase_shares'))}"
         )
         for event in (part.get("events") or [])[:5]:
@@ -973,9 +985,10 @@ def _render_holder_changes_section(fundamental_context: Any) -> str:
             )
     lines.append("")
     lines.append(
-        "> 重点看减持方与规模：控股股东、实控人或高管集中减持是风险信号。询价转让、大宗交易中的"
-        "接盘方会显示为「增持」，不代表看好。同一人可能同时出现在股东、高管两栏（如实控人兼董事长），"
-        "两栏数量不可相加。"
+        "> 历史检验（300 只随机 A 股，2020~2026）：高管减持之后 10 个交易日平均落后同日全市场约 3 个百分位"
+        "（近两年明显变弱）；股东减持公告之后并不跑输，所以这里不列股东增减持。"
+        "「弱参考：近期高管减持」是程序按检验口径算好的事实，请直接引用、不要自行改判；只作提示，"
+        "不能作为下调评级或改变操作建议的理由。"
     )
     return "\n".join(lines) + "\n"
 

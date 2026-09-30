@@ -12,6 +12,7 @@ import logging
 import math
 import re
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -478,6 +479,54 @@ def _summarize_share_changes(
     return summary
 
 
+# 「弱参考：近期高管减持」：口径与 Macd-Qlib-Analyzer scripts/insider_selling_veto.py 的 H2 逐字一致，
+# 不在这里调参。事件日 T = 变动日期当天或之后的第一个交易日再往后 2 个交易日（董监高 2 个交易日内披露，
+# 取最晚），检验测的是 T 之后 10 个交易日，所以从披露起到 T 起第 10 个交易日都提示。
+# 2026-09-30 检验：高管减持 t -3.08（置换门槛 -2.25）通过；股东减持 t -0.44 没过，不提示。
+MGMT_SELLING_LAG = 2
+MGMT_SELLING_WINDOW = 10
+
+
+@lru_cache(maxsize=1)
+def _xshg_calendar() -> Any:
+    import exchange_calendars as xcals
+
+    return xcals.get_calendar("XSHG")
+
+
+def _cn_sessions(start: Any, end: Any) -> pd.DatetimeIndex:
+    """[start, end] 内的沪市交易日。exchange-calendars 不可用或超出范围时退回工作日——
+    长假时会把休市日也算成交易日，提示窗口比检验口径早结束（少提示，不会多提示）。"""
+    try:
+        return _xshg_calendar().sessions_in_range(pd.Timestamp(start), pd.Timestamp(end))
+    except Exception:
+        return pd.bdate_range(start, end)
+
+
+def _recent_management_selling(mgmt_df: Optional[pd.DataFrame], today: Any) -> List[Dict[str, Any]]:
+    """还在提示窗口内的高管减持，最近的在前。"""
+    if mgmt_df is None or mgmt_df.empty or "变动日期" not in mgmt_df.columns or "变动数量" not in mgmt_df.columns:
+        return []
+    out: List[Dict[str, Any]] = []
+    for _, row in mgmt_df.iterrows():
+        change = _safe_str(row.get("变动数量"))
+        dt = _safe_datetime(row.get("变动日期"))
+        # 40 个日历日足够覆盖 12 个交易日加一个长假，先粗筛再查日历
+        if not change.startswith("减持") or dt is None or not (0 <= (today - dt.date()).days <= 40):
+            continue
+        # 从变动日期起到今天的交易日数；第一个是事件起点，T 在其后第 2 个，T 起第 10 个是最后提示日
+        if len(_cn_sessions(dt.date(), today)) > MGMT_SELLING_LAG + MGMT_SELLING_WINDOW:
+            continue
+        out.append({
+            "date": dt.date().isoformat(),
+            "who": _safe_str(row.get("变动人")),
+            "role": _safe_str(row.get("与公司高管关系")),
+            "change": change,
+            "via": _safe_str(row.get("股份变动途径")),
+        })
+    return sorted(out, key=lambda e: e["date"], reverse=True)
+
+
 def _summarize_holder_changes_ths(
     holder_df: Optional[pd.DataFrame],
     mgmt_df: Optional[pd.DataFrame],
@@ -490,6 +539,7 @@ def _summarize_holder_changes_ths(
     return {
         "lookback_days": lookback_days,
         "as_of": today.isoformat(),
+        "management_recent_selling": _recent_management_selling(mgmt_df, today),
         "shareholder": _summarize_share_changes(
             holder_df, date_col="公告日期", who_col="变动股东", via_col="变动途径",
             now_date=today, lookback_days=lookback_days,
@@ -562,16 +612,17 @@ class AkshareFundamentalAdapter:
         }
 
     def get_holder_changes_ths(self, stock_code: str, lookback_days: int = 180) -> Dict[str, Any]:
-        """同花顺股东与高管增减持，近 lookback_days 天。任一张表取不到时另一张照常汇总。"""
-        holder_df, holder_src, holder_err = self._call_df_candidates(
-            [("stock_shareholder_change_ths", {"symbol": stock_code})]
-        )
+        """同花顺高管增减持，近 lookback_days 天。
+
+        股东表（stock_shareholder_change_ths）2026-09-30 起不再取：股东减持公告之后 10 个交易日并不跑输
+        （Macd-Qlib-Analyzer scripts/insider_selling_veto.py，t -0.44），提示词里只留检验有效的高管减持。
+        """
         mgmt_df, mgmt_src, mgmt_err = self._call_df_candidates(
             [("stock_management_change_ths", {"symbol": stock_code})]
         )
-        summary = _summarize_holder_changes_ths(holder_df, mgmt_df, lookback_days=lookback_days)
-        chain = [f"holder_changes:{s}" for s in (holder_src, mgmt_src) if s]
-        return {"summary": summary if chain else {}, "source_chain": chain, "errors": holder_err + mgmt_err}
+        summary = _summarize_holder_changes_ths(None, mgmt_df, lookback_days=lookback_days)
+        chain = [f"holder_changes:{mgmt_src}"] if mgmt_src else []
+        return {"summary": summary if chain else {}, "source_chain": chain, "errors": mgmt_err}
 
     def _fill_financial_summary(self, result: Dict[str, Any], stock_code: str) -> None:
         fin_df, fin_source, fin_errors = self._call_df_candidates([

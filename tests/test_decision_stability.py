@@ -301,6 +301,28 @@ def test_downgrades_sell_near_support_without_sustained_outflow() -> None:
     assert "不宜仅因单日下跌直接卖出" in result.risk_warning
 
 
+def test_insider_selling_alone_does_not_count_as_significant_risk() -> None:
+    """减持只作提示、不参与决策（2026-09-30 检验：股东减持无效，高管减持只作弱参考）。"""
+    result = _result(
+        decision_type="sell",
+        operation_advice="卖出",
+        score=30,
+        current_price=30.4,
+        change_pct=-2.1,
+    )
+    result.dashboard["intelligence"] = {"risk_alerts": ["2026-09-25 弱参考：近期高管减持（董事减持2.00万）",
+                                                        "2026-09-20 股东高位减持预告"]}
+
+    stabilize_decision_with_structure(
+        result,
+        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
+        _fund_flow(main=800_000, five_day=1_200_000),
+    )
+
+    assert result.decision_type == "hold"
+    assert result.operation_advice == "洗盘观察"
+
+
 def test_preserves_sell_signal_when_significant_risk_exists_near_support() -> None:
     result = _result(
         decision_type="sell",

@@ -80,7 +80,7 @@ class TestFundamentalContext(unittest.TestCase):
                 patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_profit_forecast_ths",
                       return_value={"rows": forecast_rows, "source_chain": [], "errors": []}), \
                 patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_holder_changes_ths",
-                      return_value={"summary": {}, "source_chain": [], "errors": ["stock_shareholder_change_ths:empty"]}), \
+                      return_value={"summary": {}, "source_chain": [], "errors": ["stock_management_change_ths:empty"]}), \
                 patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_fundamental_bundle") as bundle, \
                 patch.object(manager, "get_capital_flow_context", return_value={"status": "partial", "source_chain": []}), \
                 patch.object(manager, "get_dragon_tiger_context", return_value={"status": "partial", "source_chain": []}), \
