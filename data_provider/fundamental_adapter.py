@@ -9,6 +9,7 @@ endpoint candidates. It should never raise to caller; partial data is allowed.
 from __future__ import annotations
 
 import logging
+import math
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -285,6 +286,57 @@ def _extract_latest_row(df: pd.DataFrame, stock_code: str) -> Optional[pd.Series
     return df.iloc[0]
 
 
+_REPORT_PERIOD_COL = re.compile(r"^\d{8}$")
+
+# 新浪「财务摘要」宽表的指标名 → 结构化字段。同名指标会在「常用指标」「成长能力」等分组里重复出现，
+# 数值相同，取第一次出现的即可。金额单位是元，比例是百分数（23.13 = 23.13%），与邮件渲染约定一致。
+_ABSTRACT_FIELDS: Dict[str, str] = {
+    "revenue": "营业总收入",
+    "net_profit_parent": "归母净利润",
+    "operating_cash_flow": "经营现金流量净额",
+    "roe": "净资产收益率(ROE)",
+    "gross_margin": "毛利率",
+    "revenue_yoy": "营业总收入增长率",
+    "net_profit_yoy": "归属母公司净利润增长率",
+}
+
+
+def _finite_float(value: Any) -> Optional[float]:
+    """_safe_float 会把 NaN 原样返回；宽表的空单元格就是 NaN，这里一并当作缺失。"""
+    f = _safe_float(value)
+    return f if f is not None and math.isfinite(f) else None
+
+
+def _parse_financial_abstract_wide(df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    """解析 ak.stock_financial_abstract 的宽表：行是指标（「指标」列），列是报告期（YYYYMMDD）。
+
+    旧逻辑把它当成「每行一只股票、每列一个指标」来读，取第一行再按列名找关键词，
+    列名全是日期，所以所有字段都落空且不报错（2026-09-29 查明，此前应从未取到过）。
+    非宽表返回 None，由调用方沿用逐行解析。
+    """
+    if df is None or df.empty or "指标" not in df.columns:
+        return None
+    periods = sorted((c for c in df.columns if _REPORT_PERIOD_COL.match(str(c))), reverse=True)
+    if not periods:
+        return None
+
+    table = df.drop_duplicates("指标").set_index("指标")
+    # 最近报告期 = 核心字段有数的最新一列（个别股票最新一列可能整列为空）
+    anchors = [name for name in ("营业总收入", "归母净利润") if name in table.index]
+    latest = next(
+        (p for p in periods if any(_finite_float(table.at[name, p]) is not None for name in anchors)),
+        None,
+    )
+    if latest is None:
+        return None
+
+    values = {
+        field: _finite_float(table.at[name, latest]) if name in table.index else None
+        for field, name in _ABSTRACT_FIELDS.items()
+    }
+    return {"report_date": _normalize_report_date(latest), **values}
+
+
 class AkshareFundamentalAdapter:
     """AkShare adapter for fundamentals, capital flow and dragon-tiger signals."""
 
@@ -313,27 +365,42 @@ class AkshareFundamentalAdapter:
                 continue
         return None, None, errors
 
-    def get_fundamental_bundle(self, stock_code: str) -> Dict[str, Any]:
-        """
-        Return normalized fundamental blocks from AkShare with partial tolerance.
-        """
-        result: Dict[str, Any] = {
-            "status": "not_supported",
-            "growth": {},
-            "earnings": {},
-            "institution": {},
-            "source_chain": [],
-            "errors": [],
-        }
+    def get_financial_summary(self, stock_code: str) -> Dict[str, Any]:
+        """只取财务摘要（营收、利润、现金流、ROE、同比），供调用方单独限时。
 
-        # Financial indicators
+        get_fundamental_bundle 里还有业绩预告、分红、十大股东等多个接口，整包常常超过单次超时
+        （2026-09-29 本机实测 13~14 秒 vs 超时 8 秒），超时后连 1.5 秒就能拿到的财报也一起丢掉。
+        """
+        result: Dict[str, Any] = {"growth": {}, "earnings": {}, "source_chain": [], "errors": []}
+        self._fill_financial_summary(result, stock_code)
+        return result
+
+    def _fill_financial_summary(self, result: Dict[str, Any], stock_code: str) -> None:
         fin_df, fin_source, fin_errors = self._call_df_candidates([
             ("stock_financial_abstract", {"symbol": stock_code}),
             ("stock_financial_analysis_indicator", {"symbol": stock_code}),
             ("stock_financial_analysis_indicator", {}),
         ])
         result["errors"].extend(fin_errors)
-        if fin_df is not None:
+        wide = _parse_financial_abstract_wide(fin_df) if fin_df is not None else None
+        if wide is not None:
+            result["growth"] = {
+                "revenue_yoy": wide["revenue_yoy"],
+                "net_profit_yoy": wide["net_profit_yoy"],
+                "roe": wide["roe"],
+                "gross_margin": wide["gross_margin"],
+            }
+            financial_report_payload = {
+                "report_date": wide["report_date"],
+                "revenue": wide["revenue"],
+                "net_profit_parent": wide["net_profit_parent"],
+                "operating_cash_flow": wide["operating_cash_flow"],
+                "roe": wide["roe"],
+            }
+            if any(v is not None for v in financial_report_payload.values()):
+                result["earnings"]["financial_report"] = financial_report_payload
+            result["source_chain"].append(f"growth:{fin_source}")
+        elif fin_df is not None:
             row = _extract_latest_row(fin_df, stock_code)
             if row is not None:
                 revenue_yoy = _safe_float(_pick_by_keywords(row, ["营业收入同比", "营收同比", "收入同比", "同比增长"]))
@@ -362,6 +429,25 @@ class AkshareFundamentalAdapter:
                 if any(v is not None for v in financial_report_payload.values()):
                     result["earnings"]["financial_report"] = financial_report_payload
                 result["source_chain"].append(f"growth:{fin_source}")
+
+    def get_fundamental_bundle(self, stock_code: str, include_financials: bool = True) -> Dict[str, Any]:
+        """
+        Return normalized fundamental blocks from AkShare with partial tolerance.
+
+        include_financials=False 时跳过财务摘要——调用方已用 get_financial_summary 单独取过。
+        """
+        result: Dict[str, Any] = {
+            "status": "not_supported",
+            "growth": {},
+            "earnings": {},
+            "institution": {},
+            "source_chain": [],
+            "errors": [],
+        }
+
+        # Financial indicators
+        if include_financials:
+            self._fill_financial_summary(result, stock_code)
 
         # Earnings forecast
         forecast_df, forecast_source, forecast_errors = self._call_df_candidates([

@@ -197,6 +197,37 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("财报与分红（价值投资口径）", prompt)
         self.assertIn("禁止编造", prompt)
 
+    def test_financial_table_formats_amounts_growth_and_roe_note(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        context = {
+            "code": "603986",
+            "stock_name": "兆易创新",
+            "date": "2026-09-29",
+            "today": {},
+            "fundamental_context": {
+                "earnings": {"data": {"financial_report": {
+                    "report_date": "2026-06-30",
+                    "revenue": 1.156576e10,
+                    "net_profit_parent": 6.856786e9,
+                    "operating_cash_flow": -5.2e8,
+                    "roe": 23.13,
+                }}},
+                "growth": {"data": {"revenue_yoy": 178.6723, "net_profit_yoy": 1091.499, "gross_margin": None}},
+            },
+        }
+        fake_cfg = SimpleNamespace(news_max_age_days=30, news_strategy_profile="medium")
+        with patch("src.analyzer.get_config", return_value=fake_cfg):
+            prompt = analyzer._format_prompt(context, "兆易创新", news_context="news")
+
+        self.assertIn("| 营业收入 | 115.66 亿元 |", prompt)
+        self.assertIn("| 营收同比 | 178.67% |", prompt)
+        self.assertIn("| 归母净利润同比 | 1091.50% |", prompt)
+        self.assertIn("| 经营现金流 | -5.20 亿元 |", prompt)
+        self.assertIn("| ROE | 23.13% | 报告期累计，季报/中报未年化", prompt)
+        self.assertIn("| 毛利率 | N/A |", prompt)
+
     def test_prompt_includes_capital_flow_as_operation_filter(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()

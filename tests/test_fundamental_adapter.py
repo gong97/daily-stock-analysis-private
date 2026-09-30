@@ -18,6 +18,7 @@ from data_provider.fundamental_adapter import (
     _build_dividend_payload,
     _extract_latest_row,
     _parse_dividend_plan_to_per_share,
+    _parse_financial_abstract_wide,
 )
 
 
@@ -127,6 +128,64 @@ class TestFundamentalAdapter(unittest.TestCase):
         self.assertEqual(len(events), 2)  # duplicate + future day filtered
         self.assertEqual(dividend_payload.get("ttm_event_count"), 1)
         self.assertAlmostEqual(dividend_payload.get("ttm_cash_dividend_per_share"), 0.3, places=6)
+
+    @staticmethod
+    def _sina_abstract_wide(latest_empty: bool = False) -> pd.DataFrame:
+        """按 ak.stock_financial_abstract 的真实形状构造：行是指标，列是报告期（新→旧），
+        同名指标在不同「选项」分组里重复出现。数值取自 2026-09-29 兆易创新的真实返回。"""
+        rows = [
+            ("常用指标", "归母净利润", 6.856786e9, 1.461248e9, 5.754756e8),
+            ("常用指标", "营业总收入", 1.156576e10, 4.188076e9, 4.150309e9),
+            ("常用指标", "经营现金流量净额", 6.048341e9, 1.783057e9, 9.578209e8),
+            ("常用指标", "净资产收益率(ROE)", 23.13, 6.12, 3.41),
+            ("常用指标", "毛利率", 63.13045, 57.07672, 37.21007),
+            ("成长能力", "归母净利润", 6.856786e9, 1.461248e9, 5.754756e8),
+            ("成长能力", "营业总收入增长率", 178.6723, 119.3787, 14.99766),
+            ("成长能力", "归属母公司净利润增长率", 1091.499, 522.7881, 11.31056),
+        ]
+        df = pd.DataFrame(rows, columns=["选项", "指标", "20260630", "20260331", "20250630"])
+        if latest_empty:
+            df.insert(2, "20260930", float("nan"))
+        return df
+
+    def test_parse_sina_abstract_wide_table(self) -> None:
+        parsed = _parse_financial_abstract_wide(self._sina_abstract_wide())
+        self.assertEqual(parsed["report_date"], "2026-06-30")
+        self.assertEqual(parsed["revenue"], 1.156576e10)
+        self.assertEqual(parsed["net_profit_parent"], 6.856786e9)
+        self.assertEqual(parsed["operating_cash_flow"], 6.048341e9)
+        self.assertEqual(parsed["roe"], 23.13)
+        self.assertAlmostEqual(parsed["gross_margin"], 63.13045)
+        self.assertAlmostEqual(parsed["revenue_yoy"], 178.6723)
+        self.assertAlmostEqual(parsed["net_profit_yoy"], 1091.499)
+
+    def test_parse_sina_abstract_skips_empty_latest_period(self) -> None:
+        parsed = _parse_financial_abstract_wide(self._sina_abstract_wide(latest_empty=True))
+        self.assertEqual(parsed["report_date"], "2026-06-30")
+        self.assertEqual(parsed["revenue"], 1.156576e10)
+
+    def test_parse_sina_abstract_rejects_long_format(self) -> None:
+        long_df = pd.DataFrame({"股票代码": ["600519"], "营业总收入": [1000.0]})
+        self.assertIsNone(_parse_financial_abstract_wide(long_df))
+
+    def test_fundamental_bundle_parses_real_sina_shape(self) -> None:
+        """旧测试用逐行格式冒充 stock_financial_abstract，真实接口却返回宽表，导致线上全是 N/A。"""
+        adapter = AkshareFundamentalAdapter()
+        with patch.object(
+            adapter,
+            "_call_df_candidates",
+            side_effect=[(self._sina_abstract_wide(), "stock_financial_abstract", [])]
+            + [(None, None, [])] * 10,
+        ):
+            result = adapter.get_fundamental_bundle("603986")
+
+        report = result["earnings"]["financial_report"]
+        self.assertEqual(report["report_date"], "2026-06-30")
+        self.assertEqual(report["revenue"], 1.156576e10)
+        self.assertEqual(report["roe"], 23.13)
+        self.assertAlmostEqual(result["growth"]["revenue_yoy"], 178.6723)
+        self.assertAlmostEqual(result["growth"]["net_profit_yoy"], 1091.499)
+        self.assertIn("growth:stock_financial_abstract", result["source_chain"])
 
     def test_build_dividend_payload_returns_empty_when_code_not_matched(self) -> None:
         now = datetime.now().strftime("%Y-%m-%d")

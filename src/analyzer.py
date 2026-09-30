@@ -3829,15 +3829,43 @@ class GeminiAnalyzer:
             ttm_cash = dividend_metrics.get("ttm_cash_dividend_per_share", "N/A")
             ttm_count = dividend_metrics.get("ttm_event_count", "N/A")
             report_date = financial_report.get("report_date", "N/A")
+            growth_block = (
+                fundamental_context.get("growth", {})
+                if isinstance(fundamental_context, dict)
+                else {}
+            )
+            growth_data = growth_block.get("data", {}) if isinstance(growth_block, dict) else {}
+            growth_data = growth_data if isinstance(growth_data, dict) else {}
+
+            def _signed_amount(value: Any) -> str:
+                # 带符号的「亿元/万元」；_format_amount 不处理负数（现金流常为负）
+                v = _safe_float(value, default=math.nan)
+                if not math.isfinite(v):
+                    return "N/A"
+                sign = "-" if v < 0 else ""
+                a = abs(v)
+                if a >= 1e8:
+                    return f"{sign}{a / 1e8:.2f} 亿元"
+                if a >= 1e4:
+                    return f"{sign}{a / 1e4:.2f} 万元"
+                return f"{sign}{a:.0f} 元"
+
+            def _pct(value: Any) -> str:
+                v = _safe_float(value, default=math.nan)
+                return f"{v:.2f}%" if math.isfinite(v) else "N/A"
+
             prompt += f"""
 ### 财报与分红（价值投资口径）
 | 指标 | 数值 | 说明 |
 |------|------|------|
 | 最近报告期 | {report_date} | 来自结构化财报字段 |
-| 营业收入 | {financial_report.get('revenue', 'N/A')} | |
-| 归母净利润 | {financial_report.get('net_profit_parent', 'N/A')} | |
-| 经营现金流 | {financial_report.get('operating_cash_flow', 'N/A')} | |
-| ROE | {financial_report.get('roe', 'N/A')} | |
+| 营业收入 | {_signed_amount(financial_report.get('revenue'))} | 报告期累计 |
+| 营收同比 | {_pct(growth_data.get('revenue_yoy'))} | 与上年同期累计相比 |
+| 归母净利润 | {_signed_amount(financial_report.get('net_profit_parent'))} | 报告期累计 |
+| 归母净利润同比 | {_pct(growth_data.get('net_profit_yoy'))} | 与上年同期累计相比 |
+| 经营现金流 | {_signed_amount(financial_report.get('operating_cash_flow'))} | 报告期累计 |
+| ROE | {_pct(financial_report.get('roe'))} | 报告期累计，季报/中报未年化（中报约为全年的一半） |
+| 毛利率 | {_pct(growth_data.get('gross_margin'))} | |
 | 近12个月每股现金分红 | {ttm_cash} | 仅现金分红、税前口径 |
 | TTM 股息率 | {ttm_yield} | 公式：近12个月每股现金分红 / 当前价格 × 100% |
 | TTM 分红事件数 | {ttm_count} | |

@@ -39,6 +39,59 @@ class _DummyBoardFetcher:
 
 
 class TestFundamentalContext(unittest.TestCase):
+    def setUp(self) -> None:
+        # 财务摘要从 2026-09-30 起单独取数；各用例默认给空结果，避免单元测试真的访问新浪
+        patcher = patch(
+            "data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_financial_summary",
+            return_value={"growth": {}, "earnings": {}, "source_chain": [], "errors": []},
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_financial_summary_survives_bundle_timeout(self) -> None:
+        """整包超时（线上常态）时，单独限时取到的财报仍要进入 growth / earnings。"""
+        manager = DataFetcherManager(fetchers=[])
+        cfg = SimpleNamespace(
+            enable_fundamental_pipeline=True,
+            fundamental_cache_ttl_seconds=0,
+            fundamental_stage_timeout_seconds=3.0,
+            fundamental_fetch_timeout_seconds=0.5,
+            fundamental_retry_max=1,
+        )
+        summary = {
+            "growth": {"revenue_yoy": 178.67, "net_profit_yoy": 1091.5, "roe": 23.13, "gross_margin": 63.13},
+            "earnings": {"financial_report": {
+                "report_date": "2026-06-30", "revenue": 1.156576e10, "net_profit_parent": 6.856786e9,
+                "operating_cash_flow": 6.048341e9, "roe": 23.13,
+            }},
+            "source_chain": ["growth:stock_financial_abstract"],
+            "errors": [],
+        }
+        bundle_calls = []
+
+        def slow_bundle(_self, stock_code, include_financials=True):
+            bundle_calls.append(include_financials)
+            time.sleep(2.0)  # 超过 0.5 秒的单次超时
+            return {"growth": {}, "earnings": {}, "institution": {}, "source_chain": [], "errors": []}
+
+        with patch("src.config.get_config", return_value=cfg), \
+                patch.object(manager, "get_realtime_quote", return_value=None), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_financial_summary",
+                      return_value=summary), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_fundamental_bundle",
+                      new=slow_bundle), \
+                patch.object(manager, "get_capital_flow_context", return_value={"status": "partial", "source_chain": []}), \
+                patch.object(manager, "get_dragon_tiger_context", return_value={"status": "partial", "source_chain": []}), \
+                patch.object(manager, "get_board_context", return_value={"status": "partial", "source_chain": []}):
+            ctx = manager.get_fundamental_context("603986")
+
+        self.assertEqual(bundle_calls, [False])  # 整包不再重复取财报
+        self.assertEqual(ctx["earnings"]["status"], "ok")
+        self.assertEqual(ctx["earnings"]["data"]["financial_report"]["revenue"], 1.156576e10)
+        self.assertEqual(ctx["growth"]["status"], "ok")
+        self.assertAlmostEqual(ctx["growth"]["data"]["revenue_yoy"], 178.67)
+        self.assertTrue(any("timeout" in str(e) for e in ctx["earnings"]["errors"]))
+
     def test_offshore_market_returns_not_supported_when_adapter_empty(self) -> None:
         """When yfinance adapter has no data, offshore (US/HK) status is not_supported.
 

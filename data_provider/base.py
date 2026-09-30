@@ -3215,7 +3215,33 @@ class DataFetcherManager:
             [valuation_err] if valuation_err else [],
         )
 
-        # growth / earnings / institution (one AkShare call)
+        # 财务摘要单独限时：整包里还有多个东方财富接口，常常整包超时（本机 13~14 秒 vs 超时 8 秒，
+        # CI 上东方财富不可达更慢），超时会连 1.5 秒就能拿到的新浪财报一起丢掉。
+        fin_summary: Dict[str, Any] = {}
+        fin_errors: List[str] = []
+        fin_ms = 0
+        fin_timeout = min(fetch_timeout, remaining_seconds)
+        if fin_timeout > 0:
+            fin_payload, fin_err_msg, fin_ms = self._run_with_retry(
+                lambda: self._fundamental_adapter.get_financial_summary(stock_code),
+                fin_timeout,
+                "fundamental_financials",
+            )
+            _consume_budget(fin_ms)
+            if isinstance(fin_payload, dict):
+                fin_summary = fin_payload
+                fin_errors = [str(e) for e in fin_payload.get("errors", [])]
+            elif fin_err_msg:
+                fin_errors = [fin_err_msg]
+        fin_status = "ok" if fin_summary.get("earnings", {}).get("financial_report") else "failed"
+        fin_chain = self._normalize_source_chain(
+            fin_summary.get("source_chain", []),
+            "fundamental_financials",
+            fin_status,
+            fin_ms,
+        )
+
+        # growth / earnings / institution (one AkShare call; 财务摘要已在上面取过)
         if remaining_seconds <= 0:
             bundle_status = "failed"
             bundle_payload: Dict[str, Any] = {}
@@ -3224,7 +3250,7 @@ class DataFetcherManager:
         else:
             bundle_timeout = min(fetch_timeout, remaining_seconds)
             bundle_payload, bundle_err_msg, bundle_ms = self._run_with_retry(
-                lambda: self._fundamental_adapter.get_fundamental_bundle(stock_code),
+                lambda: self._fundamental_adapter.get_fundamental_bundle(stock_code, include_financials=False),
                 bundle_timeout,
                 "fundamental_bundle",
             )
@@ -3266,6 +3292,12 @@ class DataFetcherManager:
         else:
             institution_payload = dict(institution_payload)
 
+        for key, value in (fin_summary.get("growth") or {}).items():
+            growth_payload.setdefault(key, value)
+        fin_report = (fin_summary.get("earnings") or {}).get("financial_report")
+        if fin_report and not earnings_payload.get("financial_report"):
+            earnings_payload["financial_report"] = fin_report
+
         # Derive TTM dividend yield from already-fetched quote price; avoid extra quote calls.
         earnings_extra_errors: List[str] = []
         dividend_payload = earnings_payload.get("dividend")
@@ -3302,8 +3334,8 @@ class DataFetcherManager:
 
         adapter_errors = list(bundle_payload.get("errors", [])) if isinstance(bundle_payload, dict) else []
         adapter_errors.extend(bundle_errors)
-        growth_errors = list(adapter_errors)
-        earnings_errors = list(adapter_errors)
+        growth_errors = fin_errors + adapter_errors
+        earnings_errors = fin_errors + adapter_errors
         earnings_errors.extend(earnings_extra_errors)
         institution_errors = list(adapter_errors)
 
@@ -3314,13 +3346,13 @@ class DataFetcherManager:
         result_ctx["growth"] = self._build_fundamental_block(
             growth_status,
             growth_payload,
-            bundle_chain,
+            fin_chain + bundle_chain,
             growth_errors,
         )
         result_ctx["earnings"] = self._build_fundamental_block(
             earnings_status,
             earnings_payload,
-            bundle_chain,
+            fin_chain + bundle_chain,
             earnings_errors,
         )
         result_ctx["institution"] = self._build_fundamental_block(
