@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any, List
 
 from src.report_language import normalize_report_language
@@ -37,25 +36,29 @@ def format_market_structure_prompt_section(
         if isinstance(primary_theme, dict) and primary_theme.get("name")
         else ""
     )
+    # 当天没有任何市场层面的题材证据（CI 上东财板块/概念接口不可达时就是这样），这一段只剩
+    # 「位置 unknown/edge + 缺失清单」，模型会照抄成报告里的「成分股排行数据缺失」。整段不写。
+    if not (active_themes or leading_concepts or leading_industries):
+        return ""
+    # 缺失证据清单和 *_partial 这类数据状态标签是内部诊断，不交给模型（数据本身照旧进信号记录）；
+    # 「没有证据不要断言龙头」的约束保留。
     risk_tags = [
-        str(item.get("code") or item.get("message") or "").strip()
-        for item in stock_position.get("risk_tags") or []
-        if isinstance(item, dict) and str(item.get("code") or item.get("message") or "").strip()
+        tag for tag in (
+            str(item.get("code") or item.get("message") or "").strip()
+            for item in stock_position.get("risk_tags") or []
+            if isinstance(item, dict)
+        )
+        if tag and "partial" not in tag
     ]
-    missing_fields = _string_values(stock_position.get("missing_fields"))
-    data_quality = market_theme.get("data_quality")
-    if isinstance(data_quality, dict):
-        missing_fields.extend(_string_values(data_quality.get("missing_fields")))
-    missing_fields = list(dict.fromkeys(missing_fields))
 
     if language == "en":
-        lines = _format_en(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags, missing_fields)
+        lines = _format_en(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags)
         return "\n".join(lines) + "\n"
     if language == "ko":
-        lines = _format_ko(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags, missing_fields)
+        lines = _format_ko(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags)
         return "\n".join(lines) + "\n"
 
-    lines = _format_zh(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags, missing_fields)
+    lines = _format_zh(context, stock_position, active_themes, leading_concepts, leading_industries, primary_name, risk_tags)
     return "\n".join(lines) + "\n"
 
 
@@ -67,7 +70,6 @@ def _format_en(
     leading_industries: List[str],
     primary_name: str,
     risk_tags: List[str],
-    missing_fields: List[str],
 ) -> List[str]:
     lines = [
         "\n## Market Structure Context",
@@ -85,8 +87,6 @@ def _format_en(
     lines.append(f"- Stock role: {stock_position.get('stock_role', 'unknown')}")
     if risk_tags:
         lines.append(f"- Risk tags: {', '.join(risk_tags)}")
-    if missing_fields:
-        lines.append(f"- Missing evidence: {', '.join(missing_fields)}")
     lines.append("- Guardrail: do not claim leader-stock status without constituent or leader evidence.")
     return lines
 
@@ -99,7 +99,6 @@ def _format_zh(
     leading_industries: List[str],
     primary_name: str,
     risk_tags: List[str],
-    missing_fields: List[str],
 ) -> List[str]:
     lines = [
         "\n## 市场结构上下文",
@@ -117,8 +116,6 @@ def _format_zh(
     lines.append(f"- 个股位置：{stock_position.get('stock_role', 'unknown')}")
     if risk_tags:
         lines.append(f"- 风险标签：{'，'.join(risk_tags)}")
-    if missing_fields:
-        lines.append(f"- 缺失证据：{'，'.join(missing_fields)}")
     lines.append("- 约束：没有成分股或 leader_stocks 证据时，不要断言个股是题材龙头。")
     return lines
 
@@ -131,7 +128,6 @@ def _format_ko(
     leading_industries: List[str],
     primary_name: str,
     risk_tags: List[str],
-    missing_fields: List[str],
 ) -> List[str]:
     lines = [
         "\n## 시장 구조 컨텍스트",
@@ -149,8 +145,6 @@ def _format_ko(
     lines.append(f"- 종목 위치: {stock_position.get('stock_role', '알 수 없음')}")
     if risk_tags:
         lines.append(f"- 리스크 태그: {', '.join(risk_tags)}")
-    if missing_fields:
-        lines.append(f"- 부족한 근거: {', '.join(missing_fields)}")
     lines.append("- 제약 규칙: 구성종목이나 leader_stocks 근거가 없다면 종목을 테마 선도주로 단정하지 마십시오.")
     return lines
 
@@ -173,14 +167,3 @@ def _item_names(value: Any, *, limit: int) -> List[str]:
         if len(names) >= limit:
             break
     return names
-
-
-def _string_values(value: Any) -> List[str]:
-    if not isinstance(value, Iterable) or isinstance(value, (str, bytes, dict)):
-        return []
-    normalized: List[str] = []
-    for item in value:
-        text = str(item or "").strip()
-        if text:
-            normalized.append(text)
-    return normalized
