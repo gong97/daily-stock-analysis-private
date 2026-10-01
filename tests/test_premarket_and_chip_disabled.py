@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote  # noqa: E402
 from src.core import pipeline as pipeline_module  # noqa: E402
-from src.core.pipeline import StockAnalysisPipeline, _is_premarket  # noqa: E402
+from src.core.pipeline import StockAnalysisPipeline, _no_session_yet  # noqa: E402
 from src.core import trading_calendar  # noqa: E402
 from src.stock_analyzer import TrendAnalysisResult, TrendStatus  # noqa: E402
 
@@ -50,13 +50,18 @@ def _pipeline(**config_overrides):
 @unittest.skipUnless(trading_calendar._XCALS_AVAILABLE, "exchange_calendars not installed")
 class TestIsPremarket(unittest.TestCase):
     def test_cn_phases(self):
-        self.assertTrue(_is_premarket("cn", datetime(2026, 9, 30, 3, 0, tzinfo=SHANGHAI)))
-        self.assertFalse(_is_premarket("cn", datetime(2026, 9, 30, 10, 0, tzinfo=SHANGHAI)))
-        self.assertFalse(_is_premarket("cn", datetime(2026, 9, 30, 16, 0, tzinfo=SHANGHAI)))
+        self.assertTrue(_no_session_yet("cn", datetime(2026, 9, 30, 3, 0, tzinfo=SHANGHAI)))
+        self.assertFalse(_no_session_yet("cn", datetime(2026, 9, 30, 10, 0, tzinfo=SHANGHAI)))
+        self.assertFalse(_no_session_yet("cn", datetime(2026, 9, 30, 16, 0, tzinfo=SHANGHAI)))
+
+    def test_cn_holiday_counts_as_no_session(self):
+        # 9-30 的日报实际在北京 10-01 凌晨跑：国庆休市，阶段是 non_trading，也不能叠加
+        self.assertTrue(_no_session_yet("cn", datetime(2026, 10, 1, 3, 40, tzinfo=SHANGHAI)))
+        self.assertTrue(_no_session_yet("cn", datetime(2026, 10, 3, 14, 0, tzinfo=SHANGHAI)))  # 周六
 
     def test_unknown_market_is_not_premarket(self):
         # 无法判断时保持原有行为（照常叠加）
-        self.assertFalse(_is_premarket(None, datetime(2026, 9, 30, 3, 0)))
+        self.assertFalse(_no_session_yet(None, datetime(2026, 9, 30, 3, 0)))
 
 
 @unittest.skipUnless(trading_calendar._XCALS_AVAILABLE, "exchange_calendars not installed")
@@ -128,6 +133,11 @@ class TestChipDisabled(unittest.TestCase):
             enabled = analyzer._format_prompt(base, "贵州茅台")
         self.assertNotIn("筹码分布数据", disabled)
         self.assertIn("筹码分布数据", enabled)
+        # 「重点关注」也不再问筹码（2026-09-30 报告里模型因此写了「部分筹码……缺失」）
+        focus = lambda p: p[p.index("### 重点关注"):p.index("### 决策仪表盘要求")]  # noqa: E731
+        self.assertNotIn("筹码", focus(disabled))
+        self.assertIn("筹码", focus(enabled))
+        self.assertIn("1. ❓", focus(disabled))
 
     def test_context_pack_omits_chip_block_when_disabled(self):
         from src.services.analysis_context_builder import AnalysisContextBuilder, PipelineAnalysisArtifacts

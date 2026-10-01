@@ -115,16 +115,19 @@ logger = logging.getLogger(__name__)
 # 100 天约 137 根：够过热风险旗标的 60 日高位 + 120 日量能常态，长假也有余量
 DAILY_FETCH_DAYS = 100
 
-def _is_premarket(market: Optional[str], market_now: datetime) -> bool:
-    """今天的交易还没开始：此时「实时价」就是上一交易日收盘，库里也已有那根完整日线。
+def _no_session_yet(market: Optional[str], market_now: datetime) -> bool:
+    """今天还没有开盘交易（盘前，或节假日/周末）：此时「实时价」就是上一交易日收盘，库里也已有那根完整日线。
 
-    盘前叠加实时行情只会出错：给均线追加一根日期为今天、价格等于昨收的虚拟 K 线（昨收被算两次），
+    这时叠加实时行情只会出错：给均线追加一根日期为今天、价格等于昨收的虚拟 K 线（昨收被算两次），
     把提示词里的 today 改标成今天的估算值（上一交易日从 today/yesterday 里消失），
     并让技术面被标成 partial、置信度不得为「高」。CI 定时任务实际在北京凌晨 2~5 点运行，正是盘前。
-    判断失败时按「不是盘前」处理，保持原有行为。
+    2026-10-01 补上非交易日：9-30 那次运行落在北京 10-01 凌晨（国庆休市），阶段是 non_trading 不是
+    premarket，于是照旧叠加，technical 又成了 partial。
+    判断失败时按「已开盘」处理，保持原有行为。
     """
     try:
-        return infer_market_phase(market, current_time=market_now) == MarketPhase.PREMARKET
+        return infer_market_phase(market, current_time=market_now) in (
+            MarketPhase.PREMARKET, MarketPhase.NON_TRADING)
     except Exception:
         return False
 
@@ -1075,14 +1078,14 @@ class StockAnalysisPipeline:
             }
 
         # Issue #234：盘中分析使用实时 OHLC 与趋势 MA 覆盖 today。
-        # 防护条件：trend_result.ma5 > 0 表示 MA 计算已成功且数据量充足；盘前不覆盖（见 _is_premarket）。
+        # 防护条件：trend_result.ma5 > 0 表示 MA 计算已成功且数据量充足；盘前、非交易日不覆盖（见 _no_session_yet）。
         overlay_market = get_market_for_stock(normalize_stock_code(enhanced.get('code', '')))
         overlay_now = get_market_now(overlay_market)
         if (
             realtime_quote
             and trend_result
             and trend_result.ma5 > 0
-            and not _is_premarket(overlay_market, overlay_now)
+            and not _no_session_yet(overlay_market, overlay_now)
         ):
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
@@ -2590,7 +2593,7 @@ class StockAnalysisPipeline:
         market_today = market_now.date()
         if market and not is_market_open(market, market_today):
             return df
-        if _is_premarket(market, market_now):
+        if _no_session_yet(market, market_now):
             return df
 
         last_val = df['date'].max()

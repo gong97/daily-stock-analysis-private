@@ -88,6 +88,11 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
             Config._instance = None
             self.config = Config._load_from_env()
         self.pipeline = StockAnalysisPipeline(config=self.config)
+        # 这些用例测的是「已开盘时怎么叠加」，用的是真实的 date.today()；周末、节假日、盘前
+        # _no_session_yet 会让叠加整体跳过（见 test_premarket_and_chip_disabled），所以这里固定为已开盘。
+        session = patch("src.core.pipeline._no_session_yet", return_value=False)
+        session.start()
+        self.addCleanup(session.stop)
 
     def test_returns_unchanged_when_realtime_none(self) -> None:
         df = _make_historical_df()
@@ -187,6 +192,11 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
             Config._instance = None
             self.config = Config._load_from_env()
         self.pipeline = StockAnalysisPipeline(config=self.config)
+        # 这些用例测的是「已开盘时怎么叠加」，用的是真实的 date.today()；周末、节假日、盘前
+        # _no_session_yet 会让叠加整体跳过（见 test_premarket_and_chip_disabled），所以这里固定为已开盘。
+        session = patch("src.core.pipeline._no_session_yet", return_value=False)
+        session.start()
+        self.addCleanup(session.stop)
 
     @patch("src.core.pipeline.get_market_now")
     @patch("src.core.pipeline.get_market_for_stock", return_value="cn")
