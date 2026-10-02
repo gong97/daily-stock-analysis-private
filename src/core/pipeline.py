@@ -96,6 +96,7 @@ from src.overheat_flags import (
     LOOKBACK_CALENDAR_DAYS as OVERHEAT_LOOKBACK_CALENDAR_DAYS,
     compute_overheat_flags,
 )
+from src.program_checklist import apply_program_checklist
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -899,6 +900,15 @@ class StockAnalysisPipeline:
                         code,
                         market_context_adjustments,
                     )
+                # 检查清单最前面插【程序】项（已检验信号，只提示、不调分；见 src/program_checklist.py）。
+                # agent 路径拿不到过热旗标，不接。
+                apply_program_checklist(
+                    result,
+                    overheat_flags=enhanced_context.get("overheat_flags"),
+                    fundamental_context=fundamental_context,
+                    language=getattr(result, "report_language", None)
+                    or getattr(self.config, "report_language", "zh"),
+                )
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
