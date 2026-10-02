@@ -269,9 +269,9 @@ class TestRenderDecisionSummary(unittest.TestCase):
         self.assertIn("市场状态：震荡 · 需观察", summary)
         self.assertIn("市场评分：52/100", summary)
         self.assertIn("信号分化", summary)
-        self.assertIn("| 宁德时代 300750.SZ | ADD | — | ¥330.00 ~ ¥336.00 | 🔴 |", summary)
-        self.assertIn("| 兆易创新 603986.SH | HOLD | — | > ¥132.50 再买 | 🟡 |", summary)
-        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | < ¥17.80 止损 | 🔴 |", summary)
+        self.assertIn("| 宁德时代 300750.SZ | ADD | — | ¥330.00 ~ ¥336.00 | 立即 |", summary)
+        self.assertIn("| 兆易创新 603986.SH | HOLD | — | > ¥132.50 再买 | 本周 |", summary)
+        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | < ¥17.80 止损 | 立即 |", summary)
 
         # 排序：CUT 排最前
         cut_pos = summary.index("隆基绿能")

@@ -22,10 +22,10 @@ _SIDE_TITLES = {
 # 所以用「包含匹配」而不是精确相等——顺序很重要，更紧急的判断要排在前面
 # （比如某个值同时含"立即"和"观察"字样时，先命中紧急档）。
 _URGENCY_MARKERS = (
-    ("立即", "🔴"),
-    ("今日", "🔴"),
-    ("本周", "🟡"),
-    ("不急", "🟢"),
+    ("立即", "立即"),
+    ("今日", "立即"),
+    ("本周", "本周"),
+    ("不急", "不急"),
 )
 
 _SUMMARY_ACTION_LABELS = {"add": "ADD", "cut": "CUT", "hold": "HOLD"}
@@ -190,11 +190,11 @@ def _summary_action_bucket(result: Any) -> str:
 
 
 def _summary_urgency_marker(dashboard: Dict[str, Any]) -> str:
-    """🔴🟡🟢：time_sensitivity 是自由字符串，用包含匹配 + 兜底。"""
+    """立即/本周/不急：time_sensitivity 是自由字符串，用包含匹配 + 兜底。"""
     time_sensitivity = str(dashboard.get("core_conclusion", {}).get("time_sensitivity") or "")
-    for marker, emoji in _URGENCY_MARKERS:
+    for marker, label in _URGENCY_MARKERS:
         if marker in time_sensitivity:
-            return emoji
+            return label
     return "—"
 
 
