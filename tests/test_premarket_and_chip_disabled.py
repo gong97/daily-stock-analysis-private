@@ -158,6 +158,23 @@ class TestChipDisabled(unittest.TestCase):
         # 质量评分口径不变：缺这个块按 missing 计，与未关闭且没取到时相同
         self.assertEqual(disabled.data_quality.overall_score, enabled.data_quality.overall_score)
 
+    def test_system_prompt_drops_chip_when_disabled(self):
+        """系统提示词里的 chip_structure 模板、「筹码健康」检查项、「量价/波动/筹码」都去掉。"""
+        from src.analyzer import GeminiAnalyzer
+
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+        for legacy in (True, False):
+            with patch.object(GeminiAnalyzer, "_get_skill_prompt_sections", return_value=("", "", legacy)):
+                analyzer._config_override = SimpleNamespace(enable_chip_distribution=False)
+                off = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+                analyzer._config_override = SimpleNamespace(enable_chip_distribution=True)
+                on = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+            self.assertNotIn("筹码", off.split("## Output Language")[0] if "## Output Language" in off else off)
+            self.assertNotIn("chip_structure", off)
+            self.assertIn("chip_structure", on)
+            self.assertIn('"action_checklist": [', off)
+
 
 if __name__ == "__main__":
     unittest.main()

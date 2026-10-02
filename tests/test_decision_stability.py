@@ -362,3 +362,22 @@ def test_refines_hold_pullback_near_support_as_shakeout_watch() -> None:
     assert result.decision_type == "hold"
     assert result.operation_advice == "洗盘观察"
     assert "更适合按洗盘观察处理" in result.risk_warning
+
+
+def test_structural_rewrite_is_labelled_in_position_advice() -> None:
+    """程序改写的仓位建议带来源标注；模型原填的「建议仓位」不改写，只注明结论已改为观望。"""
+    result = _result(decision_type="sell", operation_advice="卖出", score=30, current_price=30.4, change_pct=-2.1)
+    result.dashboard["battle_plan"] = {"position_strategy": {"suggested_position": "建议仓位：2成"}}
+
+    stabilize_decision_with_structure(
+        result,
+        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
+        _fund_flow(main=800_000, five_day=1_200_000),
+    )
+
+    advice = result.dashboard["core_conclusion"]["position_advice"]
+    assert advice["no_position"].endswith("（程序改写：结构稳定规则）")
+    assert advice["has_position"].endswith("（程序改写：结构稳定规则）")
+    assert result.dashboard["battle_plan"]["position_strategy"]["suggested_position"] == (
+        "建议仓位：2成（模型原建议；结论已被结构稳定规则改为观望）"
+    )

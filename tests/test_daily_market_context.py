@@ -132,7 +132,8 @@ def test_reuses_same_day_market_review_history_without_running_review() -> None:
     assert context.region == "cn"
     assert "市场退潮" in context.summary
     assert "high_risk" in context.risk_tags
-    assert "low_position_cap" in context.risk_tags
+    # 2026-10-01 起「仓位上限」不再作为风险标签（个股护栏只认红绿灯），数值仍在 position_cap
+    assert context.position_cap == "30%"
     run_review.assert_not_called()
 
 
@@ -164,7 +165,8 @@ def test_reuses_jp_market_review_history_without_normalizing_to_cn() -> None:
     assert context.region == "jp"
     assert context.summary.startswith("日股退潮")
     assert "high_risk" in context.risk_tags
-    assert "low_position_cap" in context.risk_tags
+    # 2026-10-01 起「仓位上限」不再作为风险标签（个股护栏只认红绿灯），数值仍在 position_cap
+    assert context.position_cap == "30%"
     run_review.assert_not_called()
 
 
@@ -1082,7 +1084,8 @@ def test_extract_summary_prefers_region_scoped_section_over_generic_fallback_tit
     assert context is not None
     assert context.summary.startswith("大盘退潮")
     assert "high_risk" in context.risk_tags
-    assert "low_position_cap" in context.risk_tags
+    # 2026-10-01 起「仓位上限」不再作为风险标签（个股护栏只认红绿灯），数值仍在 position_cap
+    assert context.position_cap == "30%"
 
 
 def test_region_scoped_market_light_risk_signals_survive_neutral_summary() -> None:
@@ -1117,11 +1120,12 @@ def test_region_scoped_market_light_risk_signals_survive_neutral_summary() -> No
     safe_payload = context.to_safe_dict()
     assert safe_payload["summary"] == "市场小幅震荡，结构分化。"
     assert "high_risk" in safe_payload["risk_tags"]
-    assert "low_position_cap" in safe_payload["risk_tags"]
+    assert safe_payload["market_light_status"] == "red"
     assert safe_payload["position_cap"] == "20%"
 
 
-def test_yellow_market_light_status_marks_context_conservative() -> None:
+def test_yellow_market_light_status_is_not_tagged_conservative() -> None:
+    """2026-10-01 起黄灯（需观察）不再标 conservative：护栏与提示词标签都只认红灯。"""
     context = DailyMarketContextService(
         db_manager=MagicMock(),
         today_fn=lambda: date(2026, 6, 6),
@@ -1139,7 +1143,8 @@ def test_yellow_market_light_status_marks_context_conservative() -> None:
     )
 
     assert context is not None
-    assert "conservative" in context.to_safe_dict()["risk_tags"]
+    assert context.to_safe_dict()["risk_tags"] == []
+    assert context.to_safe_dict()["market_light_status"] == "yellow"
 
 
 def test_daily_market_context_keeps_jp_kr_regions_and_labels() -> None:

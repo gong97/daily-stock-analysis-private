@@ -1495,6 +1495,18 @@ def _bound_hold_watch_sentiment_score(
     )
 
 
+_STRUCTURAL_REWRITE_NOTE = {
+    "zh": "（程序改写：结构稳定规则）",
+    "en": " (rewritten by the structure rule)",
+    "ko": " (구조 규칙으로 수정됨)",
+}
+_STRUCTURAL_KEPT_POSITION_NOTE = {
+    "zh": "（模型原建议；结论已被结构稳定规则改为观望）",
+    "en": " (model's original sizing; the decision was changed to hold by the structure rule)",
+    "ko": " (모델 원래 제안; 결론은 구조 규칙으로 관망으로 변경됨)",
+}
+
+
 def _apply_hold_watch_dashboard(
     result: "AnalysisResult",
     language: str,
@@ -1524,8 +1536,18 @@ def _apply_hold_watch_dashboard(
     if not isinstance(position_advice, dict):
         position_advice = {}
         core["position_advice"] = position_advice
-    position_advice["no_position"] = no_position
-    position_advice["has_position"] = has_position
+    # 标明是程序改写的，免得读的人当成模型原话（所有报告渲染都直接用这段文字）
+    note = _STRUCTURAL_REWRITE_NOTE.get(language, _STRUCTURAL_REWRITE_NOTE["zh"])
+    position_advice["no_position"] = f"{no_position}{note}"
+    position_advice["has_position"] = f"{has_position}{note}"
+    # 「建议仓位：X成」是模型按原结论（买入/卖出）填的，这里不改写，只注明——否则会出现
+    # 「结论观望、建议仓位 5 成」而看不出哪个是程序改的
+    battle_plan = dashboard.get("battle_plan")
+    strategy = battle_plan.get("position_strategy") if isinstance(battle_plan, dict) else None
+    if isinstance(strategy, dict) and str(strategy.get("suggested_position") or "").strip():
+        kept = _STRUCTURAL_KEPT_POSITION_NOTE.get(language, _STRUCTURAL_KEPT_POSITION_NOTE["zh"])
+        if kept not in str(strategy["suggested_position"]):
+            strategy["suggested_position"] = f"{strategy['suggested_position']}{kept}"
 
     stability = {
         "applied": True,
@@ -1966,6 +1988,23 @@ def populate_decision_action_fields(
     result.action = fields["action"]
     result.action_label = fields["action_label"]
     return result
+
+
+def _strip_chip_from_system_prompt(prompt: str) -> str:
+    """配置关闭筹码（ENABLE_CHIP_DISTRIBUTION=false）时，把系统提示词里要模型填、要模型判断筹码的地方去掉。
+
+    不去掉的话模型只能在报告里写「筹码数据缺失」「筹码健康：无法判断」（2026-09-30 报告）。
+    用户提示词那边见 _format_prompt 的 chip_off。
+    """
+    out = re.sub(r'\},\n\s*"chip_structure": \{[^{}]*\}', "}", prompt)  # JSON 模板里的 chip_structure 块
+    out = re.sub(r'\n\s*"✅/⚠️/❌ 检查项5：筹码健康",', "", out)
+    out = out.replace("检查项6：PE估值合理", "检查项5：PE估值合理")
+    out = out.replace("\n- ✅ 筹码集中健康", "")
+    # 旧版提示词经 agent/skills/defaults.py 拼进来的整节「效率优先（筹码结构）」
+    out = re.sub(r"\n### \d+\. 效率优先（筹码结构）\n(?:- [^\n]*\n)+", "\n", out)
+    out = out.replace("量价/波动/筹码是否支持判断", "量价/波动是否支持判断")
+    out = out.replace("量能/筹码、主力资金流向", "量能、主力资金流向")
+    return out
 
 
 class GeminiAnalyzer:
@@ -2475,6 +2514,8 @@ class GeminiAnalyzer:
                 .replace("{default_skill_policy_section}", default_skill_policy_section)
                 .replace("{skills_section}", skills_section)
             )
+        if not getattr(self._get_runtime_config(), "enable_chip_distribution", True):
+            base_prompt = _strip_chip_from_system_prompt(base_prompt)
         if lang == "en":
             return base_prompt + """
 

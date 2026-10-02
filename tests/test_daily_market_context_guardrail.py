@@ -68,45 +68,42 @@ def test_conservative_market_context_softens_aggressive_buy() -> None:
     core = result.dashboard["core_conclusion"]
     assert core["one_sentence"] == result.operation_advice
     assert core["position_advice"] == {
-        "no_position": "大盘环境偏谨慎，暂不开新仓，等待风险缓解或确认信号。",
-        "has_position": "仅保留小仓观察，暂不扩大仓位；若跌破风控位优先降低仓位。",
+        "no_position": "大盘处于红灯（偏防守），暂不开新仓，等待风险缓解或确认信号。（程序改写：大盘红灯）",
+        "has_position": "仅保留小仓观察，暂不扩大仓位；若跌破风控位优先降低仓位。（程序改写：大盘红灯）",
     }
     position_strategy = result.dashboard["battle_plan"]["position_strategy"]
     assert position_strategy == {
-        "suggested_position": "小仓/低仓位",
-        "entry_plan": "大盘环境偏谨慎，暂不开新仓，等待风险缓解或确认信号。",
+        "suggested_position": "小仓/低仓位（程序改写：大盘红灯）",
+        "entry_plan": "大盘处于红灯（偏防守），暂不开新仓，等待风险缓解或确认信号。（程序改写：大盘红灯）",
         "risk_control": "大盘风险未缓解前不扩大仓位，严格控制回撤。",
     }
     phase_decision = result.dashboard["phase_decision"]
-    assert any("大盘环境" in item for item in phase_decision["data_limitations"])
+    assert any("大盘处于红灯" in item for item in phase_decision["data_limitations"])
     assert "大盘环境" in phase_decision["confidence_reason"]
 
 
-def test_position_cap_only_market_context_softens_aggressive_buy() -> None:
-    cases = [
-        ("zh", "市场震荡，仓位不超过30%。", "立即买入并积极加仓", "高", "观望"),
-        ("en", "Major indices are mixed. Position limit 30%.", "Buy now and add aggressively.", "High", "Watch"),
-    ]
-    for language, summary, advice, confidence, expected_advice in cases:
-        result = _result()
-        result.operation_advice = advice
-        result.confidence_level = confidence
+def _aggressive_buy_after(context: dict) -> list:
+    result = _result()
+    result.operation_advice = "立即买入并积极加仓"
+    result.confidence_level = "高"
+    return apply_daily_market_context_guardrail(result, daily_market_context=context, report_language="zh")
 
-        adjustments = apply_daily_market_context_guardrail(
-            result,
-            daily_market_context={
-                "region": "us" if language == "en" else "cn",
-                "trade_date": "2026-06-06",
-                "summary": summary,
-                "risk_tags": [],
-                "position_cap": "30%",
-            },
-            report_language=language,
-        )
 
-        assert "daily_market_context_buy_softened" in adjustments
-        assert result.decision_type == "hold"
-        assert result.operation_advice == expected_advice
+def test_only_red_light_softens_when_light_is_known() -> None:
+    """2026-10-01 起只认结构化红绿灯：黄灯、绿灯不软化，哪怕复盘文字里有「谨慎」「观望」「仓位上限」。"""
+    words = "大盘震荡，建议谨慎观望，等待确认，仓位上限30%。"
+    base = {"region": "cn", "trade_date": "2026-06-06", "summary": words, "risk_tags": [], "position_cap": "30%"}
+    assert _aggressive_buy_after({**base, "market_light_status": "yellow"}) == []
+    assert _aggressive_buy_after({**base, "market_light_status": "green", "summary": "高风险，退潮"}) == []
+    assert "daily_market_context_buy_softened" in _aggressive_buy_after({**base, "market_light_status": "red"})
+
+
+def test_without_light_only_strong_risk_words_soften() -> None:
+    base = {"region": "cn", "trade_date": "2026-06-06", "risk_tags": []}
+    # 以前「仓位不超过 30%」「谨慎」「观望」就会软化；现在没有红绿灯时只认高风险/退潮
+    assert _aggressive_buy_after({**base, "summary": "市场震荡，建议谨慎观望，仓位不超过30%。", "position_cap": "30%"}) == []
+    assert "daily_market_context_buy_softened" in _aggressive_buy_after({**base, "summary": "大盘退潮，高风险。"})
+    assert "daily_market_context_buy_softened" in _aggressive_buy_after({**base, "summary": "", "risk_tags": ["high_risk"]})
 
 
 def test_neutral_market_context_leaves_hold_unchanged() -> None:

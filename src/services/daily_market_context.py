@@ -51,6 +51,9 @@ _RISK_PATTERNS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 )
 
 
+_STRONG_RISK_TAGS: Tuple[str, ...] = ("high_risk", "market_cooling")
+
+
 def run_market_review(**kwargs: Any) -> Any:
     """Lazy wrapper to avoid importing analyzer while prompt modules import this formatter."""
     from src.core.market_review import run_market_review as _run_market_review
@@ -68,6 +71,9 @@ class DailyMarketContext:
     risk_tags: List[str] = field(default_factory=list)
     source: str = "unknown"
     position_cap: Optional[str] = None
+    # 结构化的市场红绿灯（green/yellow/red，market_analyzer 按大盘温度分算）。个股护栏只认它，见
+    # daily_market_context_guardrail._is_conservative_context。
+    market_light_status: Optional[str] = None
     created_at: Optional[datetime] = None
     history_id: Optional[int] = None
     query_id: Optional[str] = None
@@ -83,6 +89,8 @@ class DailyMarketContext:
         }
         if self.position_cap:
             payload["position_cap"] = self.position_cap
+        if self.market_light_status:
+            payload["market_light_status"] = self.market_light_status
         return payload
 
 
@@ -612,7 +620,13 @@ class DailyMarketContextService:
         if not summary:
             return None
         risk_signal_text = _join_text_parts(summary, _extract_market_light_signal_text(scoped_payload))
-        risk_tags = _extract_risk_tags(risk_signal_text)
+        market_light_status = _extract_market_light_status(scoped_payload)
+        if market_light_status:
+            # 有红绿灯时风险标签只看红绿灯（与个股护栏同一口径）：红灯才标风险，黄灯、绿灯不标。
+            # 以前黄灯和复盘文字里的「谨慎」「观望」都会标成 conservative，提示词里几乎天天写着偏谨慎。
+            risk_tags = list(_STRONG_RISK_TAGS) if market_light_status == "red" else []
+        else:
+            risk_tags = [tag for tag in _extract_risk_tags(summary) if tag in _STRONG_RISK_TAGS]
         position_cap = _extract_position_cap(risk_signal_text)
         full_report = _extract_full_market_report(
             scoped_payload=scoped_payload,
@@ -625,6 +639,7 @@ class DailyMarketContextService:
             risk_tags=risk_tags,
             source=source,
             position_cap=position_cap,
+            market_light_status=market_light_status,
             created_at=created_at if isinstance(created_at, datetime) else None,
             history_id=history_id if isinstance(history_id, int) else None,
             query_id=query_id if isinstance(query_id, str) and query_id else None,
@@ -892,6 +907,14 @@ def _extract_summary(payload: Mapping[str, Any], fallback_summary: Optional[str]
         if text:
             return _truncate(text, 500)
     return ""
+
+
+def _extract_market_light_status(payload: Mapping[str, Any]) -> Optional[str]:
+    market_light = payload.get("market_light")
+    if not isinstance(market_light, Mapping):
+        return None
+    status = str(market_light.get("status") or "").strip().lower()
+    return status if status in ("green", "yellow", "red") else None
 
 
 def _extract_market_light_signal_text(payload: Mapping[str, Any]) -> str:

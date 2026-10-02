@@ -13,10 +13,22 @@ from src.report_language import (
 )
 
 
-_CONSERVATIVE_TAGS = {"high_risk", "market_cooling", "conservative", "low_position_cap"}
-_CONSERVATIVE_TEXT_MARKERS_ZH = ("退潮", "观望", "高风险", "谨慎", "保守", "仓位上限", "仓位不超过", "轻仓")
-_CONSERVATIVE_TEXT_MARKERS_EN = ("high risk", "risk-off", "risk off", "watch", "cautious", "conservative", "position cap", "position limit")
-_CONSERVATIVE_TEXT_MARKERS_KO = ("고위험", "관망", "위험", "신중", "보수", "비중 상한", "비중 축소", "경량")
+# 「大盘偏谨慎」只认结构化的市场红绿灯（market_analyzer 按大盘温度分算：>=60 绿、40~59 黄、<40 红），
+# 红灯才软化个股买入。2026-10-01 以前是对 LLM 写的大盘复盘做关键词匹配（「谨慎」「观望」「等待确认」
+# 「轻仓」…），黄灯也被翻成「偏谨慎」——几乎天天触发，报告里的「小仓/低仓位」多半是它换上去的。
+# 没有红绿灯数据时才退回看文字，且只认「高风险 / 退潮」这类强信号。
+# 改写后的仓位文字带上来源，所有报告渲染都直接用这段文字，读的人分得清哪句不是模型原话
+_REWRITE_NOTE = {
+    "zh": "（程序改写：大盘红灯）",
+    "en": " (rewritten: market red light)",
+    "ko": " (규칙 수정: 시장 적신호)",
+}
+_RED_LIGHT = "red"
+_KNOWN_LIGHTS = {"green", "yellow", "red"}
+_STRONG_RISK_TAGS = {"high_risk", "market_cooling"}
+_STRONG_RISK_MARKERS_ZH = ("高风险", "风险偏高", "风险较高", "退潮", "降温")
+_STRONG_RISK_MARKERS_EN = ("high risk", "elevated risk", "risk-off", "risk off", "cooling")
+_STRONG_RISK_MARKERS_KO = ("고위험",)
 _AGGRESSIVE_BUY_MARKERS_ZH = (
     "立即买入",
     "马上买入",
@@ -135,19 +147,20 @@ def _sync_softened_dashboard_fields(
 
 
 def _softened_position_advice(language: str) -> dict[str, str]:
+    note = _REWRITE_NOTE.get(language, _REWRITE_NOTE["zh"])
     if language == "en":
         return {
-            "no_position": "Do not open a new position until market risk eases or confirmation appears.",
-            "has_position": "Hold only a small position; do not increase exposure, and reduce if risk controls break.",
+            "no_position": f"Do not open a new position until market risk eases or confirmation appears.{note}",
+            "has_position": f"Hold only a small position; do not increase exposure, and reduce if risk controls break.{note}",
         }
     if language == "ko":
         return {
-            "no_position": "시장 위험이 완화되거나 확인 신호가 나오기 전까지 신규 진입하지 마세요.",
-            "has_position": "소량만 보유하고 비중을 늘리지 마세요. 리스크 관리선이 무너지면 비중을 줄이세요.",
+            "no_position": f"시장 위험이 완화되거나 확인 신호가 나오기 전까지 신규 진입하지 마세요.{note}",
+            "has_position": f"소량만 보유하고 비중을 늘리지 마세요. 리스크 관리선이 무너지면 비중을 줄이세요.{note}",
         }
     return {
-        "no_position": "大盘环境偏谨慎，暂不开新仓，等待风险缓解或确认信号。",
-        "has_position": "仅保留小仓观察，暂不扩大仓位；若跌破风控位优先降低仓位。",
+        "no_position": f"大盘处于红灯（偏防守），暂不开新仓，等待风险缓解或确认信号。{note}",
+        "has_position": f"仅保留小仓观察，暂不扩大仓位；若跌破风控位优先降低仓位。{note}",
     }
 
 
@@ -155,18 +168,18 @@ def _softened_position_strategy(language: str) -> dict[str, str]:
     position_advice = _softened_position_advice(language)
     if language == "en":
         return {
-            "suggested_position": "Small/defensive position",
+            "suggested_position": f"Small/defensive position{_REWRITE_NOTE['en']}",
             "entry_plan": position_advice["no_position"],
             "risk_control": "Do not increase exposure before market risk eases; control drawdown strictly.",
         }
     if language == "ko":
         return {
-            "suggested_position": "소량/방어적 비중",
+            "suggested_position": f"소량/방어적 비중{_REWRITE_NOTE['ko']}",
             "entry_plan": position_advice["no_position"],
             "risk_control": "시장 위험이 완화되기 전까지 비중을 늘리지 말고 낙폭을 엄격히 관리하세요.",
         }
     return {
-        "suggested_position": "小仓/低仓位",
+        "suggested_position": f"小仓/低仓位{_REWRITE_NOTE['zh']}",
         "entry_plan": position_advice["no_position"],
         "risk_control": "大盘风险未缓解前不扩大仓位，严格控制回撤。",
     }
@@ -177,11 +190,11 @@ def _append_softening_limitation(phase_decision: dict[str, Any], *, language: st
     if not isinstance(limitations, list):
         limitations = []
     if language == "en":
-        limitation = "Daily market context is conservative/high risk; aggressive buy advice was softened."
+        limitation = "The market light is red (risk-off); aggressive buy advice was softened."
     elif language == "ko":
         limitation = "대시장 환경이 보수적/고위험이라 공격적 매수 권고를 완화했습니다."
     else:
-        limitation = "大盘环境偏谨慎/高风险，已软化激进买入建议。"
+        limitation = "大盘处于红灯（偏防守），已软化激进买入建议。"
     if limitation not in limitations:
         limitations.append(limitation)
     phase_decision["data_limitations"] = limitations
@@ -201,17 +214,18 @@ def _append_softening_limitation(phase_decision: dict[str, Any], *, language: st
 def _is_conservative_context(context: Any) -> bool:
     if not isinstance(context, Mapping):
         return False
+    light = str(context.get("market_light_status") or "").strip().lower()
+    if light in _KNOWN_LIGHTS:
+        return light == _RED_LIGHT
     tags = context.get("risk_tags")
-    if isinstance(tags, list) and any(str(tag) in _CONSERVATIVE_TAGS for tag in tags):
-        return True
-    if str(context.get("position_cap") or "").strip():
+    if isinstance(tags, list) and any(str(tag) in _STRONG_RISK_TAGS for tag in tags):
         return True
     summary = str(context.get("summary") or "")
     lowered = summary.lower()
     return (
-        any(marker in summary for marker in _CONSERVATIVE_TEXT_MARKERS_ZH)
-        or any(marker in summary for marker in _CONSERVATIVE_TEXT_MARKERS_KO)
-        or any(marker in lowered for marker in _CONSERVATIVE_TEXT_MARKERS_EN)
+        any(marker in summary for marker in _STRONG_RISK_MARKERS_ZH)
+        or any(marker in summary for marker in _STRONG_RISK_MARKERS_KO)
+        or any(marker in lowered for marker in _STRONG_RISK_MARKERS_EN)
     )
 
 
