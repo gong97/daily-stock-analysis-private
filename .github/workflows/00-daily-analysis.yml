@@ -440,6 +440,8 @@ jobs:
           MAX_WORKERS: ${{ vars.MAX_WORKERS || secrets.MAX_WORKERS || '2' }}
           # 筹码分布：默认 false（云端接口不稳定）；需启用时在 Settings → Variables 添加 ENABLE_CHIP_DISTRIBUTION=true
           ENABLE_CHIP_DISTRIBUTION: ${{ vars.ENABLE_CHIP_DISTRIBUTION || secrets.ENABLE_CHIP_DISTRIBUTION || 'false' }}
+          # 决策模式：用户盘前读报告、盘中不再看，买卖结论改写成开盘前可挂的条件单（见 .env.example）
+          DECISION_MODE: ${{ vars.DECISION_MODE || 'premarket' }}
           # 基本面阶段总预算：valuation → bundle → capital_flow → dragon_tiger → boards
           # 共享这一个预算，按顺序扣减。默认 8s 是按本地网络定的，但 Actions 上
           # 光第一步 get_realtime_quote 就要 5-7s（eastmoney 被墙，要等它超时才切腾讯），

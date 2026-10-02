@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -119,8 +120,13 @@ def apply_phase_decision_guardrails(
     market_phase_summary: Optional[Dict[str, Any]],
     analysis_context_pack_overview: Optional[Dict[str, Any]],
     report_language: str = "zh",
+    decision_mode: str = "intraday",
 ) -> List[str]:
-    """Apply phase/data-quality guardrails to an AnalysisResult in place."""
+    """Apply phase/data-quality guardrails to an AnalysisResult in place.
+
+    decision_mode="premarket"（用户盘前读报告、盘中不再看）：不开盘阶段的买卖结论不再写「等待盘中确认」、
+    也不因不开盘降置信度，改写成开盘前可挂的条件单（_premarket_plan）。数据受限降置信度照旧。
+    """
 
     if result is None:
         return []
@@ -171,7 +177,17 @@ def apply_phase_decision_guardrails(
         phase in CONSERVATIVE_ACTION_PHASES
         and _has_immediate_buy_sell_signal(result, phase_decision, language=language)
     )
-    if has_non_intraday_action:
+    if has_non_intraday_action and decision_mode == "premarket":
+        phase_decision["immediate_action"] = _premarket_plan(result, phase_decision, language=language)
+        reason = _reason_text(
+            language,
+            en="Pre-market decision mode: rewritten as orders to place before the open (prices are the model's, untested).",
+            zh="盘前决策模式：已改写为开盘前可挂的条件单（价格为模型给出的狙击点位，未经检验）。",
+            ko="장전 결정 모드: 개장 전에 걸 수 있는 조건부 주문으로 바꿨습니다(가격은 모델 제시값, 미검증).",
+        )
+        _append_reason(phase_decision, reason)
+        adjustments.append("premarket_plan_written")
+    elif has_non_intraday_action:
         phase_decision["immediate_action"] = _safe_wait_action(language)
         reason = _reason_text(
             language,
@@ -401,6 +417,13 @@ def _adjustment_limitation_text(adjustment: str, *, language: str) -> str:
             zh="非盘中阶段已限制买卖置信度",
             ko="비장중 단계 매매에 대해 신뢰도를 제한함",
         )
+    if adjustment == "premarket_plan_written":
+        return _reason_text(
+            language,
+            en="pre-market mode: immediate action rewritten as pre-open orders",
+            zh="盘前决策模式：即时动作已改写为开盘前条件单",
+            ko="장전 결정 모드: 즉시 동작을 개장 전 주문으로 변경함",
+        )
     if adjustment == "confidence_capped_core_data_degraded":
         return _reason_text(
             language,
@@ -409,6 +432,63 @@ def _adjustment_limitation_text(adjustment: str, *, language: str) -> str:
             ko="핵심 데이터 제한으로 신뢰도를 낮춤",
         )
     return adjustment
+
+
+_PRICE_PATTERNS = (
+    re.compile(r"(\d+(?:\.\d+)?)\s*(?:元|yuan|CNY|RMB|원)", re.IGNORECASE),
+    re.compile(r"[¥$￥]\s*(\d+(?:\.\d+)?)"),
+)
+
+
+def _price_in(text: Any) -> Optional[str]:
+    """「理想买入点：28.50元（在MA5附近）」→ "28.50"。只认带货币单位的数字，免得把 MA5 的 5 当成价格。"""
+    s = _safe_text(text)
+    for pattern in _PRICE_PATTERNS:
+        m = pattern.search(s)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _premarket_plan(result: "AnalysisResult", phase_decision: Mapping[str, Any], *, language: str) -> str:
+    """盘前读、盘中不看：把买卖结论变成开盘前就能挂的条件单。价格取模型的狙击点位。"""
+    dashboard = getattr(result, "dashboard", None)
+    battle = dashboard.get("battle_plan") if isinstance(dashboard, dict) else None
+    points = battle.get("sniper_points") if isinstance(battle, dict) else None
+    points = points if isinstance(points, Mapping) else {}
+    buy = _price_in(points.get("ideal_buy"))
+    stop = _price_in(points.get("stop_loss"))
+    decision = _safe_text(getattr(result, "decision_type", "")).lower()
+    if decision not in {"buy", "sell"}:
+        text = " ".join(_safe_text(v) for v in (getattr(result, "operation_advice", ""), phase_decision.get("immediate_action")))
+        decision = "sell" if any(k in text for k in ("卖出", "减仓", "sell", "reduce", "매도", "비중축소")) else "buy"
+
+    if language == "en":
+        if decision == "buy":
+            parts = [f"limit buy at or below {buy}" if buy else "limit buy only, no chasing a gap-up"]
+            if stop:
+                parts.append(f"stop out below {stop}")
+            if buy:
+                parts.append("skip it if it opens above the limit")
+            return "Pre-open plan: " + "; ".join(parts) + "."
+        return "Pre-open plan: place a sell order before the open" + (f"; if you keep holding, exit below {stop}" if stop else "") + "."
+    if language == "ko":
+        if decision == "buy":
+            parts = [f"{buy} 이하 지정가 매수" if buy else "지정가 매수만, 갭상승 추격 금지"]
+            if stop:
+                parts.append(f"{stop} 이탈 시 손절")
+            if buy:
+                parts.append("지정가보다 높게 시작하면 추격하지 않음")
+            return "장전 계획: " + ", ".join(parts) + "."
+        return "장전 계획: 개장 전 매도 주문" + (f"; 계속 보유한다면 {stop} 이탈 시 정리" if stop else "") + "."
+    if decision == "buy":
+        parts = [f"限价买入不高于 {buy} 元" if buy else "只挂限价单，不追高开"]
+        if stop:
+            parts.append(f"跌破 {stop} 元止损")
+        if buy:
+            parts.append("高开超过限价就不追")
+        return "盘前计划：" + "，".join(parts) + "。"
+    return "盘前计划：开盘前挂卖单离场" + (f"；若继续持有，跌破 {stop} 元离场" if stop else "") + "。"
 
 
 def _safe_wait_action(language: str) -> str:

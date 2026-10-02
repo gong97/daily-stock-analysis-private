@@ -885,6 +885,7 @@ class StockAnalysisPipeline:
                     analysis_context_pack_overview=analysis_context_pack_overview,
                     report_language=getattr(result, "report_language", None)
                     or getattr(self.config, "report_language", "zh"),
+                    decision_mode=getattr(self.config, "decision_mode", "intraday"),
                 )
                 if adjustments:
                     logger.info("[phase_decision_guardrail] Applied adjustments for %s: %s", code, adjustments)
@@ -1650,6 +1651,7 @@ class StockAnalysisPipeline:
                     analysis_context_pack_overview=analysis_context_pack_overview,
                     report_language=getattr(result, "report_language", None)
                     or getattr(self.config, "report_language", "zh"),
+                    decision_mode=getattr(self.config, "decision_mode", "intraday"),
                 )
                 if adjustments:
                     logger.info("[phase_decision_guardrail] Applied agent adjustments for %s: %s", code, adjustments)

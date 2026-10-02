@@ -1217,6 +1217,9 @@ class Config:
     enable_realtime_technical_indicators: bool = True
     # 筹码分布开关（该接口不稳定，云端部署建议关闭）
     enable_chip_distribution: bool = True
+    # 决策模式：intraday（默认，会盯盘）/ premarket（盘前读报告、盘中不再看）。premarket 时不开盘阶段的
+    # 买卖结论改写成开盘前可挂的条件单，不再写「等待盘中确认」、也不因不开盘而降置信度（phase_decision_guardrail）
+    decision_mode: str = "intraday"
     # 东财接口补丁开关
     enable_eastmoney_patch: bool = False
     # 实时行情数据源优先级（逗号分隔）
@@ -2211,6 +2214,7 @@ class Config:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            decision_mode=(os.getenv('DECISION_MODE', 'intraday').strip().lower() or 'intraday'),
             # 东财接口补丁开关
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # 实时行情数据源优先级：

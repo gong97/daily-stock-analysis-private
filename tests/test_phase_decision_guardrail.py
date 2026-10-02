@@ -323,3 +323,59 @@ def test_guardrail_creates_dashboard_for_agent_compatible_result_object() -> Non
     assert adjustments == []
     assert result.dashboard["phase_decision"]["phase_context"]["phase"] == "intraday"
     assert result.dashboard["phase_decision"]["watch_conditions"] == []
+
+
+# ── 盘前决策模式（DECISION_MODE=premarket，2026-10-02）：盘前读报告、盘中不再看 ──────────
+
+def _with_sniper(result: AnalysisResult, buy: str, stop: str) -> AnalysisResult:
+    result.dashboard["battle_plan"] = {"sniper_points": {"ideal_buy": buy, "stop_loss": stop}}
+    return result
+
+
+def test_premarket_mode_writes_pre_open_buy_order_and_keeps_confidence() -> None:
+    result = _with_sniper(_result(), "理想买入点：28.50元（在MA5附近）", "止损位：26.80元（跌破MA20）")
+    adjustments = apply_phase_decision_guardrails(
+        result, market_phase_summary=_phase("premarket"), analysis_context_pack_overview=None,
+        decision_mode="premarket",
+    )
+    action = result.dashboard["phase_decision"]["immediate_action"]
+    assert action == "盘前计划：限价买入不高于 28.50 元，跌破 26.80 元止损，高开超过限价就不追。"
+    assert "等待盘中确认" not in action
+    assert result.confidence_level == "高"  # 不因「不开盘」降置信度
+    assert result.decision_type == "buy"
+    assert adjustments == ["premarket_plan_written"]
+
+
+def test_premarket_mode_sell_plan_and_missing_prices() -> None:
+    result = _with_sniper(_result(decision_type="sell", operation_advice="卖出"), "—", "止损位：12元")
+    apply_phase_decision_guardrails(
+        result, market_phase_summary=_phase("non_trading"), analysis_context_pack_overview=None,
+        decision_mode="premarket",
+    )
+    assert result.dashboard["phase_decision"]["immediate_action"] == "盘前计划：开盘前挂卖单离场；若继续持有，跌破 12 元离场。"
+    # 没有带货币单位的价格时不硬猜（MA5 的 5 不是价格）
+    result = _with_sniper(_result(), "理想买入点：MA5附近", "")
+    apply_phase_decision_guardrails(
+        result, market_phase_summary=_phase("premarket"), analysis_context_pack_overview=None,
+        decision_mode="premarket",
+    )
+    assert result.dashboard["phase_decision"]["immediate_action"] == "盘前计划：只挂限价单，不追高开。"
+
+
+def test_premarket_mode_still_caps_confidence_for_degraded_data() -> None:
+    result = _result()
+    adjustments = apply_phase_decision_guardrails(
+        result, market_phase_summary=_phase("premarket"), analysis_context_pack_overview=_overview("stale"),
+        decision_mode="premarket",
+    )
+    assert "confidence_capped_core_data_degraded" in adjustments
+    assert result.confidence_level == "中"
+
+
+def test_default_mode_unchanged() -> None:
+    result = _result()
+    apply_phase_decision_guardrails(
+        result, market_phase_summary=_phase("premarket"), analysis_context_pack_overview=None,
+    )
+    assert result.dashboard["phase_decision"]["immediate_action"] == "等待盘中确认，禁止追高。"
+    assert result.confidence_level == "低"
