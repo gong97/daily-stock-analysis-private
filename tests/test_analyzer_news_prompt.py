@@ -304,7 +304,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertNotIn("机构盈利预测", prompt)
         self.assertNotIn("高管增减持", prompt)
 
-    def test_prompt_includes_capital_flow_as_operation_filter(self) -> None:
+    def test_prompt_includes_capital_flow_as_description_only(self) -> None:
+        """资金流只作描述（2026-10-04 检验：主力净流入强的股票之后反而多数跑输，扣除前期涨跌后无信息）。"""
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()
 
@@ -333,11 +334,12 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         prompt = analyzer._format_prompt(context, "恩捷股份", news_context=None)
 
-        self.assertIn("主力资金流向（操作建议过滤器）", prompt)
+        self.assertIn("主力资金流向（只作描述，不作买卖依据）", prompt)
         self.assertIn("主力净流入", prompt)
         self.assertIn("-1200000", prompt)
-        self.assertIn("接近压力且主力流出时不得追买", prompt)
-        self.assertIn("洗盘观察", prompt)
+        self.assertIn("不要把「主力流入」当成买入理由", prompt)
+        self.assertNotIn("操作建议过滤器", prompt)
+        self.assertNotIn("正值偏支持", prompt)
 
     def test_prompt_prefers_context_news_window_days(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):

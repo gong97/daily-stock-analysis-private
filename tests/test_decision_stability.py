@@ -3,7 +3,9 @@
 
 from types import SimpleNamespace
 
-from src.analyzer import AnalysisResult, _capital_flow_bias, stabilize_decision_with_structure
+import pytest
+
+from src.analyzer import AnalysisResult, stabilize_decision_with_structure
 
 
 def _result(
@@ -56,37 +58,47 @@ def _unsupported_fund_flow() -> dict:
     return {"capital_flow": {"status": "not_supported", "data": {}}}
 
 
-def _unsupported_fund_flow_caps() -> dict:
-    return {"capital_flow": {"status": "NOT_SUPPORTED", "data": {"stock_flow": {"main_net_inflow": 0}}}}
+_FLOW_CONTEXTS = {
+    "inflow": _fund_flow(main=5_000_000, five_day=8_000_000, ten_day=9_000_000),
+    "outflow": _fund_flow(main=-5_000_000, five_day=-8_000_000, ten_day=-9_000_000),
+    "unsupported": _unsupported_fund_flow(),
+    "absent": None,
+}
 
 
-def test_capital_flow_bias_is_unavailable_when_stock_flow_data_is_missing() -> None:
-    assert _capital_flow_bias(_unsupported_fund_flow()) == "unavailable"
-    assert _capital_flow_bias({"capital_flow": {"status": "ok", "data": {}}}) == "unavailable"
+@pytest.mark.parametrize(
+    "decision, advice, price, change_pct, expected_decision, expected_advice",
+    [
+        ("buy", "买入", 33.4, 0.0, "hold", "震荡观望"),     # 接近压力
+        ("buy", "买入", 32.0, 0.0, "hold", "震荡观望"),     # 支撑与压力之间
+        ("buy", "买入", 35.0, 0.0, "buy", "买入"),          # 有效突破，保留买入
+        ("sell", "卖出", 30.4, -2.1, "hold", "洗盘观察"),   # 贴近支撑
+        ("sell", "卖出", 29.0, -3.0, "sell", "卖出"),       # 跌破支撑，保留卖出
+    ],
+)
+def test_capital_flow_no_longer_changes_the_decision(
+    decision, advice, price, change_pct, expected_decision, expected_advice
+) -> None:
+    """2026-10-04 起资金流不参与稳定性规则：流入、流出、取不到，结论完全一样，只看价格结构。
+
+    出处：Macd-Qlib-Analyzer scripts/capital_flow_eval.py——主力净流入最强的股票之后 10 个交易日
+    反而多数跑输，扣除前期涨跌后没有信息。以前「资金流缺失就降级买入」「流入改写卖出」都已去掉。
+    """
+    outcomes = {}
+    for name, context in _FLOW_CONTEXTS.items():
+        result = _result(
+            decision_type=decision, operation_advice=advice, score=60, current_price=price, change_pct=change_pct
+        )
+        stabilize_decision_with_structure(
+            result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), context
+        )
+        outcomes[name] = (result.decision_type, result.operation_advice)
+        assert "capital_flow_bias" not in result.dashboard.get("decision_stability", {})
+
+    assert set(outcomes.values()) == {(expected_decision, expected_advice)}, outcomes
 
 
-def test_capital_flow_bias_is_neutral_when_missing_main_windows_conflict() -> None:
-    context = {
-        "capital_flow": {
-            "data": {
-                "stock_flow": {
-                    "inflow_5d": 2_000_000,
-                    "inflow_10d": -1_000_000,
-                }
-            }
-        }
-    }
-
-    assert _capital_flow_bias(context) == "neutral"
-
-
-def test_capital_flow_bias_is_neutral_when_main_conflicts_with_windows() -> None:
-    context = _fund_flow(main=-500_000, five_day=1_200_000, ten_day=2_000_000)
-
-    assert _capital_flow_bias(context) == "neutral"
-
-
-def test_downgrades_buy_near_resistance_without_fund_confirmation() -> None:
+def test_downgrades_buy_near_resistance() -> None:
     result = _result(
         decision_type="buy",
         operation_advice="买入",
@@ -108,7 +120,7 @@ def test_downgrades_buy_near_resistance_without_fund_confirmation() -> None:
     assert result.dashboard["core_conclusion"]["signal_type"] == "🟡持有观望"
 
 
-def test_downgrades_buy_mid_range_with_neutral_fund_flow() -> None:
+def test_downgrades_buy_mid_range() -> None:
     result = _result(
         decision_type="buy",
         operation_advice="买入",
@@ -125,118 +137,7 @@ def test_downgrades_buy_mid_range_with_neutral_fund_flow() -> None:
     assert result.decision_type == "hold"
     assert result.sentiment_score <= 59
     assert result.operation_advice == "震荡观望"
-    assert "资金流不明确" in result.risk_warning
-
-
-def test_downgrades_buy_when_capital_flow_is_unavailable() -> None:
-    buy_result = _result(
-        decision_type="buy",
-        operation_advice="买入",
-        score=66,
-        current_price=32.0,
-    )
-    sell_result = _result(
-        decision_type="sell",
-        operation_advice="卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=-2.1,
-    )
-
-    stabilize_decision_with_structure(
-        buy_result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _unsupported_fund_flow(),
-    )
-    stabilize_decision_with_structure(
-        sell_result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _unsupported_fund_flow(),
-    )
-
-    assert buy_result.decision_type == "hold"
-    assert buy_result.operation_advice == "持有观察"
-    assert buy_result.confidence_level == "低"
-    assert buy_result.sentiment_score <= 59
-    assert buy_result.dashboard["decision_stability"]["applied"] is True
-    assert "买入结论缺少资金面确认" in buy_result.dashboard["decision_stability"]["reason"]
-    assert buy_result.dashboard["core_conclusion"]["signal_type"] == "🟡持有观望"
-    assert sell_result.decision_type == "sell"
-    assert sell_result.operation_advice == "卖出"
-    assert sell_result.dashboard["decision_stability"]["applied"] is False
-    assert "未使用资金流校准" in sell_result.dashboard["decision_stability"]["reason"]
-
-
-def test_downgrades_buy_when_capital_flow_values_are_na() -> None:
-    result = _result(
-        decision_type="buy",
-        operation_advice="买入",
-        score=66,
-        current_price=33.0,
-    )
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        {
-            "capital_flow": {
-                "status": "ok",
-                "data": {
-                    "stock_flow": {
-                        "main_net_inflow": "N/A",
-                        "inflow_5d": "N/A",
-                        "inflow_10d": "N/A",
-                    }
-                },
-            }
-        },
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "持有观察"
-    assert result.dashboard["decision_stability"]["applied"] is True
-    assert "资金流数据缺失" in result.dashboard["decision_stability"]["capital_flow_status"]
-
-
-def test_downgrades_buy_advice_when_decision_type_is_hold_and_capital_flow_unavailable() -> None:
-    result = _result(
-        decision_type="hold",
-        operation_advice="建议买入",
-        score=68,
-        current_price=32.0,
-    )
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _unsupported_fund_flow(),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "持有观察"
-    assert result.sentiment_score <= 59
-    assert result.dashboard["decision_stability"]["applied"] is True
-    assert "买入结论缺少资金面确认" in result.dashboard["decision_stability"]["reason"]
-
-
-def test_downgrades_buy_when_capital_flow_status_is_unavailable_case_insensitive() -> None:
-    buy_result = _result(
-        decision_type="buy",
-        operation_advice="买入",
-        score=66,
-        current_price=32.0,
-    )
-
-    stabilize_decision_with_structure(
-        buy_result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _unsupported_fund_flow_caps(),
-    )
-
-    assert buy_result.decision_type == "hold"
-    assert buy_result.operation_advice == "持有观察"
-    assert buy_result.dashboard["decision_stability"]["applied"] is True
-    assert "暂不支持" in str(buy_result.dashboard["decision_stability"]["capital_flow_status"])
+    assert "价格处于支撑与压力之间" in result.risk_warning
 
 
 def test_skips_downgrade_when_only_generic_risk_warning_and_sell_near_support() -> None:
@@ -257,7 +158,7 @@ def test_skips_downgrade_when_only_generic_risk_warning_and_sell_near_support() 
 
     assert result.decision_type == "hold"
     assert result.operation_advice == "洗盘观察"
-    assert "价格贴近支撑且未见资金持续流出" in result.risk_warning
+    assert "价格贴近支撑且未跌破" in result.risk_warning
 
 
 def test_stability_can_infer_decision_from_natural_chinese_phrases_in_analyzer_path() -> None:
