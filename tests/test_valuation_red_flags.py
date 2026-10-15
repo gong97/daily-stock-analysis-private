@@ -12,7 +12,7 @@ from src import valuation_red_flags as vrf
 PAYLOAD = {
     "stocks": {
         "000858.SZ": {
-            "date": "2026-10-15", "confidence": "中低**", "report": "2026/10/000858.SZ_20261015.md",
+            "date": "2026-10-15", "confidence": "中低** —— 核心原因：数据冲突", "report": "2026/10/000858.SZ_20261015.md",
             "flags": ["🚩 2025年收入/利润大幅追溯下修", "🚩 收入与经营现金流背离"],
             "company_risks": ["会计差错更正尚无监管结论"],
         },

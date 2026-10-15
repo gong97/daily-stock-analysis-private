@@ -119,7 +119,9 @@ def red_flags_for(code: Any, today: Optional[date] = None) -> Optional[Dict[str,
     risks = [str(x) for x in entry.get("company_risks") or [] if str(x).strip()]
     if not flags and not risks:
         return None
-    return {"date": entry.get("date", ""), "confidence": str(entry.get("confidence") or "").strip("* "),
+    # 报告原文里置信度常写成「中低** —— 核心原因：…」，只留开头的等级词
+    confidence = re.split(r"[*—（(，,：:\s]", str(entry.get("confidence") or "").strip(), maxsplit=1)[0]
+    return {"date": entry.get("date", ""), "confidence": confidence,
             "flags": flags, "company_risks": risks, "age_days": age}
 
 
