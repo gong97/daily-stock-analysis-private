@@ -1508,6 +1508,8 @@ class NotificationService(
                             f"- {labels['risk_control_label']}: {position.get('risk_control', 'N/A')}",
                             "",
                         ])
+                    if sniper or position:
+                        report_lines.extend([f"> ℹ️ {labels['untested_levels_note']}", ""])
                     # 检查清单
                     checklist = battle.get('action_checklist', []) if battle else []
                     if checklist:

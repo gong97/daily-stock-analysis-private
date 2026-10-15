@@ -273,7 +273,8 @@ class TestRenderDecisionSummary(unittest.TestCase):
         # 持有不再给「突破再买」的压力位（追涨型买点），只列【程序】风险提示
         self.assertIn("| 兆易创新 603986.SH | HOLD | — | — | 本周 |", summary)
         self.assertNotIn("再买", summary)
-        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | < ¥17.80 止损 | 立即 |", summary)
+        # 减仓行也不再把模型止损位当关键价格（未经检验），只列【程序】风险提示
+        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | — | 立即 |", summary)
 
         # 排序：CUT 排最前
         cut_pos = summary.index("隆基绿能")
@@ -352,7 +353,7 @@ class TestRenderDecisionSummary(unittest.TestCase):
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
 
         self.assertIn(
-            "| 兆易创新 603986.SH | CUT·减仓 | ¥352.10 | < ¥345.00 止损 | — |", summary
+            "| 兆易创新 603986.SH | CUT·减仓 | ¥352.10 | — | — |", summary
         )
 
     def test_current_price_falls_back_to_llm_value(self):
@@ -379,7 +380,7 @@ class TestRenderDecisionSummary(unittest.TestCase):
         )
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
 
-        self.assertIn("| ¥340.00 | < ¥345.00 止损 ⚠️已跌破 |", summary)
+        self.assertIn("| ¥340.00 | 已跌破模型止损 ¥345.00 |", summary)
 
     def test_no_successful_results_returns_empty_string(self):
         result = _make_lite_result(

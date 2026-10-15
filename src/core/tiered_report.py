@@ -234,17 +234,11 @@ def _summary_key_price(
     dashboard: Dict[str, Any],
     current_price: Optional[float] = None,
 ) -> str:
-    """总览表的「关键价格 / 风险提示」列：按动作分流。加仓看买点、减仓看止损、持有看【程序】风险提示。
+    """总览表的「关键价格 / 风险提示」列：按动作分流。加仓看买点，减仓与持有看【程序】风险提示。
 
-    现价已低于止损位时追加「⚠️已跌破」——止损不再是等待条件，而是已经触发。
+    模型止损位不再作为关键价格（未经检验）；只有现价已跌破它时，减仓行补一句。
     """
     sniper = extract_sniper_points(deep)
-
-    def _stop_text(stop_loss: Any) -> str:
-        text = f"< {_fmt_price(stop_loss)} 止损"
-        if _stop_breached(stop_loss, current_price):
-            text += " ⚠️已跌破"
-        return text
 
     if bucket == "add":
         ideal = sniper.get("ideal_buy")
@@ -258,10 +252,14 @@ def _summary_key_price(
         return "—"
 
     if bucket == "cut":
+        # 减仓行只列【程序】风险提示：模型给的止损位没有经过检验（见 report_language 的
+        # untested_levels_note），不放进当天唯一要通读的表。现价已跌破模型止损位时仍提示一句。
+        flags = _program_flag_text(dashboard)
         stop_loss = sniper.get("stop_loss")
-        if stop_loss is not None:
-            return _stop_text(stop_loss)
-        return "—"
+        if _stop_breached(stop_loss, current_price):
+            breached = f"已跌破模型止损 {_fmt_price(stop_loss)}"
+            return breached if flags == "—" else f"{flags}；{breached}"
+        return flags
 
     # hold：只列程序判定的风险提示，没有就写「—」。
     # 2026-10-15 以前这里是「> 压力位 再买」——用户盘前照这一列挂条件单，挂的就是突破买单，

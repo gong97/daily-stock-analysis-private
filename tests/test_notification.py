@@ -915,6 +915,31 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("quote: stale", out)
 
     @mock.patch("src.notification.get_config")
+    def test_battle_plan_carries_untested_levels_note(self, mock_get_config: mock.MagicMock):
+        """止损位 / 目标位 / 仓位建议是模型给的、未经检验，作战计划下方要说明（2026-10-15）。"""
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600900",
+            name="长江电力",
+            sentiment_score=55,
+            trend_prediction="震荡",
+            operation_advice="持有",
+            analysis_summary="震荡",
+            dashboard={
+                "core_conclusion": {"one_sentence": "持有"},
+                "battle_plan": {
+                    "sniper_points": {"stop_loss": "止损位：28.00元", "take_profit": "目标位：30.50元"},
+                    "position_strategy": {"suggested_position": "3-4成"},
+                },
+            },
+        )
+
+        out = service.generate_dashboard_report([result], report_date="2026-10-15")
+
+        self.assertIn("止损位、目标位和仓位建议由模型给出，未经检验", out)
+
+    @mock.patch("src.notification.get_config")
     def test_generate_dashboard_report_skips_context_only_phase_decision_default_renderer(
         self, mock_get_config: mock.MagicMock
     ):
