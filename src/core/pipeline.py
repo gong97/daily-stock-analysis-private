@@ -98,6 +98,7 @@ from src.overheat_flags import (
 )
 from src.program_checklist import apply_program_checklist
 from src.chase_guard import current_price_of, strip_chase_buy_points
+from src.tested_signals import annotate_tested_signals
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -1393,7 +1394,8 @@ class StockAnalysisPipeline:
             return None
 
     def _strip_chase_buy_points(self, result: Any, code: str) -> None:
-        """删掉追涨型买点（高于现价 / 带「突破」），两条分析路径共用；见 src/chase_guard.py。"""
+        """展示层的检验兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），
+        给已检验无效的看多理由加标注（src/tested_signals.py）。"""
         try:
             removed = strip_chase_buy_points(
                 result,
@@ -1405,6 +1407,17 @@ class StockAnalysisPipeline:
             return
         if removed:
             logger.info("[chase_guard] Removed chase-type entries for %s: %s", code, removed)
+        # 看多理由标注历史检验结论（只标注、不改分），见 src/tested_signals.py
+        try:
+            annotated = annotate_tested_signals(
+                result,
+                getattr(result, "report_language", None) or getattr(self.config, "report_language", "zh"),
+            )
+        except Exception as exc:
+            logger.warning("[tested_signals] %s 处理失败：%s", code, exc)
+            return
+        if annotated:
+            logger.info("[tested_signals] Annotated bullish reasons for %s: %s", code, annotated)
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""

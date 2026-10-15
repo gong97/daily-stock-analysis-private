@@ -117,7 +117,9 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertIn("专注于趋势交易", prompt)
         self.assertIn("多头排列必须条件", prompt)
-        self.assertIn("多头排列：MA5 > MA10 > MA20", prompt)
+        # 2026-10-15 起评分标准的买入档不再把技术形态当加分条件（src/tested_signals.py）
+        self.assertIn("有可核实的基本面支撑", prompt)
+        self.assertIn("不作为买入档的加分条件", prompt)
 
     def test_analysis_prompt_requires_phase_decision_in_main_and_legacy_modes(self) -> None:
         for legacy in (False, True):

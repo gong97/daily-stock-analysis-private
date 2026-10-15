@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 已检验无效的看多理由加标注。新增 `src/tested_signals.py`：「最强看多信号」「利好催化」与模型打 ✅ 的【模型】检查项里，出现缩量回调 / 洗盘、RSI 超卖反弹、均线多头排列、主力资金流入、已公布的业绩大增、增持、高股息、突破时，末尾加〔历史检验：…〕（只标注、不删、不改分；估值偏低不标）。提示词补一条「这些理由不作为看多依据」；旧版评分标准的买入档去掉技术形态加分条件，改为估值 / 业绩与现金流印证 / 回踩支撑；`growth_quality`、`event_driven` 技能去掉突破买点。依据：Macd-Qlib-Analyzer 研究台账（skill-rules-revision、reversal-flow-robustness、capital-flow、earnings-drift、insider-buying、dividend-yield、pattern-breakout）。
 - [改进] 不再给追涨型买点。总览表「持有」行原来显示「> 压力位 再买」（照此挂条件单就是突破买单），改为「关键价格 / 风险提示」列，只列【程序】判定的高位过热 / 高位高换手 / 近期高管减持，未触发写「—」，也不再用止损位兜底。新增 `src/chase_guard.py`：高于现价或带「突破」的 `ideal_buy` / `secondary_buy` 换成说明文字，建仓策略与空仓 / 持仓建议里「突破后再买」的分句删掉，agent 与非 agent 两条路径都接。结构稳定规则对**已突破压力位**的买入也降为观望（以前直接放行）。提示词与程序改写文案去掉「有效突破压力可买入」「放量突破后再行动」。依据：Macd-Qlib-Analyzer 的短期反转检验（过去 5 日涨幅前 20% 之后 10 日跑输，两个时期 t≈9）、形态突破确认无优势、观察名单「放量突破」「资金热度」回放不通过。
 - [改进] 全市场扫描工作流撤掉 weekly 定时任务（只保留手动触发）：周频七条策略的历史回放（Macd-Qlib-Analyzer `scripts/market_scan_weekly_replay.py`）每周前 5 名之后 20 日都无方向，观察名单不再作为候选来源。
 - [改进] 全市场扫描停用全部四条 short_term 策略（资金热度、主题动能、超跌反转、放量突破），并撤掉 daily 定时任务。依据是按生产硬过滤做的历史回放（Macd-Qlib-Analyzer `scripts/market_scan_replay.py`）：前三条的候选之后 10 日显著跑输（t −7.91 / −8.07 / −14.42，置换门槛 4.09），放量突破无方向。观察名单新增 `retired` 出局原因：停用策略的背书在下一轮扫描时立即剪掉，剩余背书接管主桶并重算分数，不再等 14~30 天的 TTL。
