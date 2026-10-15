@@ -3,7 +3,9 @@
 # 双低选股策略（低 PE + 低 PB）
 name: dual_low
 display_name: 双低选股
-description: 偏稳健的低估值筛选策略，叠加当日活跃度与形态确认，避免长期只命中静态低估值票
+# 2026-10-15 历史回放（Macd-Qlib-Analyzer scripts/market_scan_weekly_replay.py，台账 market-scan-weekly-replay）：
+# 七条周频策略每周前 5 名之后 20 日都无方向。保留启用只为手动选股；定时扫描已撤，不作买入依据。
+description: 偏稳健的低估值筛选策略，叠加当日活跃度与形态确认，避免长期只命中静态低估值票（历史回放无方向，不作买入依据）
 version: "1.2"
 category: value
 tags: [value, defensive, low_valuation, dynamic_signal]

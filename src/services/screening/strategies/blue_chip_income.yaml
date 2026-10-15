@@ -3,7 +3,9 @@
 # 蓝筹收益质量策略
 name: blue_chip_income
 display_name: 蓝筹收益质量
-description: 面向高流动性大盘蓝筹的收益质量候选，强调合理估值、稳定成交和防守型持有体验
+# 2026-10-15 历史回放（Macd-Qlib-Analyzer scripts/market_scan_weekly_replay.py，台账 market-scan-weekly-replay）：
+# 七条周频策略每周前 5 名之后 20 日都无方向。保留启用只为手动选股；定时扫描已撤，不作买入依据。
+description: 面向高流动性大盘蓝筹的收益质量候选，强调合理估值、稳定成交和防守型持有体验（历史回放无方向，不作买入依据）
 version: "1.0"
 category: income
 tags: [value, quality, income, blue_chip, defensive, snapshot_only]

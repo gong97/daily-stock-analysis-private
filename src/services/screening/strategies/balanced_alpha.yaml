@@ -3,7 +3,9 @@
 # 均衡多因子策略
 name: balanced_alpha
 display_name: 均衡多因子
-description: 综合估值、资金、动量、稳定性的通用候选发现策略
+# 2026-10-15 历史回放（Macd-Qlib-Analyzer scripts/market_scan_weekly_replay.py，台账 market-scan-weekly-replay）：
+# 七条周频策略每周前 5 名之后 20 日都无方向。保留启用只为手动选股；定时扫描已撤，不作买入依据。
+description: 综合估值、资金、动量、稳定性的通用候选发现策略（历史回放无方向，不作买入依据）
 version: "1.1"
 category: framework
 tags: [multi_factor, balanced, llm_friendly]

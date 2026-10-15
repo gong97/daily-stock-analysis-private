@@ -3,7 +3,9 @@
 # 低波动质量策略
 name: low_volatility_quality
 display_name: 低波质量
-description: 偏防守的质量型候选，优先选择波动较低、回撤浅、估值不过热且数据质量可靠的股票
+# 2026-10-15 历史回放（Macd-Qlib-Analyzer scripts/market_scan_weekly_replay.py，台账 market-scan-weekly-replay）：
+# 七条周频策略每周前 5 名之后 20 日都无方向。保留启用只为手动选股；定时扫描已撤，不作买入依据。
+description: 偏防守的质量型候选，优先选择波动较低、回撤浅、估值不过热且数据质量可靠的股票（历史回放无方向，不作买入依据）
 version: "1.0"
 category: quality
 tags: [quality, defensive, low_volatility, daily_k]
