@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 全市场扫描工作流撤掉 weekly 定时任务（只保留手动触发）：周频七条策略的历史回放（Macd-Qlib-Analyzer `scripts/market_scan_weekly_replay.py`）每周前 5 名之后 20 日都无方向，观察名单不再作为候选来源。
 - [改进] 全市场扫描停用全部四条 short_term 策略（资金热度、主题动能、超跌反转、放量突破），并撤掉 daily 定时任务。依据是按生产硬过滤做的历史回放（Macd-Qlib-Analyzer `scripts/market_scan_replay.py`）：前三条的候选之后 10 日显著跑输（t −7.91 / −8.07 / −14.42，置换门槛 4.09），放量突破无方向。观察名单新增 `retired` 出局原因：停用策略的背书在下一轮扫描时立即剪掉，剩余背书接管主桶并重算分数，不再等 14~30 天的 TTL。
 - [修复] 跨桶命中的票，`latest_score` 改为取**主桶内**最高分而不是全部策略的全局最高分。`entry.bucket` 由 `BUCKET_PRIORITY`（aggressive > balanced > defensive）派生，而 `latest_score` 此前取全局最大值，两条规则各自合理但凑一起会矛盾：实测中远海控（84.64 来自 defensive 的 `quality_value`）、上海银行（81.47 来自 `dual_low`）、中国平安（80.85 来自 `low_volatility_quality`）三只主桶都是 balanced，却拿着 defensive 的分数在 balanced 桶内排序，虚高 4~6 分，也让报告里「分数不可跨桶比较」的标注对这些行失效。结算在合并循环结束后统一做（`bucket` 是派生属性，循环中途每加一条背书都可能改变主桶），并覆盖全部条目而非仅本轮碰到的，因此存量数据下一轮即自愈。`latest_rank` / `cadence` / `holding_period` 跟随胜出的那条背书，按 `(代码, 策略)` 回填以免张冠李戴；`best_score` 语义是「历史最好」，仍取跨桶最大值。
 - [改进] 报告的「移出观察名单」段落改为显示 `代码 名称，行业`，此前只有代码，看不出移走的是什么。被移出的条目已经不在淘汰后的 `entries` 里，因此 `render_report()` 新增可选的 `known_entries`（淘汰前的名单）用于查名称；查不到名称或省略该参数时退回只显示代码，行为与此前一致。

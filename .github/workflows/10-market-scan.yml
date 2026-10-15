@@ -7,13 +7,11 @@ name: 全市场扫描观察名单
 # 详见 docs/screening-engine.md 的「全市场扫描与观察名单」。
 
 on:
-  schedule:
-    # daily 组的定时任务 2026-10-15 撤掉：四条 short_term 策略（资金热度、主题动能、
-    # 超跌反转、放量突破）回放检验不通过，已在 YAML 里停用，daily 组没有策略可跑。
-    # 手动 workflow_dispatch 仍可选 daily（会因没有匹配策略直接退出）。
-    # 每周五 UTC 10:30 = 北京时间 18:30，跑 weekly 组
-    - cron: '30 10 * * 5'
-
+  # 定时任务 2026-10-15 全部撤掉，只保留手动触发。全部十一条内置策略都做过历史回放
+  # （Macd-Qlib-Analyzer scripts/market_scan_replay.py、market_scan_weekly_replay.py）：
+  # 日频四条候选之后跑输或无方向，已停用；周频七条每周前 5 名之后 20 日都无方向。
+  # 观察名单因此不再作为候选来源，data/watchlist/ 停更。原来的两条 cron 是
+  # '30 9 * * 1-5'（daily）与 '30 10 * * 5'（weekly），下面 plan 步骤的 case 仍按它们区分。
   workflow_dispatch:
     inputs:
       cadence:
