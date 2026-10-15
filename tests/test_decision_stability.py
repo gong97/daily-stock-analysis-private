@@ -72,7 +72,7 @@ _FLOW_CONTEXTS = {
         ("buy", "买入", 33.4, 0.0, "hold", "震荡观望"),     # 接近压力
         ("buy", "买入", 32.0, 0.0, "hold", "震荡观望"),     # 支撑与压力之间
         ("buy", "买入", 35.0, 0.0, "hold", "震荡观望"),     # 已突破压力：追涨，2026-10-15 起也降级
-        ("sell", "卖出", 30.4, -2.1, "hold", "洗盘观察"),   # 贴近支撑
+        ("sell", "卖出", 30.4, -2.1, "hold", "支撑附近观察"),   # 贴近支撑
         ("sell", "卖出", 29.0, -3.0, "sell", "卖出"),       # 跌破支撑，保留卖出
     ],
 )
@@ -157,7 +157,7 @@ def test_skips_downgrade_when_only_generic_risk_warning_and_sell_near_support() 
     )
 
     assert result.decision_type == "hold"
-    assert result.operation_advice == "洗盘观察"
+    assert result.operation_advice == "支撑附近观察"
     assert "价格贴近支撑且未跌破" in result.risk_warning
 
 
@@ -177,7 +177,7 @@ def test_stability_can_infer_decision_from_natural_chinese_phrases_in_analyzer_p
     )
 
     assert result.decision_type == "hold"
-    assert result.operation_advice == "洗盘观察"
+    assert result.operation_advice == "支撑附近观察"
     assert result.dashboard["decision_stability"]["applied"] is True
 
 
@@ -198,7 +198,7 @@ def test_downgrades_sell_near_support_without_sustained_outflow() -> None:
 
     assert result.decision_type == "hold"
     assert result.sentiment_score >= 45
-    assert result.operation_advice == "洗盘观察"
+    assert result.operation_advice == "支撑附近观察"
     assert "不宜仅因单日下跌直接卖出" in result.risk_warning
 
 
@@ -221,7 +221,7 @@ def test_insider_selling_alone_does_not_count_as_significant_risk() -> None:
     )
 
     assert result.decision_type == "hold"
-    assert result.operation_advice == "洗盘观察"
+    assert result.operation_advice == "支撑附近观察"
 
 
 def test_preserves_sell_signal_when_significant_risk_exists_near_support() -> None:
@@ -245,14 +245,13 @@ def test_preserves_sell_signal_when_significant_risk_exists_near_support() -> No
     assert result.operation_advice == "卖出"
 
 
-def test_refines_hold_pullback_near_support_as_shakeout_watch() -> None:
-    result = _result(
-        decision_type="hold",
-        operation_advice="持有",
-        score=52,
-        current_price=30.5,
-        change_pct=-1.6,
-    )
+@pytest.mark.parametrize("price, change_pct", [(30.5, -1.6), (32.0, 0.5)])  # 靠近支撑下跌 / 支撑与压力之间
+def test_hold_keeps_model_wording(price, change_pct) -> None:
+    """结论本来就是 hold 时不改写措辞（2026-10-15）：以前会把模型的个股建议整段换成同一句模板。"""
+    result = _result(decision_type="hold", operation_advice="持有", score=52, current_price=price,
+                     change_pct=change_pct)
+    advice = {"no_position": "关注回款与监管动态后再考虑。", "has_position": "持仓者关注渠道回款。"}
+    result.dashboard["core_conclusion"] = {"one_sentence": "模型原话", "position_advice": dict(advice)}
 
     stabilize_decision_with_structure(
         result,
@@ -261,8 +260,10 @@ def test_refines_hold_pullback_near_support_as_shakeout_watch() -> None:
     )
 
     assert result.decision_type == "hold"
-    assert result.operation_advice == "洗盘观察"
-    assert "更适合按洗盘观察处理" in result.risk_warning
+    assert result.operation_advice == "持有"
+    assert result.dashboard["core_conclusion"]["one_sentence"] == "模型原话"
+    assert result.dashboard["core_conclusion"]["position_advice"] == advice
+    assert "洗盘" not in (result.risk_warning or "")
 
 
 def test_structural_rewrite_is_labelled_in_position_advice() -> None:
@@ -279,6 +280,8 @@ def test_structural_rewrite_is_labelled_in_position_advice() -> None:
     advice = result.dashboard["core_conclusion"]["position_advice"]
     assert advice["no_position"].endswith("（程序改写：结构稳定规则）")
     assert advice["has_position"].endswith("（程序改写：结构稳定规则）")
+    # 持仓者模板不再写「以关键支撑为风控线」（机械止损，未经检验）
+    assert "风控线" not in advice["has_position"]
     assert result.dashboard["battle_plan"]["position_strategy"]["suggested_position"] == (
         "建议仓位：2成（模型原建议；结论已被结构稳定规则改为观望）"
     )

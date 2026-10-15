@@ -41,6 +41,7 @@ _OPERATION_ADVICE_CANONICAL_MAP = {
     "add position": "buy",
     "持有": "hold",
     "洗盘观察": "hold",
+    "支撑附近观察": "hold",
     "观察": "hold",
     "hold": "hold",
     "观望": "watch",

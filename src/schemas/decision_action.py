@@ -84,6 +84,7 @@ _ACTION_PHRASES: Dict[DecisionAction, tuple[str, ...]] = {
     "hold": (
         "持有观察",
         "洗盘观察",
+        "支撑附近观察",
         "持有",
         "hold",
     ),

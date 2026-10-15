@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 结构稳定规则不再改写「持有」结论的措辞。以前模型说持有、价格靠近支撑且当天下跌（或在支撑与压力之间）时，会把模型针对个股写的一句话结论和空仓 / 持仓建议整段换成同一句模板——10-15 那次 24 只里 18 只被换掉，没有一只结论改变。现在只有真的把买入 / 卖出改成观望时才用模板。「洗盘观察」改名「支撑附近观察」（「洗盘」暗示下跌后会涨，未经检验）；持仓者模板去掉「以关键支撑为风控线」（机械止损，Macd-Qlib-Analyzer risk_rules_backtest 不支持）。旧标签「洗盘观察」仍能被识别为持有。
 - [新功能] 持仓日报接入估值报告的质量红旗。新增 `src/valuation_red_flags.py`：运行时用只读 token（`VALUATION_RED_FLAGS_TOKEN`）读私有仓库 Macd-Qlib-Analyzer 的 `reports/red_flags.json`（每只票最新一份 Claude 估值报告里的「质量红旗」与「公司层面风险」，超过 200 天的不用），作为事实写进提示词；个股卡片在风险警报后单列「📑 估值报告红旗」；有红旗而模型仍打「✅ 无重大利空」时改为 ⚠️ 并注明。不改评分与买卖结论。本仓库是公开的，红旗文件不提交进来；未配置 token 时整段跳过。起因：五粮液的检查清单写「✅ 无重大利空」，而估值报告把 2025 年会计更正争议、经营现金流与收入背离列为重大红旗。
 - [改进] 机械止损与仓位建议降为参考。总览表「减仓」行不再显示模型止损位，与「持有」行一样只列【程序】风险提示（现价已跌破模型止损时补一句）；个股「作战计划」下方加说明：止损位、目标位、仓位建议由模型给出、未经检验，风控以单只仓位上限为准。止损价仍保留在数据里（signal_log 照常记录，留待检验）。A 股大盘复盘不再要求给「仓位区间」，策略框架不再把结论映射到整体加减仓。依据：Macd-Qlib-Analyzer risk_rules_backtest（200 日趋势 / 15% 回撤止损 / 波动率控仓 × 五个风格组 15 格全不过）、market_cold_reversal_eval。
 - [改进] 已检验无效的看多理由加标注。新增 `src/tested_signals.py`：「最强看多信号」「利好催化」与模型打 ✅ 的【模型】检查项里，出现缩量回调 / 洗盘、RSI 超卖反弹、均线多头排列、主力资金流入、已公布的业绩大增、增持、高股息、突破时，末尾加〔历史检验：…〕（只标注、不删、不改分；估值偏低不标）。提示词补一条「这些理由不作为看多依据」；旧版评分标准的买入档去掉技术形态加分条件，改为估值 / 业绩与现金流印证 / 回踩支撑；`growth_quality`、`event_driven` 技能去掉突破买点。依据：Macd-Qlib-Analyzer 研究台账（skill-rules-revision、reversal-flow-robustness、capital-flow、earnings-drift、insider-buying、dividend-yield、pattern-breakout）。

@@ -76,10 +76,12 @@ class BacktestEngine:
         "持有",
         "震荡观望",
         "洗盘观察",
+        "支撑附近观察",
         "持有观察",
         "hold",
         "range-bound watch",
         "shakeout watch",
+        "near-support watch",
         "hold and watch",
     )
     _WAIT_KEYWORDS = (

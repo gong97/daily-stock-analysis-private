@@ -2090,9 +2090,9 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
 
             self.assertIsNotNone(result)
             self.assertEqual(result.decision_type, "hold")
-            self.assertEqual(result.operation_advice, "洗盘观察")
+            self.assertEqual(result.operation_advice, "支撑附近观察")
             self.assertEqual(result.dashboard.get("decision_type"), "hold")
-            self.assertEqual(result.dashboard.get("operation_advice"), "洗盘观察")
+            self.assertEqual(result.dashboard.get("operation_advice"), "支撑附近观察")
             self.assertEqual(result.dashboard.get("sentiment_score"), result.sentiment_score)
             explanation = result.dashboard["agent_disagreement_explanation"]
             self.assertEqual(explanation["risk_control"]["post_risk_signal"], "sell")
