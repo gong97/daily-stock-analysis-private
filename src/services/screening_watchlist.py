@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -870,8 +870,14 @@ def expire_entries(
     max_size: Any = None,
     max_per_industry: Any = None,
     max_per_industry_total: Optional[int] = None,
+    active_strategies: Optional[Collection[str]] = None,
 ) -> Tuple[Dict[str, WatchlistEntry], List[Tuple[str, str]]]:
     """按 TTL、行业配额和容量上限淘汰名单，**每个 bucket 独立执行**。
+
+    `active_strategies` 是当前启用的全部策略名（不分 cadence）。传入时，已停用策略的
+    背书立即剪掉，不等 TTL：停用的理由是它选的票之后跑输（Macd-Qlib-Analyzer
+    scripts/market_scan_replay.py），让它的候选在名单里再挂 14~30 天没有意义。
+    只剩停用背书的条目以 `retired` 出局。
 
     三个限额参数都接受标量（三桶统一）或 `{bucket: 值}` 映射；传 None 使用
     各桶的默认值。
@@ -884,11 +890,12 @@ def expire_entries(
     可以让给同桶其他行业的候选，而不是白白浪费。`pinned` 条目永不淘汰且不占名额。
 
     Returns:
-        `(保留下来的名单, [(被淘汰代码, 原因)])`，原因取 `ttl`、`industry_quota`
-        或 `capacity`。
+        `(保留下来的名单, [(被淘汰代码, 原因)])`，原因取 `retired`、`ttl`、
+        `industry_quota` 或 `capacity`。
     """
     kept: Dict[str, WatchlistEntry] = {}
     removed: List[Tuple[str, str]] = []
+    active = None if active_strategies is None else set(active_strategies)
 
     # 先按**每条背书自己所属桶的 TTL** 剪枝：进攻策略的背书 14 天失效，
     # 防守策略的 45 天。条目只要还剩任一条有效背书就留下，全部失效才算 ttl 出局。
@@ -896,7 +903,11 @@ def expire_entries(
     surviving: Dict[str, WatchlistEntry] = {}
     for code, entry in entries.items():
         live: Dict[str, StrategyHit] = {}
+        retired = 0
         for name, hit in entry.strategies.items():
+            if active is not None and name not in active:
+                retired += 1
+                continue
             hit_ttl = limit_for(
                 ttl_days, hit.bucket,
                 default=DEFAULT_TTL_DAYS_BY_BUCKET.get(hit.bucket, DEFAULT_TTL_DAYS),
@@ -908,10 +919,13 @@ def expire_entries(
         if not live and not entry.pinned:
             # 出局条目保留原背书不剪：bucket 由背书推导，剪空后报告会把它
             # 误标成 FALLBACK_BUCKET，看不出是从哪个桶移出的。
-            removed.append((code, "ttl"))
+            removed.append((code, "retired" if retired == len(entry.strategies) else "ttl"))
             continue
         if len(live) != len(entry.strategies):
             entry.strategies = live
+            if retired:
+                # 主桶和桶内最高分可能来自刚剪掉的停用策略，按剩下的背书重算。
+                _settle_bucket_scoped_score(entry, {})
         surviving[code] = entry
 
     for bucket, bucket_entries in group_by_bucket(surviving.values()).items():
@@ -1223,6 +1237,7 @@ def render_report(
         lines.append("## 移出观察名单")
         lines.append("")
         reason_text = {
+            "retired": "策略已停用",
             "ttl": "超过留存期",
             "industry_quota": "同行业在该桶已满额",
             "industry_quota_global": "同行业已达全局上限",

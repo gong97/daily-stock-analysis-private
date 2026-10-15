@@ -440,6 +440,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         max_size=size_limits,
         max_per_industry=industry_limits,
         max_per_industry_total=args.max_per_industry_total,
+        # 用全部启用的策略（不分 cadence）：weekly 那轮不能把 daily 策略的背书当停用剪掉。
+        active_strategies=[str(getattr(info, "name", "")) for info in infos],
     )
     # 本次刚进来又立刻被容量裁掉的，不算"新进"。
     added = [code for code in added if code in entries]

@@ -17,7 +17,10 @@ style:
   ui_badge: 突破
 
 screening:
-  enabled: true
+  # 2026-10-15 停用：按生产硬过滤回放到 2019-04~2026-09 的随机样本，候选之后 10 日
+  # 无方向：-0.032，t -2.94，未过门槛 4.09（Macd-Qlib-Analyzer scripts/market_scan_replay.py，台账 market-scan-replay-vb）。
+  # 既不跑赢也测不出跑输：没有选股能力。重新启用前先换新的检验。
+  enabled: false
   market_scope: [cn]
   hard_filters:
     exclude_st: true

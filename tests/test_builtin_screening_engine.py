@@ -23,7 +23,7 @@ from src.services.screening import scorer as screening_scorer
 from src.services.screening.scorer import compute_screen_scores
 from src.services.screening import snapshot as screening_snapshot
 from src.services.screening.industry import enrich_industry_concepts, load_industry_map
-from src.services.screening.strategy import list_strategies, load_all_strategies
+from src.services.screening.strategy import list_strategies, load_all_strategies, load_strategy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -86,20 +86,21 @@ def test_bundled_strategies_are_loaded_from_the_internal_package() -> None:
     assert set(strategies) == {
         "balanced_alpha",
         "blue_chip_income",
-        "capital_heat",
         "dual_low",
         "low_volatility_quality",
         "momentum_quality",
-        "oversold_reversal",
         "quality_value",
         "shrink_pullback",
-        "theme_momentum",
-        "volume_breakout",
     }
     assert strategies["dual_low"].screening.factor_weights["value"] < 0.40
 
+    # 四条 short_term 策略 2026-10-15 回放检验不通过后停用：文件保留，enabled=false，
+    # load_all_strategies / list_strategies 都不再返回它们。
+    for name in ("capital_heat", "oversold_reversal", "theme_momentum", "volume_breakout"):
+        assert load_strategy(SCREENING_ROOT / "strategies" / f"{name}.yaml").screening.enabled is False
+
     # theme_momentum 是显式的进攻侧补充：不看估值、限定中小市值、依赖板块热度。
-    offensive = strategies["theme_momentum"].screening
+    offensive = load_strategy(SCREENING_ROOT / "strategies" / "theme_momentum.yaml").screening
     assert "value" not in offensive.factor_weights
     assert offensive.factor_weights["theme_heat"] >= 0.25
     assert offensive.hard_filters.market_cap_max is not None
@@ -1162,5 +1163,7 @@ def test_blue_chip_strategies_do_not_require_high_turnover() -> None:
     assert strategies["shrink_pullback"].screening.hard_filters.turnover_rate_min <= 0.5
 
     # 动量/热度类策略的高换手是信号本身，不能一并放宽
+    # （这三条已停用，参数仍保留在 YAML 里，直接读文件）
     for name in ("capital_heat", "theme_momentum", "volume_breakout"):
-        assert strategies[name].screening.hard_filters.turnover_rate_min >= 2.0
+        strategy = load_strategy(SCREENING_ROOT / "strategies" / f"{name}.yaml")
+        assert strategy.screening.hard_filters.turnover_rate_min >= 2.0

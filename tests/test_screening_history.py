@@ -194,11 +194,13 @@ class ScreeningHistoryTestCase(unittest.TestCase):
     def test_screening_strategies_declare_dsa_analysis_skill_handoffs(self) -> None:
         strategies = {item.name: item for item in list_strategies()}
 
-        self.assertEqual(strategies["volume_breakout"].analysis_skills, ["volume_breakout"])
+        # volume_breakout / capital_heat 已于 2026-10-15 停用，改用仍启用的两条策略验证。
+        self.assertEqual(strategies["shrink_pullback"].analysis_skills, ["shrink_pullback"])
         self.assertEqual(
-            strategies["capital_heat"].analysis_skills,
-            ["hot_theme", "emotion_cycle"],
+            strategies["momentum_quality"].analysis_skills,
+            ["bull_trend", "growth_quality"],
         )
+        self.assertNotIn("capital_heat", strategies)
 
     def test_fresh_post_rank_context_includes_dsa_events(self) -> None:
         manager = Mock()

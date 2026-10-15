@@ -222,11 +222,19 @@ DSA 中存在两类用途不同的策略文件：
 
 | holding_period | 频率 | 内置策略 |
 | --- | --- | --- |
-| `short_term` | daily（每交易日 17:30 北京时间） | `capital_heat`、`oversold_reversal`、`volume_breakout`、`theme_momentum` |
+| `short_term` | daily（**定时任务已撤**，见下） | `capital_heat`、`oversold_reversal`、`volume_breakout`、`theme_momentum`（**均已停用**） |
 | `swing` | weekly（每周五 18:30 北京时间） | `momentum_quality`、`low_volatility_quality`、`shrink_pullback` |
 | `watchlist` | weekly | `balanced_alpha`、`quality_value`、`dual_low`、`blue_chip_income` |
 
 未识别的 `holding_period` 一律按 weekly 处理，避免新策略被默默拉成每日高频。
+
+> **2026-10-15 停用全部 short_term 策略。** 把这四条的生产硬过滤原样回放到 2019-04~2026-09 的
+> 随机样本（Macd-Qlib-Analyzer `scripts/market_scan_replay.py`，判据先于跑数提交）：候选之后 10 日的
+> 胜率百分位资金热度 −0.058（t −7.91）、主题动能 −0.053（t −8.07）、超跌反转 −0.037（t −14.42），
+> 置换门槛 |t| 4.09，三项前后两个半段都为负，即**入选之后跑输**；放量突破 −0.032（t −2.94）不过门槛，
+> 没有选股能力。跑输的大头来自四条策略共有的换手 / 成交额下限（A 股高换手之后跑输）。
+> YAML 里 `enabled: false`（文件与参数保留），daily 定时任务撤掉；`expire_entries(active_strategies=...)`
+> 会在下一轮扫描时立即剪掉停用策略的背书，不等 TTL。weekly 组的策略**同样没有回测过**，检验另行登记。
 `WATCHLIST_CADENCE_MAP=short_term:daily,swing:weekly,watchlist:weekly` 可覆盖该映射，
 只接受 `daily` / `weekly`，非法项会被跳过并保留默认值。
 

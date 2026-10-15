@@ -1438,3 +1438,45 @@ def test_backfilling_an_older_day_still_records_the_strategy_hit():
     assert sorted(entry.strategies) == ["dual_low", "quality_value"]
     assert entry.best_score == 99.0
     assert entry.hit_count == 1
+
+
+def test_expire_entries_drops_retired_strategy_endorsements() -> None:
+    """停用策略的背书不等 TTL，立即剪掉；只剩停用背书的条目以 retired 出局。"""
+    only_retired = WatchlistEntry(
+        code="000001", last_seen="2026-10-14", latest_score=90.0,
+        strategies={"capital_heat": StrategyHit(score=90.0, last_seen="2026-10-14", bucket=BUCKET_AGGRESSIVE)},
+    )
+    mixed = WatchlistEntry(
+        code="000002", last_seen="2026-10-14", latest_score=88.0,
+        strategies={
+            "oversold_reversal": StrategyHit(score=88.0, last_seen="2026-10-14", bucket=BUCKET_BALANCED),
+            "dual_low": StrategyHit(score=71.0, last_seen="2026-10-10", bucket=BUCKET_DEFENSIVE),
+        },
+    )
+    pinned = WatchlistEntry(
+        code="000003", last_seen="2026-10-14", pinned=True,
+        strategies={"theme_momentum": StrategyHit(score=80.0, last_seen="2026-10-14", bucket=BUCKET_AGGRESSIVE)},
+    )
+    kept, removed = expire_entries(
+        {e.code: e for e in (only_retired, mixed, pinned)},
+        run_date=date(2026, 10, 15),
+        active_strategies=["dual_low", "quality_value"],
+    )
+
+    assert ("000001", "retired") in removed
+    assert set(kept) == {"000002", "000003"}
+    # 剩下的防守背书接管主桶，分数按它重算，不再挂着停用策略的 88 分
+    assert list(kept["000002"].strategies) == ["dual_low"]
+    assert kept["000002"].bucket == BUCKET_DEFENSIVE
+    assert kept["000002"].latest_score == 71.0
+    assert kept["000003"].pinned
+
+
+def test_expire_entries_without_active_list_keeps_all_endorsements() -> None:
+    """不传 active_strategies 时行为不变（旧调用方与单测）。"""
+    entry = WatchlistEntry(
+        code="000001", last_seen="2026-10-14",
+        strategies={"capital_heat": StrategyHit(score=90.0, last_seen="2026-10-14", bucket=BUCKET_AGGRESSIVE)},
+    )
+    kept, removed = expire_entries({"000001": entry}, run_date=date(2026, 10, 15))
+    assert "000001" in kept and removed == []

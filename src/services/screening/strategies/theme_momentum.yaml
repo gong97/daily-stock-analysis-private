@@ -27,7 +27,10 @@ style:
   ui_badge: 主题
 
 screening:
-  enabled: true
+  # 2026-10-15 停用：按生产硬过滤回放到 2019-04~2026-09 的随机样本，候选之后 10 日
+  # 跑输：胜率百分位 -0.053，t -8.07，28/30 季（Macd-Qlib-Analyzer scripts/market_scan_replay.py，台账 market-scan-replay）。
+  # 跑输的大头来自换手 / 成交额下限本身（A 股高换手之后跑输）。重新启用前先换新的检验。
+  enabled: false
   market_scope: [cn]
   hard_filters:
     exclude_st: true
