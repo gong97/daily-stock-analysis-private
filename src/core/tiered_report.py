@@ -234,12 +234,11 @@ def _summary_key_price(
     dashboard: Dict[str, Any],
     current_price: Optional[float] = None,
 ) -> str:
-    """总览表的「关键价格」列：按动作分流，不同动作看不同的价位。
+    """总览表的「关键价格 / 风险提示」列：按动作分流。加仓看买点、减仓看止损、持有看【程序】风险提示。
 
     现价已低于止损位时追加「⚠️已跌破」——止损不再是等待条件，而是已经触发。
     """
     sniper = extract_sniper_points(deep)
-    price_position = dashboard.get("data_perspective", {}).get("price_position", {})
 
     def _stop_text(stop_loss: Any) -> str:
         text = f"< {_fmt_price(stop_loss)} 止损"
@@ -264,14 +263,23 @@ def _summary_key_price(
             return _stop_text(stop_loss)
         return "—"
 
-    # hold：优先给出「突破再买」的压力位，没有就给止损位兜底
-    resistance = price_position.get("resistance_level")
-    if resistance is not None:
-        return f"> {_fmt_price(resistance)} 再买"
-    stop_loss = sniper.get("stop_loss")
-    if stop_loss is not None:
-        return _stop_text(stop_loss)
-    return "—"
+    # hold：只列程序判定的风险提示，没有就写「—」。
+    # 2026-10-15 以前这里是「> 压力位 再买」——用户盘前照这一列挂条件单，挂的就是突破买单，
+    # 而历史检验里刚涨过、放量突破的股票之后多数跑输（见 src/chase_guard.py）。
+    # 也不再用止损位兜底：持仓者的机械止损没有经过检验，不该放在当天唯一要通读的表里。
+    return _program_flag_text(dashboard)
+
+
+_PROGRAM_FLAG_LABELS = (("overheat", "高位过热"), ("turnover", "高位高换手"), ("insider", "近期高管减持"))
+
+
+def _program_flag_text(dashboard: Dict[str, Any]) -> str:
+    """【程序】风险提示（src/program_checklist.py 的结构化结果）：只列触发的项。"""
+    flags = dashboard.get("program_flags")
+    if not isinstance(flags, dict):
+        return "—"
+    hits = [label for key, label in _PROGRAM_FLAG_LABELS if flags.get(key) is True]
+    return "⚠️ " + "、".join(hits) if hits else "—"
 
 
 def _market_light_header(market_light: Optional[Dict[str, Any]]) -> str:
@@ -345,7 +353,7 @@ def render_decision_summary(
         lines.append(header)
         lines.append("")
 
-    lines.append("| 股票 | 动作 | 现价 | 关键价格 | 紧迫度 |")
+    lines.append("| 股票 | 动作 | 现价 | 关键价格 / 风险提示 | 紧迫度 |")
     lines.append("| --- | --- | --- | --- | --- |")
     for row in rows:
         lines.append(

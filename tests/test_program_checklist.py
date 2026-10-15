@@ -68,3 +68,21 @@ def test_system_prompt_no_longer_asks_for_self_check():
     # 清单里不再有这一项（「强烈买入」评分标准里那句「仓位与止损计划明确」是另一回事，保留）
     assert "检查项5：仓位与止损计划明确" not in prompt and "【模型】仓位与止损" not in prompt
     assert prompt.count("【模型】") >= 5 and "标【程序】" in prompt
+
+
+def test_program_flags_are_stored_structured_for_the_summary_table() -> None:
+    """总览表读 dashboard["program_flags"]，不解析清单文字。"""
+    from types import SimpleNamespace
+
+    from src.program_checklist import apply_program_checklist, program_flag_states
+
+    ctx = {"holder_changes": {"status": "ok", "data": {"management_recent_selling": [{"date": "2026-10-01"}]}}}
+    assert program_flag_states({"flag_a": False, "flag_b": True, "flag_c": False}, ctx) == {
+        "overheat": True, "turnover": False, "insider": True,
+    }
+    assert program_flag_states(None, None) == {"overheat": None, "turnover": None, "insider": None}
+
+    result = SimpleNamespace(dashboard={})
+    apply_program_checklist(result, overheat_flags={"flag_a": False, "flag_b": False, "flag_c": True},
+                            fundamental_context={"holder_changes": {"status": "ok", "data": {}}})
+    assert result.dashboard["program_flags"] == {"overheat": False, "turnover": True, "insider": False}

@@ -71,7 +71,7 @@ _FLOW_CONTEXTS = {
     [
         ("buy", "买入", 33.4, 0.0, "hold", "震荡观望"),     # 接近压力
         ("buy", "买入", 32.0, 0.0, "hold", "震荡观望"),     # 支撑与压力之间
-        ("buy", "买入", 35.0, 0.0, "buy", "买入"),          # 有效突破，保留买入
+        ("buy", "买入", 35.0, 0.0, "hold", "震荡观望"),     # 已突破压力：追涨，2026-10-15 起也降级
         ("sell", "卖出", 30.4, -2.1, "hold", "洗盘观察"),   # 贴近支撑
         ("sell", "卖出", 29.0, -3.0, "sell", "卖出"),       # 跌破支撑，保留卖出
     ],
@@ -282,3 +282,16 @@ def test_structural_rewrite_is_labelled_in_position_advice() -> None:
     assert result.dashboard["battle_plan"]["position_strategy"]["suggested_position"] == (
         "建议仓位：2成（模型原建议；结论已被结构稳定规则改为观望）"
     )
+
+
+def test_downgrades_buy_after_breakout() -> None:
+    """已突破压力位的买入属于追涨：历史检验里刚涨过、放量突破的股票之后多数跑输（src/chase_guard.py）。"""
+    result = _result(decision_type="buy", operation_advice="买入", score=70, current_price=35.0)
+
+    stabilize_decision_with_structure(
+        result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), None
+    )
+
+    assert result.decision_type == "hold"
+    assert result.sentiment_score <= 59
+    assert "追涨" in result.risk_warning

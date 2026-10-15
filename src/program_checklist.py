@@ -67,6 +67,29 @@ def _item(mark: str, tag: str, label: str, detail: str, language: str) -> str:
     return f"{mark} {tag}{label}{sep}{detail}"
 
 
+def program_flag_states(
+    overheat_flags: Optional[Dict[str, Any]],
+    fundamental_context: Optional[Dict[str, Any]],
+) -> Dict[str, Optional[bool]]:
+    """三项【程序】判定的结构化结果：True 触发、False 未触发、None 数据不足。
+
+    总览表的「关键价格 / 提示」列读这里，不去解析清单文字。
+    """
+    flags = overheat_flags if isinstance(overheat_flags, dict) else {}
+    a, b, c = flags.get("flag_a"), flags.get("flag_b"), flags.get("flag_c")
+    if a or b:
+        overheat: Optional[bool] = True
+    elif a is False and b is False:
+        overheat = False
+    else:
+        overheat = None
+    turnover = c if isinstance(c, bool) else None
+    block = (fundamental_context or {}).get("holder_changes") if isinstance(fundamental_context, dict) else None
+    data = block.get("data") if isinstance(block, dict) and block.get("status") == "ok" else None
+    insider = bool(data.get("management_recent_selling")) if isinstance(data, dict) else None
+    return {"overheat": overheat, "turnover": turnover, "insider": insider}
+
+
 def build_program_checklist(
     overheat_flags: Optional[Dict[str, Any]],
     fundamental_context: Optional[Dict[str, Any]],
@@ -131,4 +154,5 @@ def apply_program_checklist(
     model_items = [x for x in model_items if not any(tag in x for tag in tags)]
     program_items = build_program_checklist(overheat_flags, fundamental_context, language)
     battle["action_checklist"] = program_items + model_items
+    dashboard["program_flags"] = program_flag_states(overheat_flags, fundamental_context)
     return program_items

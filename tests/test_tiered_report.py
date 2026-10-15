@@ -270,7 +270,9 @@ class TestRenderDecisionSummary(unittest.TestCase):
         self.assertIn("市场评分：52/100", summary)
         self.assertIn("信号分化", summary)
         self.assertIn("| 宁德时代 300750.SZ | ADD | — | ¥330.00 ~ ¥336.00 | 立即 |", summary)
-        self.assertIn("| 兆易创新 603986.SH | HOLD | — | > ¥132.50 再买 | 本周 |", summary)
+        # 持有不再给「突破再买」的压力位（追涨型买点），只列【程序】风险提示
+        self.assertIn("| 兆易创新 603986.SH | HOLD | — | — | 本周 |", summary)
+        self.assertNotIn("再买", summary)
         self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | < ¥17.80 止损 | 立即 |", summary)
 
         # 排序：CUT 排最前
@@ -534,3 +536,27 @@ class TestRenderMajorChanges(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProgramFlagKeyPriceTest(unittest.TestCase):
+    """持有行的「关键价格 / 风险提示」只列【程序】触发项。"""
+
+    def test_hold_lists_triggered_program_flags(self):
+        result = _make_lite_result(
+            code="601899.SH", name="紫金矿业", action="hold", score=55,
+            dashboard={
+                "data_perspective": {"price_position": {"resistance_level": 31.15}},
+                "program_flags": {"overheat": True, "turnover": False, "insider": True},
+            },
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("⚠️ 高位过热、近期高管减持", summary)
+        self.assertNotIn("再买", summary)
+
+    def test_hold_without_flags_shows_dash(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=55,
+            dashboard={"program_flags": {"overheat": False, "turnover": None, "insider": False}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)

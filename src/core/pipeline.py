@@ -97,6 +97,7 @@ from src.overheat_flags import (
     compute_overheat_flags,
 )
 from src.program_checklist import apply_program_checklist
+from src.chase_guard import current_price_of, strip_chase_buy_points
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -910,6 +911,7 @@ class StockAnalysisPipeline:
                     language=getattr(result, "report_language", None)
                     or getattr(self.config, "report_language", "zh"),
                 )
+                self._strip_chase_buy_points(result, code)
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
                 if isinstance(market_structure_context, dict):
@@ -1390,6 +1392,20 @@ class StockAnalysisPipeline:
             )
             return None
 
+    def _strip_chase_buy_points(self, result: Any, code: str) -> None:
+        """删掉追涨型买点（高于现价 / 带「突破」），两条分析路径共用；见 src/chase_guard.py。"""
+        try:
+            removed = strip_chase_buy_points(
+                result,
+                current_price_of(result),
+                getattr(result, "report_language", None) or getattr(self.config, "report_language", "zh"),
+            )
+        except Exception as exc:  # 只删文字，失败不影响结论
+            logger.warning("[chase_guard] %s 处理失败：%s", code, exc)
+            return
+        if removed:
+            logger.info("[chase_guard] Removed chase-type entries for %s: %s", code, removed)
+
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
         from src.services.history_loader import get_frozen_target_date
@@ -1686,6 +1702,7 @@ class StockAnalysisPipeline:
                         code,
                         market_context_adjustments,
                     )
+                self._strip_chase_buy_points(result, code)
                 self._refresh_decision_action_for_final_result(
                     result,
                     report_type=report_type.value,
