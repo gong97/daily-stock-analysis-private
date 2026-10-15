@@ -23,6 +23,7 @@ from json_repair import repair_json
 from litellm import Router
 
 from src.overheat_flags import render_overheat_flags_prompt
+from src.valuation_red_flags import render_red_flags_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -4003,6 +4004,11 @@ class GeminiAnalyzer:
         overheat_section = render_overheat_flags_prompt(context.get('overheat_flags'))
         if overheat_section:
             prompt += overheat_section
+
+        # 估值报告质量红旗：较早的深度报告里的风险，近几日新闻不一定提到（src/valuation_red_flags.py）
+        red_flags_section = render_red_flags_prompt(context.get('valuation_red_flags'))
+        if red_flags_section:
+            prompt += red_flags_section
 
         # 添加昨日对比数据
         if 'yesterday' in context:

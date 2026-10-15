@@ -1135,6 +1135,26 @@ class NotificationService(
             or cls._phase_decision_list(phase_decision.get("data_limitations"))
         )
 
+    @staticmethod
+    def _append_valuation_red_flags(report_lines: List[str], dashboard: Any, labels: Dict[str, str]) -> None:
+        """估值报告质量红旗：有红旗列红旗，没有就列公司层面风险（各最多 4 条）。"""
+        entry = dashboard.get("valuation_red_flags") if isinstance(dashboard, dict) else None
+        if not isinstance(entry, dict):
+            return
+        flags = [str(x) for x in entry.get("flags") or []][:4]
+        risks = [str(x) for x in entry.get("company_risks") or []][:4]
+        if not flags and not risks:
+            return
+        meta = f"Macd-Qlib 估值报告 {entry.get('date', '')}"
+        if entry.get("confidence"):
+            meta += f"，置信度 {entry['confidence']}"
+        title = labels.get("valuation_red_flags_label", "估值报告红旗") if flags else labels.get(
+            "company_risks_label", "公司层面风险")
+        report_lines.append("")
+        report_lines.append(f"**📑 {title}**（{meta}）:")
+        for item in flags or risks:
+            report_lines.append(f"- {item}")
+
     def _append_phase_decision_block(
         self,
         report_lines: List[str],
@@ -1365,6 +1385,8 @@ class NotificationService(
                         report_lines.append(f"**🚨 {labels['risk_alerts_label']}**:")
                         for alert in risk_alerts:
                             report_lines.append(f"- {alert}")
+                    # 估值报告质量红旗（src/valuation_red_flags.py）：较早的深度报告里的风险
+                    self._append_valuation_red_flags(report_lines, dashboard, labels)
                     # 利好催化
                     catalysts = intel.get('positive_catalysts', [])
                     if catalysts:

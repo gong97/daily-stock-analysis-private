@@ -2527,3 +2527,23 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ValuationRedFlagsRenderTest(unittest.TestCase):
+    @mock.patch("src.notification.get_config")
+    def test_red_flags_render_after_risk_alerts(self, mock_get_config):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="000858", name="五粮液", sentiment_score=55, trend_prediction="震荡",
+            operation_advice="持有", analysis_summary="震荡",
+            dashboard={
+                "intelligence": {"risk_alerts": ["大盘偏弱"]},
+                "valuation_red_flags": {"date": "2026-10-15", "confidence": "中低",
+                                        "flags": ["🚩 收入与经营现金流背离"], "company_risks": ["x"]},
+            },
+        )
+        out = service.generate_dashboard_report([result], report_date="2026-10-16")
+        self.assertIn("**📑 估值报告红旗**（Macd-Qlib 估值报告 2026-10-15，置信度 中低）:", out)
+        self.assertIn("- 🚩 收入与经营现金流背离", out)
+        self.assertLess(out.index("大盘偏弱"), out.index("估值报告红旗"))

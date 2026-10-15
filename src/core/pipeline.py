@@ -99,6 +99,7 @@ from src.overheat_flags import (
 from src.program_checklist import apply_program_checklist
 from src.chase_guard import current_price_of, strip_chase_buy_points
 from src.tested_signals import annotate_tested_signals
+from src.valuation_red_flags import apply_red_flags, red_flags_for
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -775,6 +776,10 @@ class StockAnalysisPipeline:
             enhanced_context["market_phase_context"] = market_phase_context_dict
             if overheat_flags:
                 enhanced_context["overheat_flags"] = overheat_flags
+            # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
+            valuation_red_flags = red_flags_for(code)
+            if valuation_red_flags:
+                enhanced_context["valuation_red_flags"] = valuation_red_flags
             self._attach_daily_market_context(
                 enhanced_context,
                 daily_market_context,
@@ -1394,8 +1399,8 @@ class StockAnalysisPipeline:
             return None
 
     def _strip_chase_buy_points(self, result: Any, code: str) -> None:
-        """展示层的检验兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），
-        给已检验无效的看多理由加标注（src/tested_signals.py）。"""
+        """展示层的兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），给已检验无效的
+        看多理由加标注（src/tested_signals.py），挂上估值报告质量红旗（src/valuation_red_flags.py）。"""
         try:
             removed = strip_chase_buy_points(
                 result,
@@ -1418,6 +1423,14 @@ class StockAnalysisPipeline:
             return
         if annotated:
             logger.info("[tested_signals] Annotated bullish reasons for %s: %s", code, annotated)
+        # 估值报告质量红旗：报告里单列，模型仍打 ✅「无重大利空」时改 ⚠️（src/valuation_red_flags.py）
+        try:
+            flagged = apply_red_flags(result, red_flags_for(code))
+        except Exception as exc:
+            logger.warning("[valuation_red_flags] %s 处理失败：%s", code, exc)
+            return
+        if flagged:
+            logger.info("[valuation_red_flags] Attached valuation red flags for %s: %s", code, flagged)
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""

@@ -275,6 +275,9 @@ jobs:
           # 数据源
           # ==========================================
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          # 估值报告质量红旗（src/valuation_red_flags.py）：读私有仓库 Macd-Qlib-Analyzer 的
+          # reports/red_flags.json。fine-grained PAT，只给该仓库 Contents: Read；不设则跳过。
+          VALUATION_RED_FLAGS_TOKEN: ${{ secrets.VALUATION_RED_FLAGS_TOKEN }}
           # Tushare Pro 自定义接入地址（可选；指向自建网关或第三方兼容镜像时设置）
           TUSHARE_HTTP_URL: ${{ vars.TUSHARE_HTTP_URL || secrets.TUSHARE_HTTP_URL }}
           # TickFlow（A 股日 K、实时行情、股票列表/名称与大盘复盘增强；不设则走免费源 fallback）
