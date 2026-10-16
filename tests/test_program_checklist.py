@@ -43,9 +43,9 @@ def test_apply_prepends_program_items_and_drops_model_copies():
     apply_program_checklist(result, overheat_flags={"flag_a": False, "flag_b": True, "flag_c": False},
                             fundamental_context=_fund())
     checklist = result.dashboard["battle_plan"]["action_checklist"]
-    assert [c.split(" ")[0] for c in checklist[:3]] == ["⚠️", "✅", "✅"]
-    assert checklist[3:] == ["✅ 【模型】无重大利空", "⚠️ 【模型】入场位置与风险回报是否合理"]
-    assert sum("【程序】" in c for c in checklist) == 3
+    assert [c.split(" ")[0] for c in checklist[:4]] == ["⚠️", "✅", "✅", "❓"]  # 第 4 项近 5 日涨幅：没传 → 数据不足
+    assert checklist[4:] == ["✅ 【模型】无重大利空", "⚠️ 【模型】入场位置与风险回报是否合理"]
+    assert sum("【程序】" in c for c in checklist) == 4
 
 
 def test_apply_creates_battle_plan_and_english_labels():
@@ -78,11 +78,22 @@ def test_program_flags_are_stored_structured_for_the_summary_table() -> None:
 
     ctx = {"holder_changes": {"status": "ok", "data": {"management_recent_selling": [{"date": "2026-10-01"}]}}}
     assert program_flag_states({"flag_a": False, "flag_b": True, "flag_c": False}, ctx) == {
-        "overheat": True, "turnover": False, "insider": True,
+        "overheat": True, "turnover": False, "insider": True, "runup": None,
     }
-    assert program_flag_states(None, None) == {"overheat": None, "turnover": None, "insider": None}
+    assert program_flag_states(None, None) == {"overheat": None, "turnover": None, "insider": None, "runup": None}
 
     result = SimpleNamespace(dashboard={})
     apply_program_checklist(result, overheat_flags={"flag_a": False, "flag_b": False, "flag_c": True},
                             fundamental_context={"holder_changes": {"status": "ok", "data": {}}})
-    assert result.dashboard["program_flags"] == {"overheat": False, "turnover": True, "insider": False}
+    assert result.dashboard["program_flags"] == {"overheat": False, "turnover": True, "insider": False, "runup": None}
+
+
+
+def test_recent_runup_is_the_fourth_program_item() -> None:
+    from src.program_checklist import build_program_checklist
+
+    hit = {"flag": True, "top": True, "excess": 0.14, "stock_ret": 0.16, "index_ret": 0.02}
+    items = build_program_checklist(None, None, "zh", recent_runup=hit)
+    assert items[3] == "⚠️ 【程序】近 5 日涨幅居前（不追高）：5 日 +16.0%，扣除中证 1000 后 +14.0%，全市场前 5%"
+    miss = {**hit, "flag": False, "top": False}
+    assert build_program_checklist(None, None, "zh", recent_runup=miss)[3].startswith("✅")

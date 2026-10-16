@@ -1089,14 +1089,17 @@ def stabilize_decision_with_structure(
     result: "AnalysisResult",
     trend_result: Any = None,
     fundamental_context: Optional[Dict[str, Any]] = None,
+    *,
+    recent_runup: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Calibrate aggressive buy/sell advice with price levels.
+    结构稳定规则：只剩一条——近 5 日涨幅居全市场前 10% 时，「买入」降为观望。
 
-    The LLM can overreact to one-day price movement.  This guard keeps the
-    public `decision_type` enum stable while allowing richer neutral wording
-    such as 震荡/支撑附近观察 when support and resistance do not confirm an
-    immediate buy/sell action.
+    2026-10-16 起不再用支撑 / 压力价位改判：八种支撑 / 压力算法（含本仓库的 MA5/MA10/MA20 支撑与 20 日高点
+    压力）触及后掉头的概率都与同距离的随机价位没有区别（Macd-Qlib-Analyzer scripts/sr_levels_reaction.py），
+    所以「接近压力不买」「区间中部不买」「接近支撑不卖」三条停用。原来的「突破 20 日高点后不买」本意是不追涨，
+    改为直接看涨幅：`recent_runup`（src/recent_runup.py）触发时降级——过去 5 日涨幅居前的股票之后 10 日跑输，
+    两个时期 t 约 9（reversal_flow_robustness）。`recent_runup` 为 None（分界线或指数取不到）时不改判。
 
     主力资金流不参与（2026-10-04 起）：历史检验里主力净流入最强的股票之后 10 个交易日反而多数跑输，
     扣除前期涨跌后没有信息（Macd-Qlib-Analyzer scripts/capital_flow_eval.py）。以前的「资金流缺失就
@@ -1137,48 +1140,11 @@ def stabilize_decision_with_structure(
         if current_price is None:
             return
 
-        broke_support = support is not None and current_price < support * 0.985
-        near_support = support is not None and not broke_support and current_price <= support * 1.03
-        breakout = resistance is not None and current_price > resistance * 1.01
-        near_resistance = (
-            resistance is not None
-            and not breakout
-            and current_price >= resistance * 0.97
-        )
-        mid_range = (
-            support is not None
-            and resistance is not None
-            and support * 1.03 < current_price < resistance * 0.97
-        )
-
-        has_significant_risk = _has_structural_risk_alert(result)
-
         levels = {"current_price": current_price, "support": support, "resistance": resistance}
-        if decision_type == "buy":
-            if breakout:
-                # 2026-10-15：已突破压力位的买入也降级。买在刚涨上去的位置就是追涨：历史检验里
-                # 过去 5 日涨幅居前的股票之后 10 个交易日多数跑输（Macd-Qlib-Analyzer
-                # reversal_flow_robustness，t≈9），形态突破确认也没有边（pattern_breakout_backtest）。
-                _downgrade_to_structural_hold(
-                    result, language, advice_key="range", reason_key="buy_after_breakout", **levels,
-                )
-            elif near_resistance:
-                _downgrade_to_structural_hold(
-                    result, language, advice_key="range", reason_key="buy_near_resistance", **levels,
-                )
-            elif mid_range:
-                _downgrade_to_structural_hold(
-                    result, language, advice_key="range", reason_key="hold_mid_range", **levels,
-                )
-        elif decision_type == "sell":
-            if near_support and not has_significant_risk:
-                _downgrade_to_structural_hold(
-                    result, language, advice_key="shakeout", reason_key="sell_near_support", **levels,
-                )
-        # 结论本来就是 hold 时不再改写措辞（2026-10-15）：以前「当天下跌且靠近支撑」「在支撑与压力
-        # 之间」会把模型针对这只票写的建议整段换成同一句模板——10-15 那次 24 只里 18 只被换掉，
-        # 没有一只结论变了，只丢了个股信息（如五粮液的「关注回款与监管动态」）。只有真的把买入 /
-        # 卖出改成观望时才用模板，模板里写明改的原因。
+        if decision_type == "buy" and isinstance(recent_runup, dict) and recent_runup.get("flag"):
+            _downgrade_to_structural_hold(
+                result, language, advice_key="watch", reason_key="buy_after_runup", **levels,
+            )
         _sync_stability_dashboard_fields(result)
     except Exception as exc:
         logger.warning("[decision_stability] skipped: %s", exc)
@@ -1434,16 +1400,19 @@ def _set_structural_hold_wording(
     advice_map = {
         "zh": {
             "range": "震荡观望",
+            "watch": "观望",
             "shakeout": "支撑附近观察",
             "hold": "持有观察",
         },
         "en": {
             "range": "Range-bound watch",
+            "watch": "Watch",
             "shakeout": "Near-support watch",
             "hold": "Hold and watch",
         },
         "ko": {
             "range": "박스권 관망",
+            "watch": "관망",
             "shakeout": "지지선 부근 관찰",
             "hold": "보유 관찰",
         },
@@ -1453,26 +1422,26 @@ def _set_structural_hold_wording(
     reason_templates = {
         "zh": {
             "buy_near_resistance": "价格接近压力位，不宜仅因短线反弹追买。",
-            "buy_after_breakout": "价格已突破压力位，此时买入属于追涨：历史检验中刚涨过、放量突破的股票之后多数跑输。",
+            "buy_after_runup": "近 5 日涨幅居全市场前 10%（扣除中证 1000），此时买入属于追涨：历史检验中这类股票之后 10 个交易日多数跑输。",
             "sell_near_support": "价格贴近支撑且未跌破，不宜仅因单日下跌直接卖出。",
             "hold_mid_range": "价格处于支撑与压力之间，维持震荡观望更可操作。",
         },
         "en": {
             "buy_near_resistance": "Price is near resistance, so chasing the rebound is not actionable.",
-            "buy_after_breakout": "Price has already broken above resistance; buying here is chasing, and in backtests recent breakouts mostly underperformed.",
+            "buy_after_runup": "The 5-day gain is in the market's top 10% (net of the CSI 1000); buying now is chasing, and such stocks mostly underperformed over the next 10 days in backtests.",
             "sell_near_support": "Price is near support and has not broken it, so a one-day drop is not enough to sell.",
             "hold_mid_range": "Price is between support and resistance, so range-bound watch is more actionable.",
         },
         "ko": {
             "buy_near_resistance": "가격이 저항선에 근접해 단기 반등만 보고 추격 매수하기 어렵습니다.",
-            "buy_after_breakout": "가격이 이미 저항선을 돌파해 지금 매수는 추격 매수이며, 백테스트에서 최근 돌파 종목은 대체로 부진했습니다.",
+            "buy_after_runup": "최근 5일 상승률이 시장 상위 10%(CSI 1000 차감)로 지금 매수는 추격 매수이며, 백테스트에서 이런 종목은 이후 10거래일 대체로 부진했습니다.",
             "sell_near_support": "가격이 지지선에 근접했지만 이탈하지 않아 하루 하락만으로 매도하기 어렵습니다.",
             "hold_mid_range": "가격이 지지선과 저항선 사이에 있어 박스권 관망이 더 실행 가능합니다.",
         },
     }
     reason = reason_templates.get(language, reason_templates["en"]).get(reason_key, "")
     if calibrate_score:
-        final_action = "watch" if advice_key in {"range", "shakeout"} else "hold"
+        final_action = "watch" if advice_key in {"range", "shakeout", "watch"} else "hold"
         _bound_hold_watch_sentiment_score(result, reason=reason, final_action=final_action)
     result.operation_advice = advice
     if advice_key == "range":
@@ -1484,15 +1453,15 @@ def _set_structural_hold_wording(
             result.trend_prediction = "횡보"
 
     if language == "zh":
-        no_position = "空仓先不追涨杀跌，等待回踩支撑确认后再行动。"
+        no_position = "空仓不追：近 5 日涨幅已居前，等热度回落后再评估。"
         # 不再写「以关键支撑为风控线」：那等于一条机械止损，而历史检验里回撤 / 趋势止损在多数持仓
         # 风格上让夏普变差（Macd-Qlib-Analyzer risk_rules_backtest）。
         has_position = "持仓不变；是否减仓看【程序】风险提示和基本面变化，不以单日跌破支撑为准。"
     elif language == "ko":
-        no_position = "현금 보유 시 추격·투매를 삼가고 지지선 확인 후 행동하세요."
+        no_position = "현금 보유 시 추격하지 마세요: 최근 5일 상승률이 상위권이니 과열이 식은 뒤 다시 평가하세요."
         has_position = "보유 유지; 비중 축소는 [규칙] 리스크 표시와 펀더멘털 변화로 판단하고, 하루 지지선 이탈만으로 판단하지 마세요."
     else:
-        no_position = "Do not chase or panic; wait for a pullback to confirmed support."
+        no_position = "Do not chase: the 5-day gain is already near the top of the market; reassess after it cools."
         has_position = "Keep the position; decide on trimming from rule-based risk flags and fundamentals, not a one-day break of support."
     _apply_hold_watch_dashboard(
         result,
@@ -1944,7 +1913,7 @@ class GeminiAnalyzer:
 
 ### 强烈买入（80-100分）：
 - ✅ 有可核实的基本面支撑：估值相对自身历史或同行不贵，业绩与经营现金流相互印证
-- ✅ 价格回踩到支撑附近，低乖离率：<2%
+- ✅ 低乖离率：<2%（不追高）
 - ✅ 筹码集中健康
 - ✅ 近期无风险事件（减持、问询、会计更正、现金流与利润背离等）
 
@@ -1967,7 +1936,7 @@ class GeminiAnalyzer:
 
 ### 卖出（0-19分）：
 - ❌ 空头排列或趋势显著恶化
-- ❌ 跌破关键支撑/止损位
+- ❌ 基本面明显恶化
 - ❌ 放量下跌或重大利空
 
 ## 决策仪表盘核心原则
@@ -1981,11 +1950,11 @@ class GeminiAnalyzer:
 ## 可操作性与稳定性约束
 
 - 不得仅因为单日涨跌或评分跨线就在“买入/卖出”之间剧烈切换。
-- 操作建议必须同时参考价格位置（支撑/压力位）、量能/筹码和风险事件。主力资金流向只作描述、不作买卖依据：历史检验（2020~2026，300 只随机样本）中主力净流入最强的股票之后 10 个交易日反而多数跑输（多是刚涨过的），扣除前期涨跌后没有信息。
-- 股价位于支撑与压力之间时，优先输出“持有/震荡/观望/支撑附近观察”等可执行的中性建议；`decision_type` 仍保持 `hold`。
+- 操作建议必须同时参考估值 / 基本面、风险事件和【程序】风险提示。主力资金流向只作描述、不作买卖依据：历史检验（2020~2026，300 只随机样本）中主力净流入最强的股票之后 10 个交易日反而多数跑输（多是刚涨过的），扣除前期涨跌后没有信息。
+- 没有明确的基本面或风险变化时，优先输出“持有/观望”等中性建议；`decision_type` 仍保持 `hold`。支撑位 / 压力位在 A 股历史检验中不比随机价位准（八种算法，Macd-Qlib-Analyzer sr_levels_reaction），不要把「回踩支撑」「接近压力」「跌破支撑」当作买卖依据。
 - 下列理由在 A 股历史检验（Macd-Qlib-Analyzer，随机样本 + 全市场）中没有优势或方向相反，不要把它们当作看多或加仓的依据（可以作为事实描述）：缩量回调 / 洗盘、RSI 超卖或超跌后的反弹需求、均线多头排列、主力资金净流入、已公布的业绩大增或超预期、股东 / 高管增持、高股息、放量突破。程序会在报告里给这些理由加上检验标注。
-- 只有在回踩支撑确认、且量价配合时，才能给出买入；接近或已突破压力时都不得追买。`ideal_buy` / `secondary_buy` 必须不高于现价，不要写「突破压力位再买」「放量突破跟进」这类追涨型买点：历史检验（Macd-Qlib-Analyzer，2011~2026）中刚涨过、放量突破的股票之后 10 个交易日多数跑输，形态突破确认也没有优势。高于现价或带「突破」的买点会被程序删除。
-- 只有在跌破关键支撑或风险显著放大时，才能给出卖出/减仓。
+- 不追涨：近 5 日涨幅居全市场前 10% 时不给买入（程序会改判为观望）。`ideal_buy` / `secondary_buy` 必须不高于现价，不要写「突破压力位再买」「放量突破跟进」这类追涨型买点：历史检验（Macd-Qlib-Analyzer，2011~2026）中刚涨过、放量突破的股票之后 10 个交易日多数跑输，形态突破确认也没有优势。高于现价或带「突破」的买点会被程序删除。
+- 只有在风险显著放大时（基本面恶化、重大利空、【程序】风险提示触发）才给出卖出/减仓；不要仅因跌破某个价位就卖出。
 - 必须输出 `dashboard.phase_decision` 七字段；盘中/午休/临近收盘要给出当前动作、观察条件和下一次检查点。
 - 建议输出可选展示字段 `dashboard.signal_attribution` 六字段；解释推荐理由的构成，包括技术指标、新闻舆情、基本面、市场环境的贡献度，以及最强看多/看空信号。
 - 盘前、非交易日或未知阶段不得伪造今日盘中走势；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 时，`confidence_level` 不得为高。"""
@@ -2167,11 +2136,11 @@ class GeminiAnalyzer:
 ## 可操作性与稳定性约束
 
 - 不得仅因为单日涨跌或评分跨线就在“买入/卖出”之间剧烈切换。
-- 操作建议必须同时参考价格位置（支撑/压力位）、量能/筹码和风险事件。主力资金流向只作描述、不作买卖依据：历史检验（2020~2026，300 只随机样本）中主力净流入最强的股票之后 10 个交易日反而多数跑输（多是刚涨过的），扣除前期涨跌后没有信息。
-- 股价位于支撑与压力之间时，优先输出“持有/震荡/观望/支撑附近观察”等可执行的中性建议；`decision_type` 仍保持 `hold`。
+- 操作建议必须同时参考估值 / 基本面、风险事件和【程序】风险提示。主力资金流向只作描述、不作买卖依据：历史检验（2020~2026，300 只随机样本）中主力净流入最强的股票之后 10 个交易日反而多数跑输（多是刚涨过的），扣除前期涨跌后没有信息。
+- 没有明确的基本面或风险变化时，优先输出“持有/观望”等中性建议；`decision_type` 仍保持 `hold`。支撑位 / 压力位在 A 股历史检验中不比随机价位准（八种算法，Macd-Qlib-Analyzer sr_levels_reaction），不要把「回踩支撑」「接近压力」「跌破支撑」当作买卖依据。
 - 下列理由在 A 股历史检验（Macd-Qlib-Analyzer，随机样本 + 全市场）中没有优势或方向相反，不要把它们当作看多或加仓的依据（可以作为事实描述）：缩量回调 / 洗盘、RSI 超卖或超跌后的反弹需求、均线多头排列、主力资金净流入、已公布的业绩大增或超预期、股东 / 高管增持、高股息、放量突破。程序会在报告里给这些理由加上检验标注。
-- 只有在回踩支撑确认、且量价配合时，才能给出买入；接近或已突破压力时都不得追买。`ideal_buy` / `secondary_buy` 必须不高于现价，不要写「突破压力位再买」「放量突破跟进」这类追涨型买点：历史检验（Macd-Qlib-Analyzer，2011~2026）中刚涨过、放量突破的股票之后 10 个交易日多数跑输，形态突破确认也没有优势。高于现价或带「突破」的买点会被程序删除。
-- 只有在跌破关键支撑或风险显著放大时，才能给出卖出/减仓。
+- 不追涨：近 5 日涨幅居全市场前 10% 时不给买入（程序会改判为观望）。`ideal_buy` / `secondary_buy` 必须不高于现价，不要写「突破压力位再买」「放量突破跟进」这类追涨型买点：历史检验（Macd-Qlib-Analyzer，2011~2026）中刚涨过、放量突破的股票之后 10 个交易日多数跑输，形态突破确认也没有优势。高于现价或带「突破」的买点会被程序删除。
+- 只有在风险显著放大时（基本面恶化、重大利空、【程序】风险提示触发）才给出卖出/减仓；不要仅因跌破某个价位就卖出。
 - 必须输出 `dashboard.phase_decision` 七字段；盘中/午休/临近收盘要给出当前动作、观察条件和下一次检查点。
 - 建议输出可选展示字段 `dashboard.signal_attribution` 六字段；解释推荐理由的构成，包括技术指标、新闻舆情、基本面、市场环境的贡献度，以及最强看多/看空信号。
 - 盘前、非交易日或未知阶段不得伪造今日盘中走势；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 时，`confidence_level` 不得为高。"""
@@ -4002,6 +3971,17 @@ class GeminiAnalyzer:
         red_flags_section = render_red_flags_prompt(context.get('valuation_red_flags'))
         if red_flags_section:
             prompt += red_flags_section
+
+        # 近 5 日涨幅居前（程序按检验口径算好，src/recent_runup.py）：触发时程序会把「买入」改判为观望
+        runup = context.get('recent_runup')
+        if isinstance(runup, dict):
+            state = "是（全市场前 10%）" if runup.get('flag') else "否"
+            prompt += (
+                f"\n### 近 5 日涨幅（程序计算，截至 {runup.get('as_of')}）\n"
+                f"- 个股 5 日 {runup.get('stock_ret', 0):+.2%}，中证 1000 {runup.get('index_ret', 0):+.2%}，"
+                f"扣除后 {runup.get('excess', 0):+.2%}；是否居全市场前 10%：{state}\n"
+                "> 历史检验中近 5 日涨幅居前的股票之后 10 个交易日多数跑输；触发时不要给买入。\n"
+            )
 
         # 添加昨日对比数据
         if 'yesterday' in context:

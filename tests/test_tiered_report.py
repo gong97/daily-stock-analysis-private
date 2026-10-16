@@ -75,7 +75,7 @@ def _full_dashboard():
 
 
 class TestRenderCandidateBlockFullData(unittest.TestCase):
-    """字段齐全时，卡片应包含执行计划、现价、距支撑/距压力百分比。"""
+    """字段齐全时，卡片应包含执行计划、现价；2026-10-16 起不再列支撑 / 压力与距离（八种算法都不比随机价位准）。"""
 
     def test_full_dashboard_renders_all_sections(self):
         candidate = TieredCandidate(
@@ -95,8 +95,8 @@ class TestRenderCandidateBlockFullData(unittest.TestCase):
         self.assertIn("¥121.00", block)  # 理想买点解析自带前缀的字符串
         self.assertIn("¥117.80", block)  # 止损
         self.assertIn("📊 关键位置", block)
-        self.assertIn("距支撑", block)
-        self.assertIn("距压力", block)
+        self.assertNotIn("距支撑", block)
+        self.assertNotIn("距压力", block)
         self.assertIn("✅ 转为 BUY 的条件", block)
         self.assertIn("1. 收盘 > ¥132.5", block)
         self.assertIn("📅 下一观察点", block)
@@ -269,12 +269,12 @@ class TestRenderDecisionSummary(unittest.TestCase):
         self.assertIn("市场状态：震荡 · 需观察", summary)
         self.assertIn("市场评分：52/100", summary)
         self.assertIn("信号分化", summary)
-        self.assertIn("| 宁德时代 300750.SZ | ADD | — | ¥330.00 ~ ¥336.00 | 立即 |", summary)
+        self.assertIn("| 宁德时代 300750.SZ | ADD | — | — | ¥330.00 ~ ¥336.00 | 立即 |", summary)
         # 持有不再给「突破再买」的压力位（追涨型买点），只列【程序】风险提示
-        self.assertIn("| 兆易创新 603986.SH | HOLD | — | — | 本周 |", summary)
+        self.assertIn("| 兆易创新 603986.SH | HOLD | — | — | — | 本周 |", summary)
         self.assertNotIn("再买", summary)
         # 减仓行也不再把模型止损位当关键价格（未经检验），只列【程序】风险提示
-        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | — | 立即 |", summary)
+        self.assertIn("| 隆基绿能 601012.SH | CUT·减仓 | — | — | — | 立即 |", summary)
 
         # 排序：CUT 排最前
         cut_pos = summary.index("隆基绿能")
@@ -353,7 +353,7 @@ class TestRenderDecisionSummary(unittest.TestCase):
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
 
         self.assertIn(
-            "| 兆易创新 603986.SH | CUT·减仓 | ¥352.10 | — | — |", summary
+            "| 兆易创新 603986.SH | CUT·减仓 | ¥352.10 | — | — | — |", summary
         )
 
     def test_current_price_falls_back_to_llm_value(self):
@@ -380,7 +380,7 @@ class TestRenderDecisionSummary(unittest.TestCase):
         )
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
 
-        self.assertIn("| ¥340.00 | 已跌破模型止损 ¥345.00 |", summary)
+        self.assertIn("| ¥340.00 | — | 已跌破模型止损 ¥345.00 |", summary)
 
     def test_no_successful_results_returns_empty_string(self):
         result = _make_lite_result(
@@ -561,3 +561,27 @@ class ProgramFlagKeyPriceTest(unittest.TestCase):
         )
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
         self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
+
+
+class ExpectedRangeTest(unittest.TestCase):
+    """次日波动区间（±1 ATR）：总览表一列 + 表下 ATR 说明；卡片关键位置不再列支撑 / 压力。"""
+
+    def test_summary_shows_expected_range_and_atr_note(self):
+        result = _make_lite_result(
+            code="603986.SH", name="兆易创新", action="hold", score=50,
+            dashboard={"expected_range": {"atr": 13.5, "atr_pct": 0.048, "close": 281.86,
+                                          "low": 268.36, "high": 295.36, "as_of": "2026-10-16"}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("| 次日波动区间（±1 ATR） |", summary)
+        self.assertIn("¥268.36 ~ ¥295.36（±4.8%）", summary)
+        self.assertIn("ATR（平均真实波幅）", summary)
+        self.assertIn("不再提示支撑位和压力位", summary)
+
+    def test_runup_flag_is_listed_as_program_risk(self):
+        result = _make_lite_result(
+            code="603986.SH", name="兆易创新", action="hold", score=50,
+            dashboard={"program_flags": {"overheat": False, "turnover": False, "insider": False, "runup": True}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("⚠️ 近5日涨幅居前", summary)

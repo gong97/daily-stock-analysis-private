@@ -1464,10 +1464,16 @@ class NotificationService(
                             f"| {labels['ma10_label']} | {price_data.get('ma10', 'N/A')} |",
                             f"| {labels['ma20_label']} | {price_data.get('ma20', 'N/A')} |",
                             f"| {labels['bias_ma5_label']} | {price_data.get('bias_ma5', 'N/A')}% {bias_status} |",
-                            f"| {labels['support_level_label']} | {price_data.get('support_level', 'N/A')} |",
-                            f"| {labels['resistance_level_label']} | {price_data.get('resistance_level', 'N/A')} |",
-                            "",
                         ])
+                        # 支撑位 / 压力位不再显示（八种算法都不比随机价位准），改列 ±1 ATR 的次日波动区间
+                        expected = dashboard.get('expected_range') if isinstance(dashboard, dict) else None
+                        if isinstance(expected, dict) and expected.get('low') is not None:
+                            report_lines.append(
+                                f"| {labels['expected_range_label']} | {expected['low']:.2f} ~ {expected['high']:.2f}"
+                                f"（ATR {expected['atr']:.2f}，±{expected['atr_pct'] * 100:.1f}%） |"
+                            )
+                            report_lines.extend(["", f"> ℹ️ {labels['atr_note']}"])
+                        report_lines.append("")
                     # 量能分析
                     if vol_data:
                         report_lines.extend([

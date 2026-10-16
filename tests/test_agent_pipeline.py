@@ -2089,25 +2089,17 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             )
 
             self.assertIsNotNone(result)
-            self.assertEqual(result.decision_type, "hold")
-            self.assertEqual(result.operation_advice, "支撑附近观察")
-            self.assertEqual(result.dashboard.get("decision_type"), "hold")
-            self.assertEqual(result.dashboard.get("operation_advice"), "支撑附近观察")
+            # 2026-10-16 起「接近支撑不卖」停用（支撑价位不比随机价位准），卖出结论保留
+            self.assertEqual(result.decision_type, "sell")
+            self.assertEqual(result.dashboard.get("decision_type"), result.decision_type)
+            self.assertEqual(result.dashboard.get("operation_advice"), result.operation_advice)
             self.assertEqual(result.dashboard.get("sentiment_score"), result.sentiment_score)
             explanation = result.dashboard["agent_disagreement_explanation"]
             self.assertEqual(explanation["risk_control"]["post_risk_signal"], "sell")
             self.assertNotIn("final_signal", explanation)
             self.assertEqual(explanation["final_action"], result.action)
-            self.assertEqual(
-                explanation["final_adjustments"],
-                [
-                    {
-                        "source": "structure_and_fundamentals",
-                        "from_action": "sell",
-                        "to_action": result.action,
-                    }
-                ],
-            )
+            # 结构规则没有改判，就不记调整
+            self.assertEqual(explanation["final_adjustments"], [])
             saved_result = pipeline.db.save_analysis_history.call_args.kwargs["result"]
             self.assertIs(saved_result, result)
             signal_result = (

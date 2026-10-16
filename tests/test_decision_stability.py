@@ -66,235 +66,69 @@ _FLOW_CONTEXTS = {
 }
 
 
+_RUNUP_HIT = {"flag": True, "top": False, "excess": 0.12, "stock_ret": 0.15, "index_ret": 0.03, "cutoff": 0.08}
+_RUNUP_MISS = {**_RUNUP_HIT, "flag": False, "excess": 0.01}
+
+
 @pytest.mark.parametrize(
-    "decision, advice, price, change_pct, expected_decision, expected_advice",
+    "decision, advice, price, change_pct",
     [
-        ("buy", "买入", 33.4, 0.0, "hold", "震荡观望"),     # 接近压力
-        ("buy", "买入", 32.0, 0.0, "hold", "震荡观望"),     # 支撑与压力之间
-        ("buy", "买入", 35.0, 0.0, "hold", "震荡观望"),     # 已突破压力：追涨，2026-10-15 起也降级
-        ("sell", "卖出", 30.4, -2.1, "hold", "支撑附近观察"),   # 贴近支撑
-        ("sell", "卖出", 29.0, -3.0, "sell", "卖出"),       # 跌破支撑，保留卖出
+        ("buy", "买入", 33.4, 0.0),      # 接近压力
+        ("buy", "买入", 32.0, 0.0),      # 支撑与压力之间
+        ("buy", "买入", 35.0, 0.0),      # 已突破压力
+        ("sell", "卖出", 30.4, -2.1),    # 贴近支撑
+        ("sell", "卖出", 29.0, -3.0),    # 跌破支撑
     ],
 )
-def test_capital_flow_no_longer_changes_the_decision(
-    decision, advice, price, change_pct, expected_decision, expected_advice
-) -> None:
-    """2026-10-04 起资金流不参与稳定性规则：流入、流出、取不到，结论完全一样，只看价格结构。
-
-    出处：Macd-Qlib-Analyzer scripts/capital_flow_eval.py——主力净流入最强的股票之后 10 个交易日
-    反而多数跑输，扣除前期涨跌后没有信息。以前「资金流缺失就降级买入」「流入改写卖出」都已去掉。
-    """
-    outcomes = {}
-    for name, context in _FLOW_CONTEXTS.items():
-        result = _result(
-            decision_type=decision, operation_advice=advice, score=60, current_price=price, change_pct=change_pct
-        )
+@pytest.mark.parametrize("runup", [None, _RUNUP_MISS])
+def test_price_levels_no_longer_change_the_decision(decision, advice, price, change_pct, runup) -> None:
+    """2026-10-16 起支撑 / 压力价位不再改判：八种算法都不比随机价位准（Macd-Qlib-Analyzer sr_levels_reaction）。
+    资金流也不参与（capital_flow_eval）。"""
+    for context in _FLOW_CONTEXTS.values():
+        result = _result(decision_type=decision, operation_advice=advice, score=60, current_price=price,
+                         change_pct=change_pct)
         stabilize_decision_with_structure(
-            result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), context
+            result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), context, recent_runup=runup,
         )
-        outcomes[name] = (result.decision_type, result.operation_advice)
-        assert "capital_flow_bias" not in result.dashboard.get("decision_stability", {})
-
-    assert set(outcomes.values()) == {(expected_decision, expected_advice)}, outcomes
+        assert (result.decision_type, result.operation_advice) == (decision, advice)
+        assert result.dashboard["core_conclusion"]["one_sentence"] == "原始结论"
 
 
-def test_downgrades_buy_near_resistance() -> None:
-    result = _result(
-        decision_type="buy",
-        operation_advice="买入",
-        score=65,
-        current_price=33.4,
-    )
+def test_recent_runup_downgrades_buy_to_watch() -> None:
+    """近 5 日涨幅居全市场前 10% 时「买入」改判观望：之后 10 日多数跑输（reversal_flow_robustness，t≈9）。"""
+    result = _result(decision_type="buy", operation_advice="买入", score=70, current_price=32.0)
+    result.dashboard["battle_plan"] = {"position_strategy": {"suggested_position": "建议仓位：3成"}}
 
     stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=-1_000_000, five_day=-2_000_000),
+        result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), None, recent_runup=_RUNUP_HIT,
     )
 
     assert result.decision_type == "hold"
+    assert result.operation_advice == "观望"
     assert result.sentiment_score <= 59
-    assert result.operation_advice == "震荡观望"
+    assert "追涨" in result.risk_warning
     assert result.dashboard["decision_stability"]["applied"] is True
-    assert "不宜仅因短线反弹追买" in result.risk_warning
-    assert result.dashboard["core_conclusion"]["signal_type"] == "🟡持有观望"
-
-
-def test_downgrades_buy_mid_range() -> None:
-    result = _result(
-        decision_type="buy",
-        operation_advice="买入",
-        score=66,
-        current_price=32.0,
-    )
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=0, five_day=0, ten_day=0),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.sentiment_score <= 59
-    assert result.operation_advice == "震荡观望"
-    assert "价格处于支撑与压力之间" in result.risk_warning
-
-
-def test_skips_downgrade_when_only_generic_risk_warning_and_sell_near_support() -> None:
-    result = _result(
-        decision_type="sell",
-        operation_advice="卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=1.0,
-    )
-    result.risk_warning = "注意常见回撤风险，建议关注仓位。"
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=500_000, five_day=300_000),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "支撑附近观察"
-    assert "价格贴近支撑且未跌破" in result.risk_warning
-
-
-def test_stability_can_infer_decision_from_natural_chinese_phrases_in_analyzer_path() -> None:
-    result = _result(
-        decision_type="建议卖出",
-        operation_advice="建议卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=1.0,
-    )
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=500_000, five_day=300_000),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "支撑附近观察"
-    assert result.dashboard["decision_stability"]["applied"] is True
-
-
-def test_downgrades_sell_near_support_without_sustained_outflow() -> None:
-    result = _result(
-        decision_type="sell",
-        operation_advice="卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=-2.1,
-    )
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=800_000, five_day=1_200_000),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.sentiment_score >= 45
-    assert result.operation_advice == "支撑附近观察"
-    assert "不宜仅因单日下跌直接卖出" in result.risk_warning
-
-
-def test_insider_selling_alone_does_not_count_as_significant_risk() -> None:
-    """减持只作提示、不参与决策（2026-09-30 检验：股东减持无效，高管减持只作弱参考）。"""
-    result = _result(
-        decision_type="sell",
-        operation_advice="卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=-2.1,
-    )
-    result.dashboard["intelligence"] = {"risk_alerts": ["2026-09-25 弱参考：近期高管减持（董事减持2.00万）",
-                                                        "2026-09-20 股东高位减持预告"]}
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=800_000, five_day=1_200_000),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "支撑附近观察"
-
-
-def test_preserves_sell_signal_when_significant_risk_exists_near_support() -> None:
-    result = _result(
-        decision_type="sell",
-        operation_advice="卖出",
-        score=30,
-        current_price=30.4,
-        change_pct=-2.1,
-    )
-    result.risk_warning = "重大利空消息：公司发布重大减持计划"
-    result.dashboard["intelligence"] = {"risk_alerts": ["股东高位减持预告"]}
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=800_000, five_day=1_200_000),
-    )
-
-    assert result.decision_type == "sell"
-    assert result.operation_advice == "卖出"
-
-
-@pytest.mark.parametrize("price, change_pct", [(30.5, -1.6), (32.0, 0.5)])  # 靠近支撑下跌 / 支撑与压力之间
-def test_hold_keeps_model_wording(price, change_pct) -> None:
-    """结论本来就是 hold 时不改写措辞（2026-10-15）：以前会把模型的个股建议整段换成同一句模板。"""
-    result = _result(decision_type="hold", operation_advice="持有", score=52, current_price=price,
-                     change_pct=change_pct)
-    advice = {"no_position": "关注回款与监管动态后再考虑。", "has_position": "持仓者关注渠道回款。"}
-    result.dashboard["core_conclusion"] = {"one_sentence": "模型原话", "position_advice": dict(advice)}
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=0, five_day=500_000),
-    )
-
-    assert result.decision_type == "hold"
-    assert result.operation_advice == "持有"
-    assert result.dashboard["core_conclusion"]["one_sentence"] == "模型原话"
-    assert result.dashboard["core_conclusion"]["position_advice"] == advice
-    assert "洗盘" not in (result.risk_warning or "")
-
-
-def test_structural_rewrite_is_labelled_in_position_advice() -> None:
-    """程序改写的仓位建议带来源标注；模型原填的「建议仓位」不改写，只注明结论已改为观望。"""
-    result = _result(decision_type="sell", operation_advice="卖出", score=30, current_price=30.4, change_pct=-2.1)
-    result.dashboard["battle_plan"] = {"position_strategy": {"suggested_position": "建议仓位：2成"}}
-
-    stabilize_decision_with_structure(
-        result,
-        SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]),
-        _fund_flow(main=800_000, five_day=1_200_000),
-    )
-
     advice = result.dashboard["core_conclusion"]["position_advice"]
     assert advice["no_position"].endswith("（程序改写：结构稳定规则）")
     assert advice["has_position"].endswith("（程序改写：结构稳定规则）")
-    # 持仓者模板不再写「以关键支撑为风控线」（机械止损，未经检验）
-    assert "风控线" not in advice["has_position"]
+    assert "支撑" not in advice["no_position"] and "风控线" not in advice["has_position"]
     assert result.dashboard["battle_plan"]["position_strategy"]["suggested_position"] == (
-        "建议仓位：2成（模型原建议；结论已被结构稳定规则改为观望）"
+        "建议仓位：3成（模型原建议；结论已被结构稳定规则改为观望）"
     )
 
 
-def test_downgrades_buy_after_breakout() -> None:
-    """已突破压力位的买入属于追涨：历史检验里刚涨过、放量突破的股票之后多数跑输（src/chase_guard.py）。"""
-    result = _result(decision_type="buy", operation_advice="买入", score=70, current_price=35.0)
-
-    stabilize_decision_with_structure(
-        result, SimpleNamespace(support_levels=[30.0], resistance_levels=[34.0]), None
-    )
-
+def test_recent_runup_infers_buy_from_natural_phrase() -> None:
+    result = _result(decision_type="建议买入", operation_advice="建议买入", score=66, current_price=32.0)
+    stabilize_decision_with_structure(result, None, None, recent_runup=_RUNUP_HIT)
     assert result.decision_type == "hold"
-    assert result.sentiment_score <= 59
-    assert "追涨" in result.risk_warning
+
+
+def test_recent_runup_leaves_sell_and_hold_alone() -> None:
+    sell = _result(decision_type="sell", operation_advice="卖出", score=30, current_price=30.4)
+    stabilize_decision_with_structure(sell, None, None, recent_runup=_RUNUP_HIT)
+    assert (sell.decision_type, sell.operation_advice) == ("sell", "卖出")
+
+    hold = _result(decision_type="hold", operation_advice="持有", score=52, current_price=30.5)
+    stabilize_decision_with_structure(hold, None, None, recent_runup=_RUNUP_HIT)
+    assert (hold.decision_type, hold.operation_advice) == ("hold", "持有")
+    assert hold.dashboard["core_conclusion"]["one_sentence"] == "原始结论"

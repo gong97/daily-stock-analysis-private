@@ -103,11 +103,13 @@ def _execution_plan_lines(deep: Any, dashboard: Dict[str, Any]) -> List[str]:
 
 
 def _key_levels_lines(dashboard: Dict[str, Any], current_price: Optional[float]) -> List[str]:
-    """📊 关键位置：MA20 / 支撑 / 压力 / 距支撑 / 距压力。"""
+    """📊 关键位置：MA20 / 次日波动区间 / 量比。
+
+    2026-10-16 起不再列支撑 / 压力与距离：八种支撑 / 压力算法都不比随机价位准
+    （Macd-Qlib-Analyzer scripts/sr_levels_reaction.py），改列 ±1 ATR 的次日波动区间。
+    """
     price_position = dashboard.get("data_perspective", {}).get("price_position", {})
     ma20 = price_position.get("ma20")
-    support = price_position.get("support_level")
-    resistance = price_position.get("resistance_level")
 
     volume = dashboard.get("data_perspective", {}).get("volume_analysis", {})
     volume_ratio = volume.get("volume_ratio")
@@ -115,23 +117,9 @@ def _key_levels_lines(dashboard: Dict[str, Any], current_price: Optional[float])
     rows: List[str] = []
     if ma20 is not None:
         rows.append(f"- MA20：{_fmt_price(ma20)}")
-    if support is not None:
-        rows.append(f"- 支撑：{_fmt_price(support)}")
-    if resistance is not None:
-        rows.append(f"- 压力：{_fmt_price(resistance)}")
-
-    if current_price is not None and support is not None:
-        try:
-            distance = (current_price - float(support)) / float(support) * 100
-            rows.append(f"- 距支撑：{distance:+.1f}%")
-        except (TypeError, ValueError, ZeroDivisionError):
-            pass
-    if current_price is not None and resistance is not None:
-        try:
-            distance = (float(resistance) - current_price) / current_price * 100
-            rows.append(f"- 距压力：{distance:+.1f}%")
-        except (TypeError, ValueError, ZeroDivisionError):
-            pass
+    expected = _expected_range_text(dashboard)
+    if expected != "—":
+        rows.append(f"- 次日波动区间（±1 ATR）：{expected}")
 
     if volume_ratio is not None:
         rows.append(f"- 量比：{volume_ratio}")
@@ -268,7 +256,24 @@ def _summary_key_price(
     return _program_flag_text(dashboard)
 
 
-_PROGRAM_FLAG_LABELS = (("overheat", "高位过热"), ("turnover", "高位高换手"), ("insider", "近期高管减持"))
+_PROGRAM_FLAG_LABELS = (
+    ("overheat", "高位过热"), ("turnover", "高位高换手"), ("insider", "近期高管减持"), ("runup", "近5日涨幅居前"),
+)
+
+ATR_NOTE = (
+    "次日波动区间 = 最新收盘 ± 1 个 ATR。ATR（平均真实波幅）是近 20 个交易日每天真实波动幅度的平均值——真实波幅取当天最高减最低，若有跳空，则用前收盘到当天最高 / 最低中更大的那段——表示这只股票一天通常上下波动多少钱。它不预测价格会在哪里掉头：支撑位 / 压力位的八种算法检验下来都不比随机价位准，所以日报不再提示支撑位和压力位；挂条件单时，可以用这个区间判断离现价多远才算比平时大的波动。"
+)
+
+
+def _expected_range_text(dashboard: Dict[str, Any]) -> str:
+    """次日波动区间：最新收盘 ± 1 个 ATR（src/recent_runup.py）。"""
+    rng = dashboard.get("expected_range")
+    if not isinstance(rng, dict):
+        return "—"
+    try:
+        return f"{_fmt_price(rng['low'])} ~ {_fmt_price(rng['high'])}（±{float(rng['atr_pct']) * 100:.1f}%）"
+    except (KeyError, TypeError, ValueError):
+        return "—"
 
 
 def _program_flag_text(dashboard: Dict[str, Any]) -> str:
@@ -336,6 +341,7 @@ def render_decision_summary(
                 "score": score,
                 "current_price": _fmt_price(current_price),
                 "key_price": _summary_key_price(bucket, result, dashboard, current_price),
+                "expected_range": _expected_range_text(dashboard),
                 "urgency": _summary_urgency_marker(dashboard),
             }
         )
@@ -351,13 +357,15 @@ def render_decision_summary(
         lines.append(header)
         lines.append("")
 
-    lines.append("| 股票 | 动作 | 现价 | 关键价格 / 风险提示 | 紧迫度 |")
-    lines.append("| --- | --- | --- | --- | --- |")
+    lines.append("| 股票 | 动作 | 现价 | 次日波动区间（±1 ATR） | 关键价格 / 风险提示 | 紧迫度 |")
+    lines.append("| --- | --- | --- | --- | --- | --- |")
     for row in rows:
         lines.append(
             f"| {row['name']} {row['code']} | {row['action_label']} | "
-            f"{row['current_price']} | {row['key_price']} | {row['urgency']} |"
+            f"{row['current_price']} | {row['expected_range']} | {row['key_price']} | {row['urgency']} |"
         )
+    lines.append("")
+    lines.append(f"> ℹ️ {ATR_NOTE}")
 
     return "\n".join(lines)
 

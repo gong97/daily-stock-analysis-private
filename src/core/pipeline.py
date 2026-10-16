@@ -100,6 +100,7 @@ from src.program_checklist import apply_program_checklist
 from src.chase_guard import current_price_of, strip_chase_buy_points
 from src.tested_signals import annotate_tested_signals
 from src.valuation_red_flags import apply_red_flags, red_flags_for
+from src.recent_runup import compute_expected_range, compute_recent_runup
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -632,11 +633,14 @@ class StockAnalysisPipeline:
                 flag_start = flag_end - timedelta(days=OVERHEAT_LOOKBACK_CALENDAR_DAYS)
                 flag_bars = self.db.get_data_range(code, flag_start, flag_end)
                 if flag_bars:
+                    bars_df = pd.DataFrame([bar.to_dict() for bar in flag_bars])
                     overheat_flags = compute_overheat_flags(
-                        pd.DataFrame([bar.to_dict() for bar in flag_bars]),
+                        bars_df,
                         circ_mv=getattr(realtime_quote, 'circ_mv', None) if realtime_quote else None,
                         price=getattr(realtime_quote, 'price', None) if realtime_quote else None,
                     )
+                    # 近 5 日涨幅居前、预期波动区间（±1 ATR），两条路径共用，见 src/recent_runup.py
+                    self._set_price_facts(code, bars_df)
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 过热风险旗标计算失败: {e}")
 
@@ -776,6 +780,9 @@ class StockAnalysisPipeline:
             enhanced_context["market_phase_context"] = market_phase_context_dict
             if overheat_flags:
                 enhanced_context["overheat_flags"] = overheat_flags
+            price_facts = self._price_facts_for(code)
+            if price_facts.get("recent_runup"):
+                enhanced_context["recent_runup"] = price_facts["recent_runup"]
             # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
             valuation_red_flags = red_flags_for(code)
             if valuation_red_flags:
@@ -885,7 +892,10 @@ class StockAnalysisPipeline:
             if result:
                 fill_price_position_if_needed(result, trend_result, realtime_quote)
                 action_source_advice = getattr(result, "operation_advice", None)
-                stabilize_decision_with_structure(result, trend_result, fundamental_context)
+                stabilize_decision_with_structure(
+                    result, trend_result, fundamental_context,
+                    recent_runup=self._price_facts_for(code).get("recent_runup"),
+                )
                 adjustments = apply_phase_decision_guardrails(
                     result,
                     market_phase_summary=market_phase_summary,
@@ -916,6 +926,7 @@ class StockAnalysisPipeline:
                     fundamental_context=fundamental_context,
                     language=getattr(result, "report_language", None)
                     or getattr(self.config, "report_language", "zh"),
+                    recent_runup=self._price_facts_for(code).get("recent_runup"),
                 )
                 self._strip_chase_buy_points(result, code)
                 if isinstance(fundamental_context, dict):
@@ -1398,6 +1409,23 @@ class StockAnalysisPipeline:
             )
             return None
 
+    def _set_price_facts(self, code: str, bars_df: pd.DataFrame) -> None:
+        facts: Dict[str, Any] = {}
+        try:
+            facts["recent_runup"] = compute_recent_runup(bars_df)
+        except Exception as exc:
+            logger.warning("[recent_runup] %s 计算失败：%s", code, exc)
+        try:
+            facts["expected_range"] = compute_expected_range(bars_df)
+        except Exception as exc:
+            logger.warning("[expected_range] %s 计算失败：%s", code, exc)
+        if not hasattr(self, "_price_facts"):
+            self._price_facts = {}
+        self._price_facts[code] = facts
+
+    def _price_facts_for(self, code: str) -> Dict[str, Any]:
+        return getattr(self, "_price_facts", {}).get(code) or {}
+
     def _strip_chase_buy_points(self, result: Any, code: str) -> None:
         """展示层的兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），给已检验无效的
         看多理由加标注（src/tested_signals.py），挂上估值报告质量红旗（src/valuation_red_flags.py）。"""
@@ -1431,6 +1459,17 @@ class StockAnalysisPipeline:
             return
         if flagged:
             logger.info("[valuation_red_flags] Attached valuation red flags for %s: %s", code, flagged)
+        # 预期波动区间与「近 5 日涨幅居前」挂到 dashboard，供总览表和卡片显示（agent 路径没有【程序】清单，这里补旗标）
+        dashboard = getattr(result, "dashboard", None)
+        if isinstance(dashboard, dict):
+            facts = self._price_facts_for(code)
+            if facts.get("expected_range"):
+                dashboard["expected_range"] = facts["expected_range"]
+            runup = facts.get("recent_runup")
+            if isinstance(runup, dict):
+                flags = dashboard.setdefault("program_flags", {})
+                if isinstance(flags, dict):
+                    flags["runup"] = bool(runup.get("flag"))
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
@@ -1667,7 +1706,10 @@ class StockAnalysisPipeline:
                     result.change_pct = realtime_data.get("change_pct")
                 action_before_guardrail = getattr(result, "action", None)
                 advice_before_guardrail = getattr(result, "operation_advice", None)
-                stabilize_decision_with_structure(result, trend_result, fundamental_context)
+                stabilize_decision_with_structure(
+                    result, trend_result, fundamental_context,
+                    recent_runup=self._price_facts_for(code).get("recent_runup"),
+                )
                 self._refresh_decision_action_for_final_result(
                     result,
                     report_type=report_type.value,

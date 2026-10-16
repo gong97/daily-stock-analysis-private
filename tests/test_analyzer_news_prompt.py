@@ -146,8 +146,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertIn("可操作性与稳定性约束", prompt)
         self.assertIn("不得仅因为单日涨跌", prompt)
-        self.assertIn("支撑/压力位", prompt)
-        self.assertIn("支撑附近观察", prompt)
+        self.assertIn("支撑位 / 压力位在 A 股历史检验中不比随机价位准", prompt)
+        self.assertIn("优先输出“持有/观望”等中性建议", prompt)
 
     def test_analysis_prompt_score_scale_splits_reduce_and_sell_bands(self) -> None:
         for legacy in (False, True):
