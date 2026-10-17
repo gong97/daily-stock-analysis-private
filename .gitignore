@@ -60,6 +60,7 @@ env/
 !/data/watchlist/
 # 例外：分层分析的每日信号记录，供事后检验（见 src/core/signal_log.py）
 !/data/signal_log/
+!/data/signal_log_us/
 /.llm_usage_hmac_secret
 **/.llm_usage_hmac_secret
 logs/
