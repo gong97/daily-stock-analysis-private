@@ -126,10 +126,10 @@ class YfinanceFetcher(BaseFetcher):
             logger.debug(f"识别为美股指数: {code} -> {yf_symbol}")
             return yf_symbol
 
-        # 美股：1-5 个大写字母（可选 .X 后缀），原样返回
+        # 美股：1-5 个大写字母（可选 .X 后缀）。Yahoo 的 A/B 股写法是 BRK-B，不是 BRK.B（后者 404）
         if is_us_stock_code(code):
             logger.debug(f"识别为美股代码: {code}")
-            return code
+            return code.replace(".", "-")
 
         # 日股/韩股/台股 MVP：显式 Yahoo Finance suffix-only 代码，原样传给 Yahoo。
         if self._is_jp_kr_suffix_stock(code) or self._is_tw_suffix_stock(code):

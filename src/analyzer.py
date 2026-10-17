@@ -24,6 +24,8 @@ from litellm import Router
 
 from src.overheat_flags import render_overheat_flags_prompt
 from src.valuation_red_flags import render_red_flags_prompt
+from src.market_evidence import localize_prompt
+from src.us_surge_flag import render_us_surge_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -2260,6 +2262,8 @@ class GeminiAnalyzer:
             )
         if not getattr(self._get_runtime_config(), "enable_chip_distribution", True):
             base_prompt = _strip_chip_from_system_prompt(base_prompt)
+        # 美股：把 A 股的历史检验结论换成美股的（src/market_evidence.py）
+        base_prompt = localize_prompt(base_prompt, stock_code)
         if lang == "en":
             return base_prompt + """
 
@@ -3982,6 +3986,11 @@ class GeminiAnalyzer:
                 f"扣除后 {runup.get('excess', 0):+.2%}；是否居全市场前 10%：{state}\n"
                 "> 历史检验中近 5 日涨幅居前的股票之后 10 个交易日多数跑输；触发时不要给买入。\n"
             )
+
+        # 美股高位放量异动（src/us_surge_flag.py，美股检验口径；A 股的过热旗标美股不算）
+        surge_section = render_us_surge_prompt(context.get('us_surge_flag'))
+        if surge_section:
+            prompt += surge_section
 
         # 添加昨日对比数据
         if 'yesterday' in context:

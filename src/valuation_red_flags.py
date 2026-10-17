@@ -109,7 +109,10 @@ def _age_days(day: str, today: Optional[date] = None) -> Optional[int]:
 
 def red_flags_for(code: Any, today: Optional[date] = None) -> Optional[Dict[str, Any]]:
     """该股最新估值报告的红旗；没有、太旧或两类条目都为空时返回 None。"""
-    entry = load_red_flags().get(_digits(code))
+    digits = _digits(code)
+    if not digits:  # 红旗文件只有 A 股（6 位代码）；美股不去下载
+        return None
+    entry = load_red_flags().get(digits)
     if not entry:
         return None
     age = _age_days(entry.get("date", ""), today)

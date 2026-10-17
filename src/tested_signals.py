@@ -21,12 +21,20 @@
     增持                    insider-buying：股东 / 高管增持之后不跑赢
     高股息                  dividend-yield：高股息组不显著跑赢（t 1.46）
     突破                    pattern-breakout：突破确认没有优势
+
+美股（2026-10-17 起）用另一套规则（US-stock-macd-analyzer research_ledger.jsonl），只标美股检验无效的理由：
+    缩量回调 / 洗盘、均线多头   six-skill-bonus-us：技术加分项在标普 500 上没有优势
+    MACD 金叉 / 底背离          macd-buy-trigger-us、six-skill-bonus-us（B4）
+    突破 / 形态                 pattern-detectors-us：29 个形态都没有方向信息
+    估值便宜                    value-portfolio-us：最便宜一组不跑赢（A 股估值因子成立，所以 A 股不标）
+不标：增持（美股内部人买入之后跑赢，方向与 A 股相反）、超跌反弹（标普 500 跌得多的反而反弹，事后选股偏乐观）、
+业绩超预期（前瞻复核中）、资金流和高股息（美股没测过）。
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any, List, Pattern, Tuple
+from typing import Any, List, Optional, Pattern, Tuple
 
 _RULES: Tuple[Tuple[Pattern[str], str], ...] = (
     (re.compile(r"缩量(?:回调|回踩|洗盘|整理|企稳|调整)|洗盘"), "缩量回踩的缩量条件历史上方向相反"),
@@ -39,33 +47,44 @@ _RULES: Tuple[Tuple[Pattern[str], str], ...] = (
     (re.compile(r"高股息|股息率"), "高股息组不显著跑赢"),
     (re.compile(r"突破"), "突破确认之后没有优势"),
 )
+_US_RULES: Tuple[Tuple[Pattern[str], str], ...] = (
+    (re.compile(r"缩量(?:回调|回踩|洗盘|整理|企稳|调整)|洗盘"), "缩量回踩在美股大盘股上没有优势"),
+    (re.compile(r"多头排列|均线多头|多头均线"), "均线多头在美股大盘股上没有优势"),
+    (re.compile(r"MACD[^，。；]{0,6}(?:金叉|底背离|背离)|金叉|底背离"), "MACD 金叉 / 底背离在美股没有优势"),
+    (re.compile(r"突破|头肩底|双底|W底|杯柄|旗形|三角形整理"), "形态与突破在美股没有方向信息"),
+    (re.compile(r"低估|估值(?:偏低|较低|便宜|有吸引力|具吸引力|吸引)|便宜"), "美股估值最便宜一组不跑赢"),
+)
 _TAG_OPEN, _TAG_CLOSE = "〔历史检验：", "〕"
 _MAX_NOTES = 2
 
 
-def tested_notes(text: Any) -> List[str]:
+def tested_notes(text: Any, market: Optional[str] = "cn") -> List[str]:
     if not isinstance(text, str) or not text.strip():
         return []
+    rules = _US_RULES if market == "us" else _RULES
     notes: List[str] = []
-    for pattern, note in _RULES:
+    for pattern, note in rules:
         if pattern.search(text) and note not in notes:
             notes.append(note)
     return notes[:_MAX_NOTES]
 
 
-def annotate(text: Any) -> Any:
+def annotate(text: Any, market: Optional[str] = "cn") -> Any:
     """命中规则就在末尾加〔历史检验：…〕；已标注过、或不命中，原样返回。"""
     if not isinstance(text, str) or _TAG_OPEN in text:
         return text
-    notes = tested_notes(text)
+    notes = tested_notes(text, market)
     if not notes:
         return text
     return f"{text.rstrip()} {_TAG_OPEN}{'；'.join(notes)}{_TAG_CLOSE}"
 
 
-def annotate_tested_signals(result: Any, language: str = "zh") -> List[str]:
-    """就地标注 dashboard 里的看多理由，返回改动过的字段名。只做中文（规则是中文关键词）。"""
-    if language not in (None, "", "zh"):
+def annotate_tested_signals(result: Any, language: str = "zh", market: Optional[str] = "cn") -> List[str]:
+    """就地标注 dashboard 里的看多理由，返回改动过的字段名。只做中文（规则是中文关键词）。
+
+    market：'cn' 用 A 股规则，'us' 用美股规则，其他市场（没有检验）不标注。
+    """
+    if language not in (None, "", "zh") or market not in ("cn", "us"):
         return []
     dashboard = getattr(result, "dashboard", None)
     if not isinstance(dashboard, dict):
@@ -75,7 +94,7 @@ def annotate_tested_signals(result: Any, language: str = "zh") -> List[str]:
     attribution = dashboard.get("signal_attribution")
     if isinstance(attribution, dict):
         old = attribution.get("strongest_bullish_signal")
-        new = annotate(old)
+        new = annotate(old, market)
         if new != old:
             attribution["strongest_bullish_signal"] = new
             changed.append("signal_attribution.strongest_bullish_signal")
@@ -83,7 +102,7 @@ def annotate_tested_signals(result: Any, language: str = "zh") -> List[str]:
     intel = dashboard.get("intelligence")
     catalysts = intel.get("positive_catalysts") if isinstance(intel, dict) else None
     if isinstance(catalysts, list):
-        new_list = [annotate(item) for item in catalysts]
+        new_list = [annotate(item, market) for item in catalysts]
         if new_list != catalysts:
             intel["positive_catalysts"] = new_list
             changed.append("intelligence.positive_catalysts")
@@ -93,7 +112,7 @@ def annotate_tested_signals(result: Any, language: str = "zh") -> List[str]:
     if isinstance(checklist, list):
         # 只标模型自己打 ✅ 的【模型】项：⚠️/❌ 已经是在提示风险，【程序】项本身就是检验口径
         new_list = [
-            annotate(item) if isinstance(item, str) and "【模型】" in item and item.lstrip().startswith("✅") else item
+            annotate(item, market) if isinstance(item, str) and "【模型】" in item and item.lstrip().startswith("✅") else item
             for item in checklist
         ]
         if new_list != checklist:

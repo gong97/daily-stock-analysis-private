@@ -31,6 +31,7 @@ from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
 from src.report_language import normalize_report_language
 from src.market_context import get_market_role, get_market_guidelines
+from src.market_evidence import localize_prompt
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
 from src.services.daily_market_context import format_daily_market_context_prompt_section
@@ -568,6 +569,7 @@ def prepare_agent_chat(
         skills_section=skills_section,
         language_section=_build_language_section(report_language, chat_mode=True),
     )
+    system_prompt = localize_prompt(system_prompt, stock_code)
 
     if include_provider_trace:
         history_messages = list(
@@ -698,6 +700,8 @@ class AgentExecutor:
             skills_section=skills_section,
             language_section=_build_language_section(report_language),
         )
+        # 美股：把 A 股的历史检验结论换成美股的（src/market_evidence.py）
+        system_prompt = localize_prompt(system_prompt, stock_code)
 
         # Build tool declarations in OpenAI format (litellm handles all providers)
         tool_decls = self.tool_registry.to_openai_tools()

@@ -6,6 +6,7 @@ Email 发送提醒服务
 1. 通过 SMTP 发送 Email 消息
 """
 import logging
+import os
 from typing import Optional, List
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -46,6 +47,14 @@ SMTP_CONFIGS = {
     # 139邮箱
     "139.com": {"server": "smtp.139.com", "port": 465, "ssl": True},
 }
+
+
+def _with_subject_prefix(subject: str) -> str:
+    """EMAIL_SUBJECT_PREFIX（如「【美股】」）加在主题最前面，同一邮箱收两个市场的日报时能分开。"""
+    prefix = os.getenv("EMAIL_SUBJECT_PREFIX", "").strip()
+    if not prefix or subject.startswith(prefix):
+        return subject
+    return f"{prefix}{subject}"
 
 
 class EmailSender:
@@ -172,7 +181,7 @@ class EmailSender:
             
             # 构建邮件
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = Header(subject, 'utf-8')
+            msg['Subject'] = Header(_with_subject_prefix(subject), 'utf-8')
             msg['From'] = self._format_sender_address(sender)
             msg['To'] = ', '.join(receivers)
             
@@ -239,7 +248,7 @@ class EmailSender:
             date_str = datetime.now().strftime('%Y-%m-%d')
             subject = f"📈 股票智能分析报告 - {date_str}"
             msg = MIMEMultipart('related')
-            msg['Subject'] = Header(subject, 'utf-8')
+            msg['Subject'] = Header(_with_subject_prefix(subject), 'utf-8')
             msg['From'] = self._format_sender_address(sender)
             msg['To'] = ', '.join(receivers)
 

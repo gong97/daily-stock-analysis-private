@@ -585,3 +585,12 @@ class ExpectedRangeTest(unittest.TestCase):
         )
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
         self.assertIn("⚠️ 近5日涨幅居前", summary)
+
+
+def test_list_label_from_env(monkeypatch):
+    from src.core import tiered_report
+
+    monkeypatch.delenv("STOCK_LIST_LABEL", raising=False)
+    assert tiered_report._list_label() == "持仓"
+    monkeypatch.setenv("STOCK_LIST_LABEL", "关注")
+    assert tiered_report._list_label() == "关注"

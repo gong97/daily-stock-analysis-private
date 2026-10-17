@@ -101,6 +101,8 @@ from src.chase_guard import current_price_of, strip_chase_buy_points
 from src.tested_signals import annotate_tested_signals
 from src.valuation_red_flags import apply_red_flags, red_flags_for
 from src.recent_runup import compute_expected_range, compute_recent_runup
+from src.market_evidence import evidence_market
+from src.us_surge_flag import compute_us_surge_flag
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -634,12 +636,14 @@ class StockAnalysisPipeline:
                 flag_bars = self.db.get_data_range(code, flag_start, flag_end)
                 if flag_bars:
                     bars_df = pd.DataFrame([bar.to_dict() for bar in flag_bars])
-                    overheat_flags = compute_overheat_flags(
-                        bars_df,
-                        circ_mv=getattr(realtime_quote, 'circ_mv', None) if realtime_quote else None,
-                        price=getattr(realtime_quote, 'price', None) if realtime_quote else None,
-                    )
-                    # 近 5 日涨幅居前、预期波动区间（±1 ATR），两条路径共用，见 src/recent_runup.py
+                    # 过热旗标是 A 股检验口径，美股复现不成立（src/market_evidence.py），美股不算
+                    if evidence_market(code) != "us":
+                        overheat_flags = compute_overheat_flags(
+                            bars_df,
+                            circ_mv=getattr(realtime_quote, 'circ_mv', None) if realtime_quote else None,
+                            price=getattr(realtime_quote, 'price', None) if realtime_quote else None,
+                        )
+                    # 近 5 日涨幅居前、预期波动区间（±1 ATR）、美股高位放量异动，两条路径共用
                     self._set_price_facts(code, bars_df)
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 过热风险旗标计算失败: {e}")
@@ -783,6 +787,8 @@ class StockAnalysisPipeline:
             price_facts = self._price_facts_for(code)
             if price_facts.get("recent_runup"):
                 enhanced_context["recent_runup"] = price_facts["recent_runup"]
+            if price_facts.get("us_surge"):
+                enhanced_context["us_surge_flag"] = price_facts["us_surge"]
             # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
             valuation_red_flags = red_flags_for(code)
             if valuation_red_flags:
@@ -927,6 +933,8 @@ class StockAnalysisPipeline:
                     language=getattr(result, "report_language", None)
                     or getattr(self.config, "report_language", "zh"),
                     recent_runup=self._price_facts_for(code).get("recent_runup"),
+                    market="us" if evidence_market(code) == "us" else "cn",
+                    us_surge=self._price_facts_for(code).get("us_surge"),
                 )
                 self._strip_chase_buy_points(result, code)
                 if isinstance(fundamental_context, dict):
@@ -1411,10 +1419,19 @@ class StockAnalysisPipeline:
 
     def _set_price_facts(self, code: str, bars_df: pd.DataFrame) -> None:
         facts: Dict[str, Any] = {}
-        try:
-            facts["recent_runup"] = compute_recent_runup(bars_df)
-        except Exception as exc:
-            logger.warning("[recent_runup] %s 计算失败：%s", code, exc)
+        market = evidence_market(code)
+        # 「近 5 日涨幅居前」扣的是中证 1000、分界线是 A 股全市场，只对 A 股有意义；
+        # 美股标普 500 上短期反转不成立（reversal-us-sp500），美股改算高位放量异动（src/us_surge_flag.py）
+        if market == "cn":
+            try:
+                facts["recent_runup"] = compute_recent_runup(bars_df)
+            except Exception as exc:
+                logger.warning("[recent_runup] %s 计算失败：%s", code, exc)
+        elif market == "us":
+            try:
+                facts["us_surge"] = compute_us_surge_flag(bars_df)
+            except Exception as exc:
+                logger.warning("[us_surge] %s 计算失败：%s", code, exc)
         try:
             facts["expected_range"] = compute_expected_range(bars_df)
         except Exception as exc:
@@ -1445,6 +1462,7 @@ class StockAnalysisPipeline:
             annotated = annotate_tested_signals(
                 result,
                 getattr(result, "report_language", None) or getattr(self.config, "report_language", "zh"),
+                market=evidence_market(code),
             )
         except Exception as exc:
             logger.warning("[tested_signals] %s 处理失败：%s", code, exc)
@@ -1470,6 +1488,11 @@ class StockAnalysisPipeline:
                 flags = dashboard.setdefault("program_flags", {})
                 if isinstance(flags, dict):
                     flags["runup"] = bool(runup.get("flag"))
+            surge = facts.get("us_surge")
+            if isinstance(surge, dict):
+                flags = dashboard.setdefault("program_flags", {})
+                if isinstance(flags, dict):
+                    flags["surge"] = bool(surge.get("flag"))
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""

@@ -7,11 +7,17 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
 from src.core.tiered_analysis import ADD_ACTIONS, CUT_ACTIONS, TieredAnalysisOutcome, TieredCandidate
 from src.schemas.decision_action import display_action_fields_for_result, localize_action_label
 from src.utils.sniper_points import extract_sniper_points
+
+def _list_label() -> str:
+    """STOCK_LIST 的称呼：默认「持仓」；美股空仓时那份名单只是关注列表，workflow 设 STOCK_LIST_LABEL=关注。"""
+    return os.getenv("STOCK_LIST_LABEL", "").strip() or "持仓"
+
 
 _SIDE_TITLES = {
     "add": "📈 加仓候选（深度复核）",
@@ -258,6 +264,7 @@ def _summary_key_price(
 
 _PROGRAM_FLAG_LABELS = (
     ("overheat", "高位过热"), ("turnover", "高位高换手"), ("insider", "近期高管减持"), ("runup", "近5日涨幅居前"),
+    ("surge", "高位放量异动"),  # 美股（src/us_surge_flag.py）
 )
 
 ATR_NOTE = (
@@ -350,7 +357,7 @@ def render_decision_summary(
     bucket_order = {"cut": 0, "add": 1, "hold": 2}
     rows.sort(key=lambda r: (bucket_order[r["bucket"]], -r["score"]))
 
-    lines: List[str] = ["# 📋 今日持仓决策", ""]
+    lines: List[str] = [f"# 📋 今日{_list_label()}决策", ""]
 
     header = _market_light_header(market_light)
     if header:
@@ -573,7 +580,7 @@ def render_deep_section(
         blocks.extend(render_candidate_block(c, language=language) for c in group)
 
     if not blocks:
-        return "今日持仓无明确加仓 / 减仓信号，未触发深度复核。"
+        return f"今日{_list_label()}无明确加仓 / 减仓信号，未触发深度复核。"
     return "\n\n".join(blocks)
 
 
@@ -653,7 +660,7 @@ def render_tiered_email(
             outcome.lite_results,
             lite_report_type,
         )
-        lite_header = f"# 🗂 持仓全量初筛（{len(outcome.lite_results)} 只）"
+        lite_header = f"# 🗂 {_list_label()}全量初筛（{len(outcome.lite_results)} 只）"
         if tier1_model:
             lite_header += f"（{tier1_model}）"
         parts.append(f"{lite_header}\n\n{lite_body}")

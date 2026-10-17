@@ -185,7 +185,11 @@ def append_signal_log(
     if not records:
         return None
 
-    directory = Path(directory) if directory is not None else DEFAULT_DIR
+    if directory is None:
+        # 美股 workflow 设 SIGNAL_LOG_DIR=data/signal_log_us：两个市场分开存，检验口径（买入点、对比基准）不同
+        env_dir = os.getenv("SIGNAL_LOG_DIR", "").strip()
+        directory = Path(env_dir) if env_dir else DEFAULT_DIR
+    directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{run_at:%Y-%m}.jsonl"
     with path.open("a", encoding="utf-8", newline="\n") as fh:

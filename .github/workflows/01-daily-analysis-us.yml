@@ -1,0 +1,38 @@
+name: 每日股票分析（美股）
+
+# 与 A 股共用 00-daily-analysis.yml 的全部步骤，只传 market=us。差别都在那个文件里按 inputs.market 切换：
+#   股票名单 US_STOCK_LIST、大盘复盘区域 us、策略不含 overheat_guard、信号记录 data/signal_log_us、
+#   邮件主题前缀【美股】。提示词与【程序】项按代码自动切到美股检验口径（src/market_evidence.py）。
+on:
+  schedule:
+    # 美东 17:30 收盘后跑，第二天开盘前读（用户盘前读报告、盘中不看）。
+    # 带 timezone，所以是美东时间、随夏令时走，不是 UTC。GitHub 定时常晚几个小时，仍在次日开盘前。
+    - cron: '30 17 * * 1-5'
+      timezone: 'America/New_York'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full          # 完整分析（股票+大盘）
+          - market-only   # 仅大盘复盘
+          - stocks-only   # 仅股票分析
+      force_run:
+        description: '强制运行（跳过交易日检查）'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  analyze:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/00-daily-analysis.yml
+    with:
+      market: us
+      mode: ${{ inputs.mode || 'full' }}
+      force_run: ${{ inputs.force_run || false }}
+    secrets: inherit
