@@ -2023,8 +2023,15 @@ class AkshareFetcher(BaseFetcher):
         import akshare as ak
 
         def _get_rank_top_n(df: pd.DataFrame, change_col: str, industry_name: str, n: int) -> Tuple[list, list]:
+            df = df.copy()
             df[change_col] = pd.to_numeric(df[change_col], errors='coerce')
             df = df.dropna(subset=[change_col])
+            # 2026-10-16 CI 上同花顺返回过拦截页：列名齐全、板块名全是 NaN、涨跌幅全是 0，却被当成成功，
+            # 大盘复盘里出现一整张 nan / +0.00% 的表。名称无效或涨跌幅全为 0 时当失败，交给下一个源。
+            names = df[industry_name].astype(str).str.strip()
+            df = df[df[industry_name].notna() & (names != '') & (names.str.lower() != 'nan')]
+            if len(df) < n or (df[change_col] == 0).all():
+                raise ValueError(f'板块排行数据无效：有效行 {len(df)}，涨跌幅全为 0={bool((df[change_col] == 0).all())}')
 
             # 涨幅前n
             top = df.nlargest(n, change_col)

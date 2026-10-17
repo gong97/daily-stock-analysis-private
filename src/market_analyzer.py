@@ -53,6 +53,22 @@ _CHINESE_SECTION_PATTERNS = {
 }
 
 
+def _valid_sectors(items):
+    """去掉名称为空 / NaN 的板块；全被去掉时返回空列表（报告就不画这张表）。"""
+    out = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if name is None or (isinstance(name, float) and name != name):
+            continue
+        text = str(name).strip()
+        if not text or text.lower() == "nan":
+            continue
+        out.append(item)
+    return out
+
+
 @dataclass
 class MarketIndex:
     """大盘指数数据"""
@@ -535,6 +551,9 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             logger.info("[大盘] %s action=get_sector_rankings status=start", self._log_context())
 
             top_sectors, bottom_sectors = self.data_manager.get_sector_rankings(5)
+            # 名称无效的行不进报告（数据源偶尔返回拦截页，解析出 NaN 名称）
+            top_sectors = _valid_sectors(top_sectors)
+            bottom_sectors = _valid_sectors(bottom_sectors)
 
             if top_sectors or bottom_sectors:
                 overview.top_sectors = top_sectors
