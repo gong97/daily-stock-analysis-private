@@ -81,10 +81,11 @@ def test_us_surge_flag_needs_all_three_conditions():
 def test_us_program_checklist_shows_only_us_tested_item():
     flag = compute_us_surge_flag(_bars())
     items = build_program_checklist(None, None, "zh", None, market="us", us_surge=flag)
-    assert len(items) == 1 and items[0].startswith("⚠️") and "高位放量异动" in items[0]
-    assert program_flag_states(None, None, None, market="us", us_surge=flag) == {"surge": True}
+    assert len(items) == 2 and items[0].startswith("⚠️") and "高位放量异动" in items[0]
+    assert items[1].startswith("❓") and "内部人" in items[1]  # 名单不可用 = 不知道
+    assert program_flag_states(None, None, None, market="us", us_surge=flag) == {"surge": True, "insider_buy": None}
     unknown = build_program_checklist(None, None, "zh", None, market="us", us_surge=None)
-    assert len(unknown) == 1 and unknown[0].startswith("❓")
+    assert [x[0] for x in unknown] == ["❓", "❓"]
     # A 股不变：四项
     assert len(build_program_checklist(None, None, "zh", None)) == 4
 

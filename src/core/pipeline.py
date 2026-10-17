@@ -103,6 +103,7 @@ from src.valuation_red_flags import apply_red_flags, red_flags_for
 from src.recent_runup import compute_expected_range, compute_recent_runup
 from src.market_evidence import evidence_market
 from src.us_surge_flag import compute_us_surge_flag
+from src.us_insider_feed import insider_buy_for
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -789,6 +790,8 @@ class StockAnalysisPipeline:
                 enhanced_context["recent_runup"] = price_facts["recent_runup"]
             if price_facts.get("us_surge"):
                 enhanced_context["us_surge_flag"] = price_facts["us_surge"]
+            if price_facts.get("us_insider"):
+                enhanced_context["us_insider_buy"] = price_facts["us_insider"]
             # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
             valuation_red_flags = red_flags_for(code)
             if valuation_red_flags:
@@ -935,6 +938,7 @@ class StockAnalysisPipeline:
                     recent_runup=self._price_facts_for(code).get("recent_runup"),
                     market="us" if evidence_market(code) == "us" else "cn",
                     us_surge=self._price_facts_for(code).get("us_surge"),
+                    us_insider=self._price_facts_for(code).get("us_insider"),
                 )
                 self._strip_chase_buy_points(result, code)
                 if isinstance(fundamental_context, dict):
@@ -1432,6 +1436,11 @@ class StockAnalysisPipeline:
                 facts["us_surge"] = compute_us_surge_flag(bars_df)
             except Exception as exc:
                 logger.warning("[us_surge] %s 计算失败：%s", code, exc)
+            # 近期内部人公开市场买入（不是价格事实，但同样两条路径共用，放一起；src/us_insider_feed.py）
+            try:
+                facts["us_insider"] = insider_buy_for(code)
+            except Exception as exc:
+                logger.warning("[us_insider_feed] %s 查询失败：%s", code, exc)
         try:
             facts["expected_range"] = compute_expected_range(bars_df)
         except Exception as exc:
@@ -1493,6 +1502,11 @@ class StockAnalysisPipeline:
                 flags = dashboard.setdefault("program_flags", {})
                 if isinstance(flags, dict):
                     flags["surge"] = bool(surge.get("flag"))
+            insider = facts.get("us_insider")
+            if isinstance(insider, dict):
+                flags = dashboard.setdefault("program_flags", {})
+                if isinstance(flags, dict):
+                    flags["insider_buy"] = bool(insider.get("flag"))
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""

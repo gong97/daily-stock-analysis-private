@@ -15,8 +15,9 @@
 触发标 ⚠️（检验里是弱参考，不是否决条件，所以不用 ❌）；未触发 ✅；数据不足或取数失败 ❓。
 
 美股（2026-10-17 起）：上面四项都是 A 股检验，在美股复现时不成立或方向相反（src/market_evidence.py），
-美股只列自己检验成立的一项：
-    高位放量异动   src/us_surge_flag.py（US-stock-macd-analyzer skill4-danger-us）
+美股只列自己检验成立的两项：
+    高位放量异动       src/us_surge_flag.py（US-stock-macd-analyzer skill4-danger-us），风险，触发标 ⚠️
+    近期内部人买入     src/us_insider_feed.py（insider-buying-us-*），正面弱参考，有买入标 💡、没有标 ➖
 简版报告只列 ⚠️/❌ 项，程序项排在最前，检验过的风险会优先显示。
 """
 
@@ -43,6 +44,8 @@ _TEXT = {
         "runup_tier": "前 5~10%",
         "surge": "高位放量异动",
         "surge_detail": "相对成交量 {rv:.1f} 倍，当日 {pct:+.1%}",
+        "insider_buy": "近期内部人公开市场买入（美股检验之后跑赢，弱参考）",
+        "insider_buy_none": "近 10 个交易日无（申报 {start} ~ {end}）",
     },
     "en": {
         "overheat": "Overheated at highs (stretched / volume spike)",
@@ -60,6 +63,8 @@ _TEXT = {
         "runup_tier": "top 5-10%",
         "surge": "Volume surge near highs",
         "surge_detail": "relative volume {rv:.1f}x, day {pct:+.1%}",
+        "insider_buy": "Recent open-market insider buying (outperformed in US tests; weak reference)",
+        "insider_buy_none": "none in the last 10 trading days (filed {start} ~ {end})",
     },
     "ko": {
         "overheat": "고점 과열(이격 과대/거래량 급증)",
@@ -77,6 +82,8 @@ _TEXT = {
         "runup_tier": "상위 5~10%",
         "surge": "고점 부근 거래량 급변",
         "surge_detail": "상대 거래량 {rv:.1f}배, 당일 {pct:+.1%}",
+        "insider_buy": "최근 내부자 장내 매수(미국 검증에서 이후 초과수익, 약한 참고)",
+        "insider_buy_none": "최근 10거래일 없음(신고 {start} ~ {end})",
     },
 }
 
@@ -97,13 +104,17 @@ def program_flag_states(
     *,
     market: Optional[str] = "cn",
     us_surge: Optional[Dict[str, Any]] = None,
+    us_insider: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Optional[bool]]:
     """【程序】判定的结构化结果：True 触发、False 未触发、None 数据不足。
 
     总览表的「关键价格 / 提示」列读这里，不去解析清单文字。
     """
     if market == "us":
-        return {"surge": bool(us_surge.get("flag")) if isinstance(us_surge, dict) else None}
+        return {
+            "surge": bool(us_surge.get("flag")) if isinstance(us_surge, dict) else None,
+            "insider_buy": bool(us_insider.get("flag")) if isinstance(us_insider, dict) else None,
+        }
     flags = overheat_flags if isinstance(overheat_flags, dict) else {}
     a, b, c = flags.get("flag_a"), flags.get("flag_b"), flags.get("flag_c")
     if a or b:
@@ -128,6 +139,7 @@ def build_program_checklist(
     *,
     market: Optional[str] = "cn",
     us_surge: Optional[Dict[str, Any]] = None,
+    us_insider: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     lang = _lang(language)
     t, tag = _TEXT[lang], PROGRAM_TAG[lang]
@@ -135,9 +147,24 @@ def build_program_checklist(
         if isinstance(us_surge, dict):
             if us_surge.get("flag"):
                 detail = t["surge_detail"].format(rv=us_surge["rv"], pct=us_surge["pct"])
-                return [_item("⚠️", tag, t["surge"], detail, lang)]
-            return [_item("✅", tag, t["surge"], t["clear"], lang)]
-        return [_item("❓", tag, t["surge"], t["unknown"], lang)]
+                items = [_item("⚠️", tag, t["surge"], detail, lang)]
+            else:
+                items = [_item("✅", tag, t["surge"], t["clear"], lang)]
+        else:
+            items = [_item("❓", tag, t["surge"], t["unknown"], lang)]
+        # 内部人买入是正面信号：有买入标 💡（不是风险，所以不用 ⚠️），没有标 ➖
+        if isinstance(us_insider, dict):
+            if us_insider.get("flag"):
+                from src.us_insider_feed import describe
+
+                items.append(_item("💡", tag, t["insider_buy"], describe(us_insider), lang))
+            else:
+                window = us_insider.get("window") or ["?", "?"]
+                items.append(_item("➖", tag, t["insider_buy"],
+                                   t["insider_buy_none"].format(start=window[0], end=window[-1]), lang))
+        else:
+            items.append(_item("❓", tag, t["insider_buy"], t["unknown"], lang))
+        return items
     flags = overheat_flags if isinstance(overheat_flags, dict) else {}
     items: List[str] = []
 
@@ -193,6 +220,7 @@ def apply_program_checklist(
     recent_runup: Optional[Dict[str, Any]] = None,
     market: Optional[str] = "cn",
     us_surge: Optional[Dict[str, Any]] = None,
+    us_insider: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     """把【程序】项插到清单最前面；模型自己写的同名【程序】项先去掉（模型改不到这几项）。"""
     dashboard = getattr(result, "dashboard", None)
@@ -208,9 +236,11 @@ def apply_program_checklist(
     model_items = [x for x in model_items if not any(tag in x for tag in tags)]
     program_items = build_program_checklist(
         overheat_flags, fundamental_context, language, recent_runup, market=market, us_surge=us_surge,
+        us_insider=us_insider,
     )
     battle["action_checklist"] = program_items + model_items
     dashboard["program_flags"] = program_flag_states(
         overheat_flags, fundamental_context, recent_runup, market=market, us_surge=us_surge,
+        us_insider=us_insider,
     )
     return program_items

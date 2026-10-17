@@ -5,9 +5,10 @@ name: 每日股票分析（美股）
 #   邮件主题前缀【美股】。提示词与【程序】项按代码自动切到美股检验口径（src/market_evidence.py）。
 on:
   schedule:
-    # 美东 17:30 收盘后跑，第二天开盘前读（用户盘前读报告、盘中不看）。
+    # 美东 19:00 收盘后跑，第二天开盘前读（用户盘前读报告、盘中不看）。晚于 US-stock-macd-analyzer 的
+    # 美股日报（UTC 21:30 = 美东 17:30 / 冬令时 16:30）：那边跑完才上传内部人买入名单（src/us_insider_feed.py）。
     # 带 timezone，所以是美东时间、随夏令时走，不是 UTC。GitHub 定时常晚几个小时，仍在次日开盘前。
-    - cron: '30 17 * * 1-5'
+    - cron: '0 19 * * 1-5'
       timezone: 'America/New_York'
   workflow_dispatch:
     inputs:

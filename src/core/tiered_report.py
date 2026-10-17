@@ -284,12 +284,18 @@ def _expected_range_text(dashboard: Dict[str, Any]) -> str:
 
 
 def _program_flag_text(dashboard: Dict[str, Any]) -> str:
-    """【程序】风险提示（src/program_checklist.py 的结构化结果）：只列触发的项。"""
+    """【程序】提示（src/program_checklist.py 的结构化结果）：只列触发的项。
+
+    风险项标 ⚠️；美股的内部人买入是正面弱参考，单独标 💡。
+    """
     flags = dashboard.get("program_flags")
     if not isinstance(flags, dict):
         return "—"
     hits = [label for key, label in _PROGRAM_FLAG_LABELS if flags.get(key) is True]
-    return "⚠️ " + "、".join(hits) if hits else "—"
+    parts = ["⚠️ " + "、".join(hits)] if hits else []
+    if flags.get("insider_buy") is True:
+        parts.append("💡 近期内部人买入")
+    return "；".join(parts) if parts else "—"
 
 
 def _market_light_header(market_light: Optional[Dict[str, Any]]) -> str:

@@ -26,6 +26,7 @@ from src.overheat_flags import render_overheat_flags_prompt
 from src.valuation_red_flags import render_red_flags_prompt
 from src.market_evidence import localize_prompt
 from src.us_surge_flag import render_us_surge_prompt
+from src.us_insider_feed import render_insider_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -3991,6 +3992,11 @@ class GeminiAnalyzer:
         surge_section = render_us_surge_prompt(context.get('us_surge_flag'))
         if surge_section:
             prompt += surge_section
+
+        # 美股近期内部人公开市场买入（src/us_insider_feed.py，美股检验之后跑赢，弱参考）
+        insider_section = render_insider_prompt(context.get('us_insider_buy'))
+        if insider_section:
+            prompt += insider_section
 
         # 添加昨日对比数据
         if 'yesterday' in context:

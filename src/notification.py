@@ -1145,7 +1145,7 @@ class NotificationService(
         risks = [str(x) for x in entry.get("company_risks") or []][:4]
         if not flags and not risks:
             return
-        meta = f"Macd-Qlib 估值报告 {entry.get('date', '')}"
+        meta = f"{entry.get('source') or 'Macd-Qlib 估值报告'} {entry.get('date', '')}"
         if entry.get("confidence"):
             meta += f"，置信度 {entry['confidence']}"
         title = labels.get("valuation_red_flags_label", "估值报告红旗") if flags else labels.get(
