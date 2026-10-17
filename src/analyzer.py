@@ -3626,7 +3626,7 @@ class GeminiAnalyzer:
             [
                 f"| {pct_chg_label} | {today.get('pct_chg', 'N/A')}% |",
                 f"| {volume_label} | {self._format_volume(today.get('volume'))} |",
-                f"| {amount_label} | {self._format_amount(today.get('amount'))} |",
+                f"| {amount_label} | {self._format_amount(today.get('amount'), code)} |",
             ]
         )
         quote_rows_text = "\n".join(quote_rows)
@@ -3691,8 +3691,8 @@ class GeminiAnalyzer:
 | **换手率** | **{rt.get('turnover_rate', 'N/A')}%** | |
 | 市盈率(动态) | {rt.get('pe_ratio', 'N/A')} | |
 | 市净率 | {rt.get('pb_ratio', 'N/A')} | |
-| 总市值 | {self._format_amount(rt.get('total_mv'))} | |
-| 流通市值 | {self._format_amount(rt.get('circ_mv'))} | |
+| 总市值 | {self._format_amount(rt.get('total_mv'), code)} | |
+| 流通市值 | {self._format_amount(rt.get('circ_mv'), code)} | |
 | 60日涨跌幅 | {rt.get('change_60d', 'N/A')}% | 中期表现 |
 """
 
@@ -4161,16 +4161,17 @@ class GeminiAnalyzer:
         else:
             return f"{volume:.0f} 股"
     
-    def _format_amount(self, amount: Optional[float]) -> str:
-        """格式化成交额显示"""
+    def _format_amount(self, amount: Optional[float], code: Optional[str] = None) -> str:
+        """格式化成交额显示。美股金额是美元，不能写「元」（提示词里写成元会误导模型）。"""
         if amount is None:
             return 'N/A'
+        unit = "美元" if detect_market(code) == "us" else "元"
         if amount >= 1e8:
-            return f"{amount / 1e8:.2f} 亿元"
+            return f"{amount / 1e8:.2f} 亿{unit}"
         elif amount >= 1e4:
-            return f"{amount / 1e4:.2f} 万元"
+            return f"{amount / 1e4:.2f} 万{unit}"
         else:
-            return f"{amount:.0f} 元"
+            return f"{amount:.0f} {unit}"
 
     def _format_percent(self, value: Optional[float]) -> str:
         """格式化百分比显示"""
@@ -4225,7 +4226,7 @@ class GeminiAnalyzer:
             "change_amount": self._format_price(change_amount),
             "amplitude": self._format_percent(amplitude),
             "volume": self._format_volume(today.get('volume')),
-            "amount": self._format_amount(today.get('amount')),
+            "amount": self._format_amount(today.get('amount'), context.get('code')),
         }
 
         if realtime:

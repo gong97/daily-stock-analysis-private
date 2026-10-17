@@ -104,3 +104,10 @@ def test_yahoo_share_class_symbol():
 
     assert YfinanceFetcher()._convert_stock_code("BRK.B") == "BRK-B"
     assert YfinanceFetcher()._convert_stock_code("AAPL") == "AAPL"
+
+
+def test_amount_unit_follows_market():
+    analyzer = GeminiAnalyzer.__new__(GeminiAnalyzer)
+    assert analyzer._format_amount(2.858e9, "JPM") == "28.58 亿美元"
+    assert analyzer._format_amount(2.858e9, "600519") == "28.58 亿元"
+    assert analyzer._format_amount(2.858e9) == "28.58 亿元"
