@@ -89,6 +89,7 @@ from src.notification_sender import (
     resolve_ntfy_endpoint,
 )
 from src.substack_digest import render_report_lines as render_substack_report_lines
+from src.cn_market_feeds import render_stock_report as render_cn_flash_report
 
 logger = logging.getLogger(__name__)
 
@@ -1392,6 +1393,10 @@ class NotificationService(
                     if isinstance(dashboard, dict) and dashboard.get("substack_cards"):
                         report_lines.append("")
                         report_lines.extend(render_substack_report_lines(dashboard["substack_cards"]))
+                    # A 股当日快讯（src/cn_market_feeds.py）
+                    if isinstance(dashboard, dict) and dashboard.get("cn_flash"):
+                        report_lines.append("")
+                        report_lines.extend(render_cn_flash_report(dashboard["cn_flash"]))
                     # 利好催化
                     catalysts = intel.get('positive_catalysts', [])
                     if catalysts:
@@ -1822,6 +1827,13 @@ class NotificationService(
                     lines.append(f"📰 Substack（外部观点）：{card.get('direction', '')} · {card.get('thesis', '')} "
                                  f"[{card.get('publication') or '原文'}]({card.get('link', '')})")
                 if substack_cards:
+                    lines.append("")
+
+                # A 股当日快讯：简版只列最新一条和条数
+                cn_flash = dashboard.get("cn_flash") if isinstance(dashboard, dict) else None
+                if cn_flash:
+                    more = f"（共 {len(cn_flash)} 条）" if len(cn_flash) > 1 else ""
+                    lines.append(f"⚡ 快讯 {cn_flash[0]['time']} {cn_flash[0]['source']}：{cn_flash[0]['text'][:80]}{more}")
                     lines.append("")
 
                 lines.append("---")

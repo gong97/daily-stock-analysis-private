@@ -57,8 +57,19 @@ jobs:
     # 提交每日信号记录（data/signal_log）需要写权限
     permissions:
       contents: write
+    # A 股的快讯与政策来源走自建 RSSHub（src/cn_market_feeds.py）：公共实例限流，财联社路由在公共实例上失败。
+    # 服务容器随 job 启动、结束即销毁；美股运行不用它，起来也只多几秒。
+    services:
+      rsshub:
+        image: diygod/rsshub:latest
+        ports:
+          - 1200:1200
+        env:
+          NODE_ENV: production
+          CACHE_TYPE: memory
     env:
       MARKET: ${{ inputs.market || 'cn' }}
+      RSSHUB_BASE: http://localhost:1200
       # 美股的信号记录单独存放：两个市场的检验口径（买入时点、对比基准）不同
       SIGNAL_LOG_DIR: ${{ inputs.market == 'us' && 'data/signal_log_us' || 'data/signal_log' }}
     

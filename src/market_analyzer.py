@@ -35,6 +35,11 @@ from src.services.run_diagnostics import record_llm_run, record_llm_run_started
 from src.services.intelligence_service import IntelligenceService
 from data_provider.base import DataFetcherManager
 
+from src.cn_market_feeds import (
+    market_digest as cn_market_digest,
+    render_market_prompt as render_cn_market_prompt,
+    render_market_report as render_cn_market_report,
+)
 from src.substack_digest import (
     market_cards as substack_market_cards,
     render_market_prompt as render_substack_market_prompt,
@@ -740,6 +745,15 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             logger.warning("[大盘] substack 宏观观点失败：%s", exc)
             macro_cards = []
         prompt += render_substack_market_prompt(macro_cards)
+        # A 股：当天快讯与政策公告整理成「政策与快讯」卡片（src/cn_market_feeds.py，一次 LLM）
+        cn_digest = None
+        if self.region == "cn":
+            try:
+                cn_digest = cn_market_digest(
+                    lambda p: self.analyzer.generate_text(p, max_tokens=3000, temperature=0.2))
+            except Exception as exc:  # 只是补充信息
+                logger.warning("[大盘] 政策与快讯整理失败：%s", exc)
+            prompt += render_cn_market_prompt(cn_digest)
 
         logger.info("[大盘] %s action=generate_review status=start", self._log_context())
         # Use the public generate_text() entry point - never access private analyzer attributes.
@@ -781,6 +795,8 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
             # Inject structured data tables into LLM prose sections
             review = self._inject_data_into_review(review, overview, news)
+            if cn_digest:
+                review = review.rstrip() + "\n" + render_cn_market_report(cn_digest)
             if macro_cards:
                 review = review.rstrip() + "\n" + render_substack_market_report(macro_cards)
             return review

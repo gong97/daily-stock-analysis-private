@@ -28,6 +28,7 @@ from src.market_evidence import localize_prompt
 from src.us_surge_flag import render_us_surge_prompt
 from src.us_insider_feed import render_insider_prompt
 from src.substack_digest import render_prompt as render_substack_prompt
+from src.cn_market_feeds import render_stock_prompt as render_cn_flash_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -4003,6 +4004,11 @@ class GeminiAnalyzer:
         substack_section = render_substack_prompt(context.get('substack_cards') or [])
         if substack_section:
             prompt += substack_section
+
+        # A 股当日快讯（src/cn_market_feeds.py）：名称命中的媒体转述，未核实
+        flash_section = render_cn_flash_prompt(context.get('cn_flash') or [])
+        if flash_section:
+            prompt += flash_section
 
         # 添加昨日对比数据
         if 'yesterday' in context:

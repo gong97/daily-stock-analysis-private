@@ -418,7 +418,12 @@ def render_report_lines(cards: List[Dict[str, Any]]) -> List[str]:
 # 用户 2026-10-18：映射到指数 / 债券 ETF 的 feed（SPY、QQQ、DIA、IWM、TLT…）不对应名单里的个股，
 # 改为提炼成「宏观观点卡片」放进该市场的大盘复盘。每个 feed 只取回看期内最新一篇，同样缓存、标未核实。
 
-MARKET_TICKERS = {"us": {"SPY", "QQQ", "DIA", "IWM", "TLT", "VOO", "IVV", "VTI", "IEF", "SHY", "HYG", "GLD"}}
+MARKET_TICKERS = {
+    "us": {"SPY", "QQQ", "DIA", "IWM", "TLT", "VOO", "IVV", "VTI", "IEF", "SHY", "HYG", "GLD"},
+    # A 股大盘：SUBSTACK_FEEDS 里写 CN（如 Pekingnology，2026-10-18 用户加入）
+    "cn": {"CN", "CSI300", "000300"},
+}
+MARKET_NAMES = {"us": "美股", "cn": "A 股"}
 MARKET_LOOKBACK_DAYS = 14
 MAX_MARKET_CARDS = 4
 
@@ -475,7 +480,7 @@ def market_cards(region: str, generate: Callable[[str], Optional[str]],
                 continue
             new_calls += 1
             prompt = MARKET_PROMPT.format(
-                market={"us": "美股"}.get(region, region), title=a["title"], author=a["author"] or "未署名",
+                market=MARKET_NAMES.get(region, region), title=a["title"], author=a["author"] or "未署名",
                 publication=a["publication"], published=a["published"][:10] or "未知", text=a["text"][:MAX_ARTICLE_CHARS])
             try:
                 data = _parse_json(generate(prompt))

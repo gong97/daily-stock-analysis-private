@@ -105,6 +105,7 @@ from src.market_evidence import evidence_market
 from src.us_surge_flag import compute_us_surge_flag
 from src.us_insider_feed import insider_buy_for
 from src.substack_digest import cards_for as substack_cards_for
+from src.cn_market_feeds import stock_flash as cn_stock_flash
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -652,6 +653,8 @@ class StockAnalysisPipeline:
 
             # Substack 深度文章的观点卡片（src/substack_digest.py），两条路径共用；未配置 SUBSTACK_FEEDS 时为空
             self._set_substack_cards(code, [stock_name, getattr(realtime_quote, 'name', None) if realtime_quote else None])
+            # A 股：当日快讯里命中该股的条目（src/cn_market_feeds.py，关键词匹配，不调 LLM）
+            self._set_cn_flash(code, stock_name)
 
             if use_agent:
                 logger.info(f"{stock_name}({code}) 启用 Agent 模式进行分析")
@@ -798,6 +801,8 @@ class StockAnalysisPipeline:
                 enhanced_context["us_insider_buy"] = price_facts["us_insider"]
             if self._substack_cards_for(code):
                 enhanced_context["substack_cards"] = self._substack_cards_for(code)
+            if self._cn_flash_for(code):
+                enhanced_context["cn_flash"] = self._cn_flash_for(code)
             # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
             valuation_red_flags = red_flags_for(code)
             if valuation_red_flags:
@@ -1476,6 +1481,20 @@ class StockAnalysisPipeline:
     def _substack_cards_for(self, code: str) -> List[Dict[str, Any]]:
         return getattr(self, "_substack", {}).get(code) or []
 
+    def _set_cn_flash(self, code: str, stock_name: Any) -> None:
+        if not hasattr(self, "_cn_flash"):
+            self._cn_flash = {}
+        if code in self._cn_flash or evidence_market(code) != "cn":
+            return
+        try:
+            self._cn_flash[code] = cn_stock_flash(code, str(stock_name or ""))
+        except Exception as exc:  # 只是补充信息
+            logger.warning("[cn_feeds] %s 失败：%s", code, exc)
+            self._cn_flash[code] = []
+
+    def _cn_flash_for(self, code: str) -> List[Dict[str, Any]]:
+        return getattr(self, "_cn_flash", {}).get(code) or []
+
     def _strip_chase_buy_points(self, result: Any, code: str) -> None:
         """展示层的兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），给已检验无效的
         看多理由加标注（src/tested_signals.py），挂上估值报告质量红旗（src/valuation_red_flags.py）。"""
@@ -1528,6 +1547,8 @@ class StockAnalysisPipeline:
                     flags["surge"] = bool(surge.get("flag"))
             if self._substack_cards_for(code):
                 dashboard["substack_cards"] = self._substack_cards_for(code)
+            if self._cn_flash_for(code):
+                dashboard["cn_flash"] = self._cn_flash_for(code)
             insider = facts.get("us_insider")
             if isinstance(insider, dict):
                 flags = dashboard.setdefault("program_flags", {})
