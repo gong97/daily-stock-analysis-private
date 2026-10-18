@@ -85,6 +85,15 @@ jobs:
         run: |
           mkdir -p data logs reports
       
+      # Substack 观点卡片的跨天缓存（src/substack_digest.py）：同一篇文章只调一次 LLM。
+      # 在 data/ 下，不进版本库（本仓库公开，文章与卡片都不提交）。
+      - name: 恢复 Substack 卡片缓存
+        uses: actions/cache/restore@v4
+        with:
+          path: data/substack_cache_${{ inputs.market || 'cn' }}.json
+          key: substack-${{ inputs.market || 'cn' }}-${{ github.run_id }}
+          restore-keys: substack-${{ inputs.market || 'cn' }}-
+
       - name: 执行股票分析
         env:
           # ==========================================
@@ -297,6 +306,9 @@ jobs:
           # 数据源
           # ==========================================
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          # Substack 深度文章（src/substack_digest.py）：出版物地址，逗号或换行分隔；不设则跳过
+          SUBSTACK_FEEDS: ${{ vars.SUBSTACK_FEEDS || secrets.SUBSTACK_FEEDS }}
+          SUBSTACK_CACHE_PATH: data/substack_cache_${{ inputs.market || 'cn' }}.json
           # 估值报告质量红旗（src/valuation_red_flags.py）：读私有仓库 Macd-Qlib-Analyzer 的
           # reports/red_flags.json。fine-grained PAT，只给该仓库 Contents: Read；不设则跳过。
           VALUATION_RED_FLAGS_TOKEN: ${{ secrets.VALUATION_RED_FLAGS_TOKEN }}
@@ -600,6 +612,13 @@ jobs:
             python main.py $FORCE_RUN_ARG
           fi
       
+      - name: 保存 Substack 卡片缓存
+        if: always() && hashFiles(format('data/substack_cache_{0}.json', inputs.market || 'cn')) != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data/substack_cache_${{ inputs.market || 'cn' }}.json
+          key: substack-${{ inputs.market || 'cn' }}-${{ github.run_id }}
+
       # 分析步骤失败时也提交：写入发生在推送邮件之前，已写下的记录就是当天发出去的判断
       - name: 提交信号记录
         if: always()

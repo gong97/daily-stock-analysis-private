@@ -27,6 +27,7 @@ from src.valuation_red_flags import render_red_flags_prompt
 from src.market_evidence import localize_prompt
 from src.us_surge_flag import render_us_surge_prompt
 from src.us_insider_feed import render_insider_prompt
+from src.substack_digest import render_prompt as render_substack_prompt
 from src.agent.llm_adapter import (
     get_thinking_extra_body,
     resolve_fallback_litellm_wire_models,
@@ -3997,6 +3998,11 @@ class GeminiAnalyzer:
         insider_section = render_insider_prompt(context.get('us_insider_buy'))
         if insider_section:
             prompt += insider_section
+
+        # Substack 深度文章观点卡片（src/substack_digest.py）：外部观点，未核实
+        substack_section = render_substack_prompt(context.get('substack_cards') or [])
+        if substack_section:
+            prompt += substack_section
 
         # 添加昨日对比数据
         if 'yesterday' in context:

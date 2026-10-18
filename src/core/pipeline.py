@@ -104,6 +104,7 @@ from src.recent_runup import compute_expected_range, compute_recent_runup
 from src.market_evidence import evidence_market
 from src.us_surge_flag import compute_us_surge_flag
 from src.us_insider_feed import insider_buy_for
+from src.substack_digest import cards_for as substack_cards_for
 from src.core.trading_calendar import (
     MarketPhase,
     build_market_phase_context,
@@ -649,6 +650,9 @@ class StockAnalysisPipeline:
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 过热风险旗标计算失败: {e}")
 
+            # Substack 深度文章的观点卡片（src/substack_digest.py），两条路径共用；未配置 SUBSTACK_FEEDS 时为空
+            self._set_substack_cards(code, [stock_name, getattr(realtime_quote, 'name', None) if realtime_quote else None])
+
             if use_agent:
                 logger.info(f"{stock_name}({code}) 启用 Agent 模式进行分析")
                 self._emit_progress(58, f"{stock_name}：正在切换 Agent 分析链路")
@@ -792,6 +796,8 @@ class StockAnalysisPipeline:
                 enhanced_context["us_surge_flag"] = price_facts["us_surge"]
             if price_facts.get("us_insider"):
                 enhanced_context["us_insider_buy"] = price_facts["us_insider"]
+            if self._substack_cards_for(code):
+                enhanced_context["substack_cards"] = self._substack_cards_for(code)
             # 估值报告的质量红旗（src/valuation_red_flags.py）：作为事实写进提示词，不改分
             valuation_red_flags = red_flags_for(code)
             if valuation_red_flags:
@@ -1452,6 +1458,24 @@ class StockAnalysisPipeline:
     def _price_facts_for(self, code: str) -> Dict[str, Any]:
         return getattr(self, "_price_facts", {}).get(code) or {}
 
+    def _set_substack_cards(self, code: str, names: List[Any]) -> None:
+        """同一只股票在初筛和深度复核里只提炼一次（卡片另有跨天缓存，见 src/substack_digest.py）。"""
+        if not hasattr(self, "_substack"):
+            self._substack = {}
+        if code in self._substack:
+            return
+        try:
+            self._substack[code] = substack_cards_for(
+                code, [str(n) for n in names if n],
+                lambda prompt: self.analyzer.generate_text(prompt, max_tokens=2048, temperature=0.2),
+            )
+        except Exception as exc:  # 只是补充信息
+            logger.warning("[substack] %s 失败：%s", code, exc)
+            self._substack[code] = []
+
+    def _substack_cards_for(self, code: str) -> List[Dict[str, Any]]:
+        return getattr(self, "_substack", {}).get(code) or []
+
     def _strip_chase_buy_points(self, result: Any, code: str) -> None:
         """展示层的兜底，两条分析路径共用：删追涨型买点（src/chase_guard.py），给已检验无效的
         看多理由加标注（src/tested_signals.py），挂上估值报告质量红旗（src/valuation_red_flags.py）。"""
@@ -1502,6 +1526,8 @@ class StockAnalysisPipeline:
                 flags = dashboard.setdefault("program_flags", {})
                 if isinstance(flags, dict):
                     flags["surge"] = bool(surge.get("flag"))
+            if self._substack_cards_for(code):
+                dashboard["substack_cards"] = self._substack_cards_for(code)
             insider = facts.get("us_insider")
             if isinstance(insider, dict):
                 flags = dashboard.setdefault("program_flags", {})

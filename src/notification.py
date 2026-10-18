@@ -88,6 +88,7 @@ from src.notification_sender import (
     resolve_gotify_message_endpoint,
     resolve_ntfy_endpoint,
 )
+from src.substack_digest import render_report_lines as render_substack_report_lines
 
 logger = logging.getLogger(__name__)
 
@@ -1387,6 +1388,10 @@ class NotificationService(
                             report_lines.append(f"- {alert}")
                     # 估值报告质量红旗（src/valuation_red_flags.py）：较早的深度报告里的风险
                     self._append_valuation_red_flags(report_lines, dashboard, labels)
+                    # Substack 深度文章观点卡片（src/substack_digest.py）
+                    if isinstance(dashboard, dict) and dashboard.get("substack_cards"):
+                        report_lines.append("")
+                        report_lines.extend(render_substack_report_lines(dashboard["substack_cards"]))
                     # 利好催化
                     catalysts = intel.get('positive_catalysts', [])
                     if catalysts:
@@ -1810,6 +1815,14 @@ class NotificationService(
                         for check in failed_checks[:3]:
                             lines.append(f"   {check[:40]}")
                         lines.append("")
+
+                # Substack 观点卡片：简版只列一行（src/substack_digest.py）
+                substack_cards = dashboard.get("substack_cards") if isinstance(dashboard, dict) else None
+                for card in (substack_cards or [])[:2]:
+                    lines.append(f"📰 Substack（外部观点）：{card.get('direction', '')} · {card.get('thesis', '')} "
+                                 f"[{card.get('publication') or '原文'}]({card.get('link', '')})")
+                if substack_cards:
+                    lines.append("")
 
                 lines.append("---")
                 lines.append("")
