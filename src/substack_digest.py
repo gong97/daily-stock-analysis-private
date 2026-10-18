@@ -411,3 +411,124 @@ def render_report_lines(cards: List[Dict[str, Any]]) -> List[str]:
         out.append(f"  - 作者持仓：{c.get('author_position') or '未披露'}")
     out.append("")
     return out
+
+
+# --------------------------------------------------------------------------- market review (macro feeds)
+#
+# 用户 2026-10-18：映射到指数 / 债券 ETF 的 feed（SPY、QQQ、DIA、IWM、TLT…）不对应名单里的个股，
+# 改为提炼成「宏观观点卡片」放进该市场的大盘复盘。每个 feed 只取回看期内最新一篇，同样缓存、标未核实。
+
+MARKET_TICKERS = {"us": {"SPY", "QQQ", "DIA", "IWM", "TLT", "VOO", "IVV", "VTI", "IEF", "SHY", "HYG", "GLD"}}
+MARKET_LOOKBACK_DAYS = 14
+MAX_MARKET_CARDS = 4
+
+MARKET_PROMPT = """你是严谨的宏观研究助理。下面是一篇外部文章（Substack），请判断它是否在表达对{market}大盘、利率或宏观经济的观点，
+是的话按格式提炼。只依据文章本身，不要补充文章里没有的信息。纯图表合集、个股分析、广告或活动通知都算不相关。
+
+只输出一个 JSON 对象，不要任何其他文字：
+{{
+  "relevant": true 或 false,
+  "stance": "对股市偏多" / "对股市偏空" / "中性" / "主要谈利率或经济，未表态股市",
+  "thesis": "一句话核心观点（中文，不超过 60 字）",
+  "data_points": [{{"claim": "文章引用的数据或事实", "quote": "文章原句（原文语言，不超过 40 词）"}}],
+  "implications": ["作者认为对股票、债券、板块或风格意味着什么"],
+  "horizon": "观点的时间维度（几周 / 几个月 / 一年以上；文章没说写「未说明」）",
+  "risks": ["作者自己写的风险或反方观点"],
+  "falsifiers": ["什么数据出现就说明作者错了（文章没写就推出，开头注明「推断：」）"]
+}}
+relevant 为 false 时其余字段留空。data_points 最多 4 条，每条必须附原句。
+付费文章在 RSS 里只有付费墙之前的部分：正文如果戛然而止，只提炼看得到的内容。
+
+文章标题：{title}
+作者 / 出版物：{author} / {publication}
+发布时间：{published}
+正文：
+{text}
+"""
+
+
+def market_cards(region: str, generate: Callable[[str], Optional[str]],
+                 now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    """该市场的宏观观点卡片（每个 feed 最新一篇、最多 MAX_MARKET_CARDS 张）；没有配置或失败返回 []。"""
+    tickers = MARKET_TICKERS.get(region)
+    if not tickers:
+        return []
+    articles = load_articles()
+    cutoff = ((now or datetime.now(timezone.utc)) - timedelta(days=MARKET_LOOKBACK_DAYS)).isoformat()
+    latest_per_feed: Dict[str, Dict[str, Any]] = {}
+    for a in articles:
+        if not a.get("tickers") or not set(a["tickers"]) & tickers:
+            continue
+        if a["published"] and a["published"] < cutoff:
+            continue
+        cur = latest_per_feed.get(a["publication"])
+        if cur is None or a["published"] > cur["published"]:
+            latest_per_feed[a["publication"]] = a
+    cards: List[Dict[str, Any]] = []
+    new_calls = 0
+    for a in sorted(latest_per_feed.values(), key=lambda x: x["published"], reverse=True):
+        key = f"{a['link']}|MARKET:{region}"
+        with _lock:
+            cached = _load_cache().get(key)
+        if cached is None:
+            if new_calls >= MAX_NEW_EXTRACTIONS:
+                continue
+            new_calls += 1
+            prompt = MARKET_PROMPT.format(
+                market={"us": "美股"}.get(region, region), title=a["title"], author=a["author"] or "未署名",
+                publication=a["publication"], published=a["published"][:10] or "未知", text=a["text"][:MAX_ARTICLE_CHARS])
+            try:
+                data = _parse_json(generate(prompt))
+            except Exception as exc:
+                logger.warning("[substack] %s 宏观提炼失败：%s", a["link"], exc)
+                continue
+            if not isinstance(data, dict):
+                continue
+            cached = {"data": data, "extracted_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            with _lock:
+                _load_cache()[key] = cached
+                _save_cache()
+        if cached["data"].get("relevant") is True:
+            cards.append({**cached["data"], "title": a["title"], "link": a["link"], "publication": a["publication"],
+                          "published": a["published"][:10], "partial": a["partial"]})
+        if len(cards) >= MAX_MARKET_CARDS:
+            break
+    if cards:
+        logger.info("[substack] 大盘复盘（%s）：%d 张宏观观点卡片", region, len(cards))
+    return cards
+
+
+def render_market_prompt(cards: List[Dict[str, Any]]) -> str:
+    if not cards:
+        return ""
+    lines = ["\n\n## 外部宏观观点（Substack，未核实，程序提炼）"]
+    for c in cards:
+        lines.append(f"- 《{c['title']}》{c['publication']} {c['published']}：{c.get('stance', '')}。{c.get('thesis', '')}")
+        data = [d.get("claim") for d in (c.get("data_points") or []) if isinstance(d, dict) and d.get("claim")]
+        if data:
+            lines.append(f"  引用的数据（待核对）：{_join(data, 3)}")
+        if c.get("implications"):
+            lines.append(f"  作者推论：{_join(c['implications'])}")
+    lines.append(
+        "> 以上是外部作者的观点，不是事实；数据以上面提供的行情为准。可以在复盘里作为「市场上的观点」引用并注明来源，"
+        "不要把它们当成你自己的结论，也不要因此给出择时建议。"
+    )
+    return "\n".join(lines) + "\n"
+
+
+def render_market_report(cards: List[Dict[str, Any]]) -> str:
+    if not cards:
+        return ""
+    out = ["", "### 外部宏观观点（Substack，未核实）", ""]
+    for c in cards:
+        head = f"- [{c['title']}]({c['link']}) · {c['publication']} · {c['published']}"
+        if c.get("partial"):
+            head += " · 付费文章仅摘录"
+        out.append(head)
+        out.append(f"  - {c.get('stance', '')}：{c.get('thesis', '')}（时间维度：{c.get('horizon') or '未说明'}）")
+        if c.get("implications"):
+            out.append(f"  - 作者推论：{_join(c['implications'])}")
+        if c.get("falsifiers"):
+            out.append(f"  - 证伪条件：{_join(c['falsifiers'])}")
+    out.append("")
+    return "\n".join(out)

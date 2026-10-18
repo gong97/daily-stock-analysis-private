@@ -35,6 +35,12 @@ from src.services.run_diagnostics import record_llm_run, record_llm_run_started
 from src.services.intelligence_service import IntelligenceService
 from data_provider.base import DataFetcherManager
 
+from src.substack_digest import (
+    market_cards as substack_market_cards,
+    render_market_prompt as render_substack_market_prompt,
+    render_market_report as render_substack_market_report,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -726,6 +732,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
         # 构建 Prompt
         prompt = self._build_review_prompt(overview, news)
+        # 宏观类 Substack feed 的观点卡片（src/substack_digest.py，美股；未配置时为空）
+        try:
+            macro_cards = substack_market_cards(
+                self.region, lambda p: self.analyzer.generate_text(p, max_tokens=2048, temperature=0.2))
+        except Exception as exc:  # 只是补充信息
+            logger.warning("[大盘] substack 宏观观点失败：%s", exc)
+            macro_cards = []
+        prompt += render_substack_market_prompt(macro_cards)
 
         logger.info("[大盘] %s action=generate_review status=start", self._log_context())
         # Use the public generate_text() entry point - never access private analyzer attributes.
@@ -766,7 +780,10 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 len(review),
             )
             # Inject structured data tables into LLM prose sections
-            return self._inject_data_into_review(review, overview, news)
+            review = self._inject_data_into_review(review, overview, news)
+            if macro_cards:
+                review = review.rstrip() + "\n" + render_substack_market_report(macro_cards)
+            return review
 
         logger.warning(
             "[大盘] %s action=generate_review status=fallback_template reason=empty_llm_response",

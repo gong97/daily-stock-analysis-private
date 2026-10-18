@@ -113,3 +113,30 @@ def test_mapped_feed_only_feeds_its_tickers(articles):
     for a in sd._articles:
         a["tickers"] = ["MSFT"]
     assert sd.cards_for("AAPL", ["Apple Inc."], lambda p: pytest.fail("not for AAPL")) == []
+
+
+def test_market_cards_take_the_latest_post_of_each_macro_feed(articles):
+    from datetime import datetime, timezone
+
+    base = sd._articles[0]
+    sd._articles = [
+        {**base, "link": "https://m/1", "publication": "Macro A", "published": "2026-10-16T00:00:00+00:00", "tickers": ["SPY"]},
+        {**base, "link": "https://m/0", "publication": "Macro A", "published": "2026-10-10T00:00:00+00:00", "tickers": ["SPY"]},
+        {**base, "link": "https://m/2", "publication": "Rates B", "published": "2026-10-15T00:00:00+00:00", "tickers": ["TLT"]},
+        {**base, "link": "https://s/1", "publication": "Stocks", "published": "2026-10-16T00:00:00+00:00", "tickers": ["AAPL"]},
+        {**base, "link": "https://m/old", "publication": "Old", "published": "2026-09-01T00:00:00+00:00", "tickers": ["QQQ"]},
+    ]
+    seen = []
+
+    def generate(prompt):
+        seen.append(prompt)
+        return json.dumps({"relevant": True, "stance": "对股市偏空", "thesis": "估值过高", "implications": ["防御"],
+                           "horizon": "几个月", "falsifiers": ["盈利上修"]}, ensure_ascii=False)
+
+    cards = sd.market_cards("us", generate, now=datetime(2026, 10, 18, tzinfo=timezone.utc))
+    assert [c["link"] for c in cards] == ["https://m/1", "https://m/2"]
+    assert len(seen) == 2 and "美股大盘" in seen[0]
+    report = sd.render_market_report(cards)
+    assert "外部宏观观点（Substack，未核实）" in report and "证伪条件：盈利上修" in report
+    assert "不要把它们当成你自己的结论" in sd.render_market_prompt(cards)
+    assert sd.market_cards("cn", generate) == []
