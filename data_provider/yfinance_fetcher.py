@@ -55,6 +55,39 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _volume_ratio_and_turnover(ticker, volume, ticker_info) -> tuple:
+    """(量比, 换手率%, 当日成交量)；算不出的项为 None。
+
+    量比 = 当日成交量 / 前 5 个交易日平均成交量（日线口径；A 股的量比按分钟折算，盘中才有区别——
+    美股 workflow 在美东收盘后跑，当天的量已是全天）。换手率 = 当日成交量 / 流通股（floatShares，
+    没有时用总股本）。当日成交量以日线为准，与 fast_info 的 lastVolume 不一致时用日线的。
+    """
+    ratio = turnover = None
+    try:
+        hist = ticker.history(period="1mo", auto_adjust=False)
+        vols = hist["Volume"].dropna() if hist is not None and not hist.empty else None
+        if vols is not None and len(vols) >= 6:
+            today = float(vols.iloc[-1])
+            base = float(vols.iloc[-6:-1].mean())
+            if today > 0:
+                volume = int(today)
+            if base > 0 and today > 0:
+                ratio = round(today / base, 2)
+    except Exception as exc:
+        logger.debug("[Yfinance] 量比计算失败: %s", exc)
+    info = ticker_info or {}
+    shares = _safe_float(info.get("floatShares")) or _safe_float(info.get("sharesOutstanding"))
+    # 股本口径核对：A/B 股公司（BRK.B）的 floatShares 可能是另一类股的股数（实测换手率算出 330%）。
+    # 与「市值 / 股价」隐含的股数对不上（流通股多于总股本、或不到 5%）时改用隐含股数。
+    cap, px = _safe_float(info.get("marketCap")), _safe_float(info.get("currentPrice") or info.get("regularMarketPrice"))
+    implied = cap / px if cap and px else None
+    if implied and (not shares or shares > implied * 1.05 or shares < implied * 0.05):
+        shares = implied
+    if shares and volume:
+        turnover = round(float(volume) / shares * 100, 2)
+    return ratio, turnover, volume
+
+
 class YfinanceFetcher(BaseFetcher):
     """
     Yahoo Finance 数据源实现
@@ -763,7 +796,7 @@ class YfinanceFetcher(BaseFetcher):
             quote = UnifiedRealtimeQuote(
                 code=user_code,
                 name=index_name or user_code,
-                source=RealtimeSource.FALLBACK,
+                source=RealtimeSource.YFINANCE,
                 market="us",
                 currency=str(ticker_info.get("currency") or "").upper() or None,
                 data_quality="partial" if missing_fields else "ok",
@@ -895,6 +928,9 @@ class YfinanceFetcher(BaseFetcher):
             pe_ratio = _safe_float(ticker_info.get('trailingPE'))
             pb_ratio = _safe_float(ticker_info.get('priceToBook'))
 
+            # 量比与换手率：yfinance 不直接给，用日线算（美股 workflow 在收盘后跑，当天成交量是全天的）
+            volume_ratio, turnover_rate, volume = _volume_ratio_and_turnover(ticker, volume, ticker_info)
+
             missing_fields = [
                 field
                 for field, value in {
@@ -910,7 +946,7 @@ class YfinanceFetcher(BaseFetcher):
             quote = UnifiedRealtimeQuote(
                 code=symbol,
                 name=name,
-                source=RealtimeSource.FALLBACK,
+                source=RealtimeSource.YFINANCE,
                 market=suffix_market or ("us" if is_us_symbol else None),
                 currency=str(ticker_info.get("currency") or "").upper() or None,
                 data_quality="partial" if missing_fields else "ok",
@@ -920,8 +956,8 @@ class YfinanceFetcher(BaseFetcher):
                 change_amount=round(change_amount, 4) if change_amount is not None else None,
                 volume=volume,
                 amount=None,  # yfinance 不直接提供成交额
-                volume_ratio=None,
-                turnover_rate=None,
+                volume_ratio=volume_ratio,
+                turnover_rate=turnover_rate,
                 amplitude=round(amplitude, 2) if amplitude is not None else None,
                 open_price=open_price,
                 high=high,

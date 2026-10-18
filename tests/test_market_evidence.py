@@ -112,3 +112,28 @@ def test_amount_unit_follows_market():
     assert analyzer._format_amount(2.858e9, "JPM") == "28.58 亿美元"
     assert analyzer._format_amount(2.858e9, "600519") == "28.58 亿元"
     assert analyzer._format_amount(2.858e9) == "28.58 亿元"
+
+
+def test_yfinance_volume_ratio_and_turnover():
+    from types import SimpleNamespace
+
+    from data_provider.yfinance_fetcher import _volume_ratio_and_turnover
+
+    hist = pd.DataFrame({"Volume": [100.0] * 10 + [150.0]})
+    ticker = SimpleNamespace(history=lambda period, auto_adjust: hist)
+    ratio, turnover, volume = _volume_ratio_and_turnover(
+        ticker, 140, {"floatShares": 10_000.0, "marketCap": 1e6, "currentPrice": 50.0})
+    assert (ratio, volume) == (1.5, 150)
+    assert turnover == 1.5                      # 150 / 10,000
+    # floatShares from another share class (BRK.B): fall back to market cap / price
+    _, turnover, _ = _volume_ratio_and_turnover(
+        ticker, 150, {"floatShares": 10.0, "marketCap": 1e6, "currentPrice": 50.0})
+    assert turnover == 0.75                     # 150 / 20,000
+
+
+def test_yfinance_quotes_are_not_labelled_fallback():
+    from data_provider.realtime_types import RealtimeSource
+    from src.notification import NotificationService
+
+    assert RealtimeSource.YFINANCE.value == "yfinance"
+    assert NotificationService._SOURCE_DISPLAY_NAMES["yfinance"]["zh"] == "Yahoo Finance"
