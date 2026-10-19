@@ -11,7 +11,7 @@ A 股 DSA 的盘面和宏观信息原来只靠搜索引擎（召回不稳、免�
         新浪财经 7×24（直连接口，可翻页到 24 小时前；RSSHub 的快讯路由只给最新 15~20 条，覆盖不了一天）
         财联社「看盘」、金十「重要快讯」（RSSHub）
     大盘复盘（一次 LLM 整理成卡片）
-        金十重要快讯、财联社看盘、证监会新闻、LPR 公告、央行公开市场操作（RSSHub，取不到就跳过）
+        金十重要快讯、财联社看盘、证监会新闻、LPR 公告（RSSHub）；央行公开市场操作（用户本机每天抓，src/local_feeds.py）。取不到就跳过
         Pekingnology 等宏观 Substack 走 src/substack_digest.py 的大盘卡片（SUBSTACK_FEEDS 里映射到 CN）
 
 RSSHub 不用公共实例（限流、财联社路由在公共实例上失败）：workflow 在 job 里起一个 diygod/rsshub 服务容器，
@@ -50,7 +50,10 @@ RSSHUB_SOURCES = (
     ("财联社看盘", "/cls/telegraph/watch", {"stock", "market"}),
     ("证监会", "/gov/csrc/news", {"market"}),
     ("LPR", "/chinamoney/3686", {"market"}),
-    ("央行公开市场操作", "/gov/pbc/tradeAnnouncement", {"market"}),
+)
+# RSSHub 取不到、由用户本机每天抓的来源（src/local_feeds.py；央行页面在 Actions 上没有可用路由）
+LOCAL_SOURCES = (
+    ("央行公开市场操作", "pboc_omo", {"market"}),
 )
 
 _lock = threading.Lock()
@@ -141,6 +144,21 @@ def load_items(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
                 logger.info("[cn_feeds] %s：%d 条，回看期内 %d 条", name, len(rows), len(kept))
         else:
             logger.info("[cn_feeds] 未设置 %s，只用新浪 7×24", ENV_RSSHUB)
+        from src import local_feeds
+
+        for name, key, uses in LOCAL_SOURCES:
+            body = local_feeds.get(key)
+            if body is None:
+                logger.info("[cn_feeds] %s：本机备份没有或太旧，跳过", name)
+                continue
+            try:
+                rows = parse_rss(body, name, uses)
+            except Exception as exc:
+                logger.warning("[cn_feeds] %s 本机备份解析失败：%s", name, exc)
+                continue
+            kept = [r for r in rows if r["time"] >= cutoff]
+            items.extend(kept)
+            logger.info("[cn_feeds] %s（本机备份）：%d 条，回看期内 %d 条", name, len(rows), len(kept))
         items.sort(key=lambda r: r["time"], reverse=True)
         _items = items
         return items

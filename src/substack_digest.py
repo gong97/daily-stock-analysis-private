@@ -161,8 +161,19 @@ def load_articles(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
                     resp.raise_for_status()
                     items = parse_feed(resp.content, url)
                 except Exception as exc:  # 单个 feed 失败不影响其他
-                    logger.warning("[substack] %s 读取失败：%s", url, exc)
-                    continue
+                    # *.substack.com 在 Actions 上 403：改用用户本机每天抓的那份（src/local_feeds.py）
+                    from src import local_feeds
+
+                    local = local_feeds.get(url)
+                    if local is None:
+                        logger.warning("[substack] %s 读取失败，本机备份也没有：%s", url, exc)
+                        continue
+                    try:
+                        items = parse_feed(local, url)
+                    except Exception as parse_exc:
+                        logger.warning("[substack] %s 本机备份解析失败：%s", url, parse_exc)
+                        continue
+                    logger.info("[substack] %s 直连失败（%s），改用本机备份", url, str(exc)[:60])
                 kept = [a for a in items if a["link"] and (not a["published"] or datetime.fromisoformat(a["published"]) >= cutoff)]
                 for a in kept:
                     a["tickers"] = sorted(spec["tickers"]) if spec["tickers"] else None
