@@ -51,20 +51,32 @@ def market_items(tmp_path, monkeypatch):
     sd.reset()
 
 
-def test_market_digest_is_cached_and_rendered(market_items):
-    card = {"summary": "监管新规出台", "policy": [{"text": "证监会发布新规", "source": "证监会", "time": "10-19"}],
-            "data": [], "overseas": [], "sectors": [], "commentary": [{"text": "某券商称利好", "source": "", "time": ""}]}
+def test_market_digest_three_sections_cached_and_rendered(market_items):
+    card = {
+        "key_points": [{"point": "证监会发布新规", "why": "影响市场风险偏好", "source": "证监会", "time": "10-19"}],
+        "calendar": [{"when": "今天 10:00", "event": "三季度 GDP", "prior": "5.2%", "expected": "4.8%", "actual": ""}],
+        "holdings": [
+            {"holding": "宁德时代(300750)", "news": "前三季度净利润增长 30%", "link": "直接提到", "source": "新浪7×24", "time": "09:30"},
+            {"holding": "长电科技(600584)", "news": "英伟达辟谣 RTX 5090 停产", "link": "关联推断", "reason": "半导体封测", "source": "", "time": ""},
+        ],
+        "others": [{"category": "观点", "text": "某券商称利好", "source": "", "time": ""}],
+    }
     calls = []
-    got = cf.market_digest(lambda p: calls.append(p) or json.dumps(card, ensure_ascii=False))
-    assert got["summary"] == "监管新规出台" and got["sources"] == ["证监会"]
-    assert "证监会发布新规" in calls[0] and "宁德时代" not in calls[0]   # 只用 market 来源
+    got = cf.market_digest(lambda p: calls.append(p) or json.dumps(card, ensure_ascii=False),
+                           holdings=["宁德时代(300750)", "长电科技(600584)"])
+    assert got["sources"] == ["新浪7×24", "证监会"]          # 新浪只有 is_focus 的进大盘卡片
+    assert "宁德时代(300750)、长电科技(600584)" in calls[0] and "央行开展" not in calls[0]
     sd._cache = None
-    again = cf.market_digest(lambda p: pytest.fail("should use cache"))
-    assert again["policy"][0]["text"] == "证监会发布新规"
+    again = cf.market_digest(lambda p: pytest.fail("should use cache"), holdings=["宁德时代(300750)", "长电科技(600584)"])
+    assert again["key_points"][0]["point"] == "证监会发布新规"
     report = cf.render_market_report(got)
-    assert "【政策】证监会发布新规（证监会 10-19）" in report and "【观点（非事实）】某券商称利好" in report
+    assert report.index("**一、今日要点**") < report.index("**二、日程与事件风险**") < report.index("**三、与持仓相关**")
+    assert "- **证监会发布新规**：影响市场风险偏好（证监会 10-19）" in report
+    assert "- 今天 10:00 三季度 GDP（预期 4.8%，前值 5.2%）" in report
+    assert "宁德时代(300750)【直接提到】" in report and "长电科技(600584)【关联推断：半导体封测】" in report
+    assert "【观点】某券商称利好" in report
     assert "不要据此给出择时建议" in cf.render_market_prompt(got)
-    assert cf.render_market_report(None) == ""
+    assert cf.render_market_report(None) == "" and cf.render_market_report({"key_points": []}) == ""
 
 
 def test_cn_market_substack_mapping():

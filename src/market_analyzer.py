@@ -699,6 +699,17 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         
         return all_news
     
+    def _holding_labels(self) -> List[str]:
+        """「名称(代码)」：政策与快讯卡片的第三段用（只查本地名称索引，不发实时请求）。"""
+        labels = []
+        for code in getattr(self.config, "stock_list", None) or []:
+            try:
+                name = self.data_manager.get_stock_name(code, allow_realtime=False)
+            except Exception:
+                name = None
+            labels.append(f"{name}({code})" if name else str(code))
+        return labels
+
     def generate_market_review(self, overview: MarketOverview, news: List) -> str:
         """
         使用大模型生成大盘复盘报告
@@ -750,7 +761,8 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         if self.region == "cn":
             try:
                 cn_digest = cn_market_digest(
-                    lambda p: self.analyzer.generate_text(p, max_tokens=3000, temperature=0.2))
+                    lambda p: self.analyzer.generate_text(p, max_tokens=3000, temperature=0.2),
+                    holdings=self._holding_labels())
             except Exception as exc:  # 只是补充信息
                 logger.warning("[大盘] 政策与快讯整理失败：%s", exc)
             prompt += render_cn_market_prompt(cn_digest)

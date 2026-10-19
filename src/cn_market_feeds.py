@@ -82,8 +82,10 @@ def parse_sina(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             continue
         text = _clean(row.get("rich_text", ""))
         if text:
-            out.append({"source": "新浪7×24", "time": ts, "text": text, "focus": bool(row.get("is_focus")),
-                        "uses": {"stock"}})
+            focus = bool(row.get("is_focus"))
+            # 新浪标为重点（is_focus）的也进大盘卡片：工作日金十「重要」只有十几条
+            out.append({"source": "新浪7×24", "time": ts, "text": text, "focus": focus,
+                        "uses": {"stock", "market"} if focus else {"stock"}})
     return out
 
 
@@ -199,39 +201,52 @@ def render_stock_report(flash: List[Dict[str, Any]]) -> List[str]:
 
 # --------------------------------------------------------------------------- market review (one LLM call)
 
-DIGEST_PROMPT = """你是严谨的 A 股宏观研究助理。下面是过去一天的快讯与政策公告（来源和时间已标注）。
-请整理成 A 股盘前要看的「政策与快讯」要点。只依据下面的内容，不要补充任何外部信息，不要预测涨跌。
+DIGEST_PROMPT = """你是严谨的 A 股宏观研究助理。下面是过去一天的快讯与政策公告（来源和时间已标注），以及用户的持仓。
+请整理成用户 A 股开盘前要读的三段。只依据下面的内容，不要补充任何外部信息，不要预测涨跌、不要给买卖或择时建议。
 
 只输出一个 JSON 对象，不要任何其他文字：
 {{
-  "summary": "一句话概括今天最重要的变化（中文，不超过 50 字；没有重要变化就写「无重大变化」）",
-  "policy": [{{"text": "央行 / 财政 / 监管 / 产业政策的事实", "source": "来源", "time": "时间"}}],
-  "data": [{{"text": "经济数据及与预期 / 前值的比较（原文有才写）", "source": "", "time": ""}}],
-  "overseas": [{{"text": "海外市场、汇率、大宗商品中会影响 A 股的事实", "source": "", "time": ""}}],
-  "sectors": [{{"text": "行业或题材层面的事实", "source": "", "time": ""}}],
-  "commentary": [{{"text": "快讯里机构或人士的观点（标明是谁说的）", "source": "", "time": ""}}]
+  "key_points": [{{"point": "要点（事实）", "why": "为什么对 A 股大盘重要（一句话）", "source": "来源", "time": "时间"}}],
+  "calendar": [{{"when": "今天 10:00 / 本周三 等", "event": "要公布的数据或要开的会", "prior": "前值（原文有才写）",
+                 "expected": "预期（原文有才写）", "actual": "已公布的实际值（原文有才写）"}}],
+  "holdings": [{{"holding": "持仓名称(代码)", "news": "相关的快讯事实", "link": "直接提到" 或 "关联推断",
+                 "reason": "关联推断时写清推断理由（所在行业 / 上下游 / 同类公司）", "source": "", "time": ""}}],
+  "others": [{{"category": "政策 / 数据 / 海外 / 行业 / 观点", "text": "其余值得留意的一条", "source": "", "time": ""}}]
 }}
-每类最多 5 条，按重要性排序；重复的消息只写一次；事实和观点必须分开（观点放 commentary）。
-没有内容的类别给空列表。
+
+规则：
+- key_points 最多 3 条，只挑会影响 A 股大盘或市场风险偏好的事实，按重要性排序；与 A 股关系不大的海外政治、社会新闻不要放。
+- calendar 只写快讯里明确提到的日程；已经公布的写 actual，并在 event 里注明与预期 / 前值相比是高还是低（原文有才写）。
+- holdings 只能是下面列出的持仓；「直接提到」= 快讯里出现了这家公司；「关联推断」= 快讯讲的是它所在行业、上下游或同类公司，
+  必须写 reason。没有相关消息的持仓不要写。
+- others 最多 5 条；机构或人士的观点只能放在这里，category 写「观点」，并写明是谁说的。
+- 没有内容的部分给空列表。
+
+用户持仓：{holdings}
 
 快讯与公告：
 {items}
 """
 
 
-def _digest_key(items: List[Dict[str, Any]]) -> str:
-    h = hashlib.sha1("|".join(i["text"][:60] for i in items).encode("utf-8")).hexdigest()[:16]
-    return f"CN_MARKET_DIGEST|{h}"
+def _digest_key(items: List[Dict[str, Any]], holdings: List[str]) -> str:
+    raw = "|".join(i["text"][:60] for i in items) + "#" + ",".join(holdings)
+    return f"CN_MARKET_DIGEST_V2|{hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]}"
 
 
-def market_digest(generate: Callable[[str], Optional[str]]) -> Optional[Dict[str, Any]]:
-    """大盘复盘的「政策与快讯」卡片；没有素材或失败返回 None。同一批素材不重复调 LLM。"""
+def market_digest(generate: Callable[[str], Optional[str]],
+                  holdings: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """大盘复盘的「政策与快讯」三段卡片；没有素材或失败返回 None。同一批素材不重复调 LLM。
+
+    holdings：「名称(代码)」列表，用于第三段「与持仓相关」。
+    """
     from src import substack_digest as sd  # 共用卡片缓存
 
+    holdings = [h for h in (holdings or []) if h]
     items = [i for i in load_items() if "market" in i["uses"]]
     if not items:
         return None
-    key = _digest_key(items)
+    key = _digest_key(items, holdings)
     with sd._lock:
         cached = sd._load_cache().get(key)
     if cached is None:
@@ -242,8 +257,9 @@ def market_digest(generate: Callable[[str], Optional[str]]) -> Optional[Dict[str
             if total > MAX_DIGEST_INPUT_CHARS:
                 break
             lines.append(line)
+        prompt = DIGEST_PROMPT.format(holdings="、".join(holdings) or "（未提供）", items="\n".join(lines))
         try:
-            data = sd._parse_json(generate(DIGEST_PROMPT.format(items="\n".join(lines))))
+            data = sd._parse_json(generate(prompt))
         except Exception as exc:
             logger.warning("[cn_feeds] 政策与快讯整理失败：%s", exc)
             return None
@@ -258,33 +274,65 @@ def market_digest(generate: Callable[[str], Optional[str]]) -> Optional[Dict[str
     return data
 
 
-_SECTIONS = (("policy", "政策"), ("data", "数据"), ("overseas", "海外与汇率商品"), ("sectors", "行业题材"),
-             ("commentary", "观点（非事实）"))
+def _rows(card: Dict[str, Any], key: str, limit: int) -> List[Dict[str, Any]]:
+    return [r for r in (card.get(key) or []) if isinstance(r, dict)][:limit]
 
 
-def _lines(card: Dict[str, Any]) -> List[str]:
+def _meta(r: Dict[str, Any]) -> str:
+    meta = " ".join(x for x in (r.get("source"), r.get("time")) if x)
+    return f"（{meta}）" if meta else ""
+
+
+def _sections(card: Dict[str, Any]) -> List[tuple]:
+    """[(标题, [行])]，三段 + 其他；没有内容的段落不出现。"""
     out = []
-    for key, label in _SECTIONS:
-        rows = [r for r in (card.get(key) or []) if isinstance(r, dict) and r.get("text")]
-        for r in rows[:5]:
-            meta = " ".join(x for x in (r.get("source"), r.get("time")) if x)
-            out.append(f"- 【{label}】{r['text']}" + (f"（{meta}）" if meta else ""))
+    keys = [f"- **{r['point']}**：{r.get('why', '')}{_meta(r)}" for r in _rows(card, "key_points", 3) if r.get("point")]
+    if keys:
+        out.append(("一、今日要点", keys))
+    cal = []
+    for r in _rows(card, "calendar", 8):
+        if not r.get("event"):
+            continue
+        nums = "，".join(f"{label}{r[k]}" for k, label in (("actual", "实际 "), ("expected", "预期 "), ("prior", "前值 ")) if r.get(k))
+        cal.append(f"- {r.get('when', '')} {r['event']}" + (f"（{nums}）" if nums else ""))
+    if cal:
+        out.append(("二、日程与事件风险", cal))
+    hold = []
+    for r in _rows(card, "holdings", 10):
+        if not (r.get("holding") and r.get("news")):
+            continue
+        if r.get("link") == "关联推断":
+            hold.append(f"- {r['holding']}【关联推断：{r.get('reason') or '未说明'}】{r['news']}{_meta(r)}")
+        else:
+            hold.append(f"- {r['holding']}【直接提到】{r['news']}{_meta(r)}")
+    if hold:
+        out.append(("三、与持仓相关", hold))
+    others = [f"- 【{r.get('category') or '其他'}】{r['text']}{_meta(r)}" for r in _rows(card, "others", 5) if r.get("text")]
+    if others:
+        out.append(("其他（供参考）", others))
     return out
 
 
 def render_market_prompt(card: Optional[Dict[str, Any]]) -> str:
     if not card:
         return ""
-    body = _lines(card)
-    if not body:
+    sections = _sections(card)
+    if not sections:
         return ""
-    return ("\n\n## 政策与快讯（程序从 " + "、".join(card.get("sources") or []) + " 整理，未核实）\n"
-            f"今日要点：{card.get('summary', '')}\n" + "\n".join(body) +
-            "\n> 以上是媒体快讯与公告的整理。复盘时可以引用并注明来源；数据以上面提供的行情为准，不要据此给出择时建议。\n")
+    body = "\n".join(f"{title}\n" + "\n".join(lines) for title, lines in sections)
+    return ("\n\n## 政策与快讯（程序从 " + "、".join(card.get("sources") or []) + " 整理，未核实）\n" + body +
+            "\n> 以上是媒体快讯与公告的整理；「关联推断」是程序推断，不是快讯原文。复盘时可以引用并注明来源；"
+            "数据以上面提供的行情为准，不要据此给出择时建议。\n")
 
 
 def render_market_report(card: Optional[Dict[str, Any]]) -> str:
-    if not card or not _lines(card):
+    if not card:
         return ""
-    return ("\n### 政策与快讯（" + "、".join(card.get("sources") or []) + "，程序整理，未核实）\n\n"
-            f"**今日要点**：{card.get('summary', '')}\n\n" + "\n".join(_lines(card)) + "\n")
+    sections = _sections(card)
+    if not sections:
+        return ""
+    parts = ["\n### 政策与快讯（" + "、".join(card.get("sources") or []) + "，程序整理，未核实）\n"]
+    for title, lines in sections:
+        parts.append(f"**{title}**\n\n" + "\n".join(lines) + "\n")
+    parts.append("> 「关联推断」是程序根据行业 / 上下游推断的，快讯原文没有提到这家公司。\n")
+    return "\n".join(parts)
