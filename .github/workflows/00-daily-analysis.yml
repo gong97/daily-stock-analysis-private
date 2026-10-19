@@ -317,8 +317,9 @@ jobs:
           # 数据源
           # ==========================================
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-          # Substack 深度文章（src/substack_digest.py）：出版物地址，逗号或换行分隔；不设则跳过
-          SUBSTACK_FEEDS: ${{ vars.SUBSTACK_FEEDS || secrets.SUBSTACK_FEEDS }}
+          # Substack 深度文章（src/substack_digest.py）：两个市场分开配（2026-10-19 用户要求），
+          # 美股 US_SUBSTACK_FEEDS、A 股 CN_SUBSTACK_FEEDS；按 market 取变量名，不会回落到另一个市场的列表。不设则跳过
+          SUBSTACK_FEEDS: ${{ vars[format('{0}_SUBSTACK_FEEDS', inputs.market == 'us' && 'US' || 'CN')] }}
           SUBSTACK_CACHE_PATH: data/substack_cache_${{ inputs.market || 'cn' }}.json
           # 估值报告质量红旗（src/valuation_red_flags.py）：读私有仓库 Macd-Qlib-Analyzer 的
           # reports/red_flags.json。fine-grained PAT，只给该仓库 Contents: Read；不设则跳过。
