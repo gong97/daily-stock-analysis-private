@@ -205,3 +205,42 @@ def test_stock_data_falls_back_after_sina_timeout(monkeypatch) -> None:
     result = fetcher._fetch_stock_data("605218", "2026-05-01", "2026-05-25")
 
     assert result is tx_df
+
+
+def test_eastmoney_history_call_uses_timeout_wrapper(monkeypatch) -> None:
+    """2026-10-19: ak.stock_zh_a_hist hung on Actions with no timeout and the run was cancelled at 45 minutes."""
+    captured = {}
+
+    def fake_call(func, *args, timeout=None, call_name="", **kwargs):
+        captured.update(func=func, timeout=timeout, call_name=call_name, kwargs=kwargs)
+        return pd.DataFrame({"日期": ["2026-10-19"], "收盘": [10.2]})
+
+    fake_api_func = object()
+    monkeypatch.setitem(sys.modules, "akshare", SimpleNamespace(stock_zh_a_hist=fake_api_func))
+    monkeypatch.setattr("data_provider.akshare_fetcher._akshare_call_with_timeout", fake_call)
+
+    fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
+    fetcher._history_call_timeout = 7
+    df = fetcher._fetch_stock_data_em("002111", "2026-04-02", "2026-10-19")
+
+    assert captured["func"] is fake_api_func and captured["timeout"] == 7
+    assert captured["call_name"] == "ak.stock_zh_a_hist"
+    assert captured["kwargs"] == {"symbol": "002111", "period": "daily", "start_date": "20260402",
+                                  "end_date": "20261019", "adjust": "qfq"}
+    assert not df.empty
+
+
+def test_eastmoney_is_skipped_for_the_rest_of_the_run_after_a_timeout(monkeypatch) -> None:
+    fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
+    calls = []
+    sina_df = pd.DataFrame({"日期": ["2026-10-19"], "收盘": [10.2]})
+
+    def em(*args):
+        calls.append("em")
+        raise TimeoutError("ak.stock_zh_a_hist 调用超过 30s")
+
+    monkeypatch.setattr(fetcher, "_fetch_stock_data_em", em)
+    monkeypatch.setattr(fetcher, "_fetch_stock_data_sina", lambda *a: calls.append("sina") or sina_df)
+    fetcher._fetch_stock_data("002111", "2026-04-02", "2026-10-19")
+    fetcher._fetch_stock_data("601865", "2026-04-02", "2026-10-19")
+    assert calls == ["em", "sina", "sina"]

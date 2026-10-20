@@ -512,6 +512,9 @@ class AkshareFetcher(BaseFetcher):
         last_error = None
 
         for fetch_method, source_name in methods:
+            # 东方财富超时过一次，本次运行剩下的股票就不再先等它（每只要白等 30 秒）
+            if source_name == "东方财富" and getattr(self, "_em_history_timed_out", False):
+                continue
             try:
                 logger.info(f"[数据源] 尝试使用 {source_name} 获取 {stock_code}...")
                 df = fetch_method(stock_code, start_date, end_date)
@@ -522,6 +525,9 @@ class AkshareFetcher(BaseFetcher):
             except Exception as e:
                 last_error = e
                 logger.warning(f"[数据源] {source_name} 获取失败: {e}")
+                if source_name == "东方财富" and isinstance(e, TimeoutError):
+                    self._em_history_timed_out = True
+                    logger.warning("[数据源] 东方财富超时，本次运行后续股票直接用新浪 / 腾讯")
                 # 继续尝试下一个
 
         # 所有都失败
@@ -546,12 +552,17 @@ class AkshareFetcher(BaseFetcher):
             import time as _time
             api_start = _time.time()
 
-            df = ak.stock_zh_a_hist(
+            # 与新浪 / 腾讯两条一样加超时：东方财富在 GitHub Actions 上通常秒回 502，
+            # 但 2026-10-19 的 A 股运行里连接挂住不返回，两个 worker 都卡在这里 29 分钟，整个任务被 45 分钟上限取消。
+            df = _akshare_call_with_timeout(
+                ak.stock_zh_a_hist,
                 symbol=stock_code,
                 period="daily",
                 start_date=start_date.replace('-', ''),
                 end_date=end_date.replace('-', ''),
-                adjust="qfq"
+                adjust="qfq",
+                timeout=self._history_call_timeout,
+                call_name="ak.stock_zh_a_hist",
             )
 
             api_elapsed = _time.time() - api_start
