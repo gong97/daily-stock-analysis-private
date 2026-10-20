@@ -571,6 +571,8 @@ class StockAnalysisPipeline:
             # - 关闭开关时仍返回 not_supported 结构
             fundamental_context = None
             try:
+                # 复用上面已取到的实时行情：基本面阶段再取一次要排队（fetcher 调用锁 + 腾讯随机休眠），
+                # 常超时，TTM 股息率因此全是 N/A（2026-10-20）
                 fundamental_context = self.fetcher_manager.get_fundamental_context(
                     code,
                     budget_seconds=getattr(
@@ -578,6 +580,7 @@ class StockAnalysisPipeline:
                         'fundamental_stage_timeout_seconds',
                         FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
                     ),
+                    quote=realtime_quote,
                 )
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 基本面聚合失败: {e}")

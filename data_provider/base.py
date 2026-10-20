@@ -3161,10 +3161,15 @@ class DataFetcherManager:
     def get_fundamental_context(
         self,
         stock_code: str,
-        budget_seconds: Optional[float] = None
+        budget_seconds: Optional[float] = None,
+        quote: Any = None,
     ) -> Dict[str, Any]:
         """
         Aggregate fundamental blocks with fail-open semantics.
+
+        quote：调用方已经取到的实时行情（A 股）。传入时估值块和 TTM 股息率直接用它，不再重取。
+        2026-10-20 查明：CI 上 MAX_WORKERS=2，同一个 fetcher 的调用有锁、腾讯行情每次先随机休眠 2~5 秒，
+        这里的第二次取价要排在另一只股票后面，常超过 8 秒单次超时——价格丢失，TTM 股息率全部 N/A。
         """
         from src.config import get_config
 
@@ -3228,7 +3233,9 @@ class DataFetcherManager:
             remaining_seconds = max(0.0, remaining_seconds - consumed_ms / 1000.0)
 
         valuation_timeout = min(fetch_timeout, remaining_seconds)
-        if valuation_timeout > 0:
+        if quote is not None:
+            quote_payload, valuation_err, valuation_ms = quote, None, 0
+        elif valuation_timeout > 0:
             quote_payload, valuation_err, valuation_ms = self._run_with_retry(
                 lambda: self.get_realtime_quote(stock_code),
                 valuation_timeout,

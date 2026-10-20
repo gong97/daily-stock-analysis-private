@@ -397,6 +397,34 @@ class TestFundamentalContext(unittest.TestCase):
         self.assertAlmostEqual(dividend_payload["ttm_dividend_yield_pct"], 5.0, places=6)
         self.assertIn("yield_formula", dividend_payload)
 
+    def test_fundamental_context_reuses_caller_quote_without_refetching(self) -> None:
+        """2026-10-20：CI 上基本面阶段重取行情常超时（fetcher 锁 + 腾讯随机休眠），股息率全是 N/A。
+        调用方传入已取到的行情时直接用它，不再调用 get_realtime_quote。"""
+        manager = DataFetcherManager(fetchers=[])
+        cfg = SimpleNamespace(
+            enable_fundamental_pipeline=True,
+            fundamental_cache_ttl_seconds=0,
+            fundamental_stage_timeout_seconds=5.0,
+            fundamental_fetch_timeout_seconds=1.0,
+            fundamental_retry_max=1,
+            fundamental_bundle_enabled=False,
+        )
+        quote = SimpleNamespace(pe_ratio=20.0, pb_ratio=3.3, total_mv=7.2e11, circ_mv=7.2e11, price=29.54,
+                                source=SimpleNamespace(value="tencent"))
+        dividend = {"events": [], "ttm_event_count": 2, "ttm_cash_dividend_per_share": 1.0,
+                    "coverage": "cash_dividend_pre_tax", "as_of": "2026-10-20"}
+        with patch("src.config.get_config", return_value=cfg), \
+                patch.object(manager, "get_realtime_quote", side_effect=AssertionError("不应重取行情")), \
+                patch("data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_dividend_ths",
+                      return_value={"dividend": dividend, "source_chain": [], "errors": []}), \
+                patch.object(manager, "get_capital_flow_context", return_value={"status": "not_supported", "source_chain": []}), \
+                patch.object(manager, "get_dragon_tiger_context", return_value={"status": "not_supported", "source_chain": []}), \
+                patch.object(manager, "get_board_context", return_value={"status": "not_supported", "source_chain": []}):
+            ctx = manager.get_fundamental_context("600900", budget_seconds=5.0, quote=quote)
+
+        self.assertAlmostEqual(ctx["earnings"]["data"]["dividend"]["ttm_dividend_yield_pct"], 3.3852, places=4)
+        self.assertEqual(ctx["valuation"]["data"]["pe_ratio"], 20.0)
+
     def test_fundamental_context_dividend_yield_keeps_null_when_price_invalid(self) -> None:
         manager = DataFetcherManager(fetchers=[])
         cfg = SimpleNamespace(
