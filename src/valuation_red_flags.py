@@ -166,10 +166,32 @@ def render_red_flags_prompt(entry: Optional[Dict[str, Any]]) -> str:
     for item in entry["company_risks"]:
         lines.append(f"- 公司层面风险：{item}")
     lines.append(
-        "\n> 以上来自较早的深度估值报告，不一定出现在近几日新闻里。判断「有无重大利空」与写风险警报时必须考虑，"
-        "不要因为近期新闻没提到就写「无重大利空」。"
+        "\n> 以上来自较早的深度估值报告，不一定出现在近几日新闻里。判断「有无重大利空」与给分时要考虑，"
+        "不要因为近期新闻没提到就写「无重大利空」。**但不要把它们写进 risk_alerts**：报告会在「估值报告红旗 / "
+        "公司层面风险」一栏单独列出；risk_alerts 只写分析窗口内的新事件（新闻、公告、减持、处罚等），"
+        "不得给这些旧条目标上近期日期。"
     )
     return "\n".join(lines) + "\n"
+
+
+# 风险警报与估值报告条目连续相同多少个字算「抄过来的」。2026-10-20 的日报里 48 条风险警报有 34 条与估值报告
+# 重合（71%），其中 12 条被标成近几日日期、没注明来源；抄写的条目与原文的最长连续相同片段都在 12 字以上。
+COPY_MIN_CHARS = 12
+
+
+def _longest_common(a: str, b: str) -> int:
+    from difflib import SequenceMatcher
+
+    return SequenceMatcher(None, a, b, autojunk=False).find_longest_match(0, len(a), 0, len(b)).size
+
+
+def drop_copied_alerts(alerts: List[Any], entry: Dict[str, Any]) -> List[Any]:
+    """去掉从估值报告抄进风险警报的条目（报告另有一栏显示它们）。非字符串条目原样保留。"""
+    sources = [str(x) for x in (entry.get("flags") or []) + (entry.get("company_risks") or []) if str(x).strip()]
+    if not sources:
+        return list(alerts)
+    return [a for a in alerts
+            if not (isinstance(a, str) and any(_longest_common(a, s) >= COPY_MIN_CHARS for s in sources))]
 
 
 def apply_red_flags(result: Any, entry: Optional[Dict[str, Any]]) -> List[str]:
@@ -179,6 +201,14 @@ def apply_red_flags(result: Any, entry: Optional[Dict[str, Any]]) -> List[str]:
         return []
     dashboard["valuation_red_flags"] = entry
     changed = ["valuation_red_flags"]
+    # 风险警报只留分析窗口内的新事件：抄自估值报告的条目在「估值报告红旗 / 公司层面风险」一栏已有
+    intel = dashboard.get("intelligence")
+    alerts = intel.get("risk_alerts") if isinstance(intel, dict) else None
+    if isinstance(alerts, list):
+        kept = drop_copied_alerts(alerts, entry)
+        if len(kept) != len(alerts):
+            intel["risk_alerts"] = kept
+            changed.append("intelligence.risk_alerts")
     if not entry["flags"]:
         return changed  # 只有一般性的公司层面风险时不去改模型的勾
     battle = dashboard.get("battle_plan")

@@ -76,3 +76,29 @@ def test_apply_flips_model_no_risk_tick_only_when_flags_exist():
     vrf.apply_red_flags(result2, vrf.red_flags_for("600900", date(2026, 10, 16)))
     assert result2.dashboard["battle_plan"]["action_checklist"] == checklist
     assert result2.dashboard["valuation_red_flags"]["company_risks"] == ["来水不确定"]
+
+
+def test_prompt_tells_model_not_to_copy_report_risks_into_alerts():
+    text = vrf.render_red_flags_prompt(vrf.red_flags_for("000858", date(2026, 10, 16)))
+    assert "不要把它们写进 risk_alerts" in text and "不得给这些旧条目标上近期日期" in text
+
+
+def test_alerts_copied_from_report_are_dropped_and_new_events_kept():
+    """2026-10-20 实例：长江电力的风险警报抄了估值报告的来水风险，还标成「【2026-10-19】」。"""
+    entry = {"date": "2026-09-11", "confidence": "中", "flags": [],
+             "company_risks": ["来水波动风险：2026年前三季度六座电站总发电量同比-4.28%，乌东德偏枯9.29%；"
+                               "来水是公司收入的核心波动变量，且不受公司控制。"]}
+    alerts = [
+        "【2026-10-19】来水波动风险：2026年前三季度六座电站总发电量同比-4.28%，乌东德偏枯9.29%，来水影响主营收入。",
+        "【2026-10-18】公司公告控股股东拟减持不超过1%股份。",
+    ]
+    result = SimpleNamespace(dashboard={"intelligence": {"risk_alerts": list(alerts)}})
+    changed = vrf.apply_red_flags(result, entry)
+    assert result.dashboard["intelligence"]["risk_alerts"] == [alerts[1]]
+    assert "intelligence.risk_alerts" in changed
+
+
+def test_short_generic_overlap_is_not_treated_as_copy():
+    entry = {"flags": ["🚩 存货高企"], "company_risks": []}
+    alerts = ["【2026-10-19】行业库存高企，渠道去库存压力加大。", "非字符串条目"]
+    assert vrf.drop_copied_alerts(alerts + [{"x": 1}], entry) == alerts + [{"x": 1}]
