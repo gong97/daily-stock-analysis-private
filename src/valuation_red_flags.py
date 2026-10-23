@@ -17,7 +17,8 @@
 （Macd-Qlib build_red_flags.py 分类，说明文字在 kind_notes，这里不写研究结论）：
 - major（立案、处罚、会计更正、冻结等）：仍把「✅ 无重大利空」改成 ⚠️；
 - tested / other（财务质量提示）：不改模型的勾，清单末尾另加一行「⚠️ 【估值报告】财务提示」，警示仍在。
-没有 flag_kinds 的旧文件（如美股仓库）全部按 major 处理，与以前相同。
+没有 flag_kinds 的旧文件全部按 major 处理，与以前相同。美股仓库也带 flag_kinds（只有 major / other，
+A 股那次检验没在美股复现过）。
 
 数据来源与隐私
 --------------
