@@ -1154,6 +1154,18 @@ class NotificationService(
             "company_risks_label", "公司层面风险")
         report_lines.append("")
         report_lines.append(f"**📑 {title}**（{meta}）:")
+        kinds = entry.get("flag_kinds") if flags else None
+        if isinstance(kinds, list) and len(kinds) >= len(flags):
+            # 分过类的（src/valuation_red_flags.py）：标出重大红旗与财务提示，检验说明放在末尾
+            kind_label = {"major": labels.get("red_flag_major_label", "重大红旗"),
+                          "tested": labels.get("red_flag_finance_label", "财务提示"),
+                          "other": labels.get("red_flag_finance_label", "财务提示")}
+            for item, kind in zip(flags, kinds):
+                report_lines.append(f"- 〔{kind_label.get(kind, kind_label['other'])}〕{item}")
+            note = (entry.get("kind_notes") or {}).get("tested")
+            if note and "tested" in kinds[:len(flags)]:
+                report_lines.append(f"> ℹ️ 现金流 / 存货 / 应收类：{note}")
+            return
         for item in flags or risks:
             report_lines.append(f"- {item}")
 

@@ -2547,3 +2547,20 @@ class ValuationRedFlagsRenderTest(unittest.TestCase):
         self.assertIn("**📑 估值报告红旗**（Macd-Qlib 估值报告 2026-10-15，置信度 中低）:", out)
         self.assertIn("- 🚩 收入与经营现金流背离", out)
         self.assertLess(out.index("大盘偏弱"), out.index("估值报告红旗"))
+
+    @mock.patch("src.notification.get_config")
+    def test_kinded_red_flags_are_labelled_with_tested_note(self, mock_get_config):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="300750", name="宁德时代", sentiment_score=45, trend_prediction="震荡",
+            operation_advice="持有", analysis_summary="震荡",
+            dashboard={"intelligence": {"risk_alerts": ["大盘偏弱"]}, "valuation_red_flags": {
+                "date": "2026-10-21", "confidence": "中", "company_risks": [],
+                "flags": ["🚩 重大红旗：追溯下修", "收入增速 vs 现金流增速背离"],
+                "flag_kinds": ["major", "tested"], "kind_notes": {"tested": "检验说明文字"}}},
+        )
+        out = service.generate_dashboard_report([result], report_date="2026-10-23")
+        self.assertIn("- 〔重大红旗〕🚩 重大红旗：追溯下修", out)
+        self.assertIn("- 〔财务提示〕收入增速 vs 现金流增速背离", out)
+        self.assertIn("> ℹ️ 现金流 / 存货 / 应收类：检验说明文字", out)

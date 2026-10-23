@@ -10,7 +10,14 @@
 红旗不是检验过的信号（与 src/program_checklist.py 的【程序】项不同），所以：
 - 不改评分、不改买卖结论；
 - 写进提示词作为事实，让模型在「无重大利空」这类判断里不再忽略；
-- 报告里单列一段，注明来源报告日期；模型仍打「✅ 无重大利空」时改成 ⚠️ 并注明。
+- 报告里单列一段，注明来源报告日期。
+
+分类（2026-10-23 起）：以前只要有红旗就把模型的「✅ 无重大利空」改成 ⚠️，50 只有红旗的股票里 49 只被改，
+多数只是「商誉占比接近阈值」「少数股东权益高」这类财务提示。现在 red_flags.json 给每条红旗带 flag_kinds
+（Macd-Qlib build_red_flags.py 分类，说明文字在 kind_notes，这里不写研究结论）：
+- major（立案、处罚、会计更正、冻结等）：仍把「✅ 无重大利空」改成 ⚠️；
+- tested / other（财务质量提示）：不改模型的勾，清单末尾另加一行「⚠️ 【估值报告】财务提示」，警示仍在。
+没有 flag_kinds 的旧文件（如美股仓库）全部按 major 处理，与以前相同。
 
 数据来源与隐私
 --------------
@@ -54,6 +61,9 @@ MAX_AGE_DAYS = 200  # 约两轮重估周期；更旧的报告不再引用
 
 _lock = threading.Lock()
 _cache: Dict[str, Dict[str, Any]] = {}  # 市场 -> {键: 条目}
+_notes: Dict[str, Dict[str, str]] = {}  # 市场 -> kind_notes
+REPORT_TAG = "【估值报告】"
+KIND_ORDER = ("major", "tested", "other")
 _NO_RISK_CHECK = re.compile(r"无(?:重大|实质性|明显)?(?:突发)?(?:重大)?(?:恶性)?利空")
 
 
@@ -90,6 +100,8 @@ def load_red_flags(market: str = "cn") -> Dict[str, Any]:
             else:
                 logger.info("[valuation_red_flags] 未配置 %s，跳过估值报告红旗", ENV_TOKEN)
                 payload = {}
+            notes = payload.get("kind_notes") if isinstance(payload, dict) else None
+            _notes[market] = {str(k): str(v) for k, v in notes.items()} if isinstance(notes, dict) else {}
             raw = payload.get("stocks") if isinstance(payload, dict) else None
             if isinstance(raw, dict):
                 for k, v in raw.items():
@@ -108,6 +120,7 @@ def load_red_flags(market: str = "cn") -> Dict[str, Any]:
 def reset_cache() -> None:
     with _lock:
         _cache.clear()
+        _notes.clear()
 
 
 def _digits(code: Any) -> str:
@@ -143,14 +156,30 @@ def red_flags_for(code: Any, today: Optional[date] = None) -> Optional[Dict[str,
     age = _age_days(entry.get("date", ""), today)
     if age is not None and age > MAX_AGE_DAYS:
         return None
-    flags = [str(x) for x in entry.get("flags") or [] if str(x).strip()]
+    raw_flags = [str(x) for x in entry.get("flags") or []]
+    raw_kinds = entry.get("flag_kinds")
+    if not (isinstance(raw_kinds, list) and len(raw_kinds) == len(raw_flags)):
+        raw_kinds = ["major"] * len(raw_flags)  # 没分类的旧文件：与以前一样，每条都当重大
+    pairs = [(f, k if k in KIND_ORDER else "other") for f, k in zip(raw_flags, raw_kinds) if f.strip()]
+    pairs.sort(key=lambda p: KIND_ORDER.index(p[1]))  # 报告栏最多列 4 条，重大的排前面
+    flags = [f for f, _ in pairs]
     risks = [str(x) for x in entry.get("company_risks") or [] if str(x).strip()]
     if not flags and not risks:
         return None
     # 报告原文里置信度常写成「中低** —— 核心原因：…」，只留开头的等级词
     confidence = re.split(r"[*—（(，,：:\s]", str(entry.get("confidence") or "").strip(), maxsplit=1)[0]
     return {"date": entry.get("date", ""), "confidence": confidence,
-            "flags": flags, "company_risks": risks, "age_days": age, "source": SOURCE_LABEL[market]}
+            "flags": flags, "flag_kinds": [k for _, k in pairs], "kind_notes": dict(_notes.get(market, {})),
+            "company_risks": risks, "age_days": age, "source": SOURCE_LABEL[market]}
+
+
+def flag_kinds(entry: Dict[str, Any]) -> List[str]:
+    """与 entry['flags'] 一一对应的类别；没带 flag_kinds 的条目（直接构造的、旧文件）全部当 major。"""
+    flags = entry.get("flags") or []
+    kinds = entry.get("flag_kinds")
+    if isinstance(kinds, list) and len(kinds) == len(flags):
+        return [k if k in KIND_ORDER else "other" for k in kinds]
+    return ["major"] * len(flags)
 
 
 def render_red_flags_prompt(entry: Optional[Dict[str, Any]]) -> str:
@@ -161,16 +190,21 @@ def render_red_flags_prompt(entry: Optional[Dict[str, Any]]) -> str:
     if source == SOURCE_LABEL["cn"]:
         source = "Macd-Qlib-Analyzer 估值报告"  # A 股提示词原文不变
     lines = [f"\n### 估值报告质量红旗（{source}，{entry['date']}）"]
-    for item in entry["flags"]:
-        lines.append(f"- 红旗：{item}")
+    kinds = flag_kinds(entry)
+    for item, kind in zip(entry["flags"], kinds):
+        lines.append(f"- {'红旗' if kind == 'major' else '财务提示'}：{item}")
     for item in entry["company_risks"]:
         lines.append(f"- 公司层面风险：{item}")
     lines.append(
-        "\n> 以上来自较早的深度估值报告，不一定出现在近几日新闻里。判断「有无重大利空」与给分时要考虑，"
-        "不要因为近期新闻没提到就写「无重大利空」。**但不要把它们写进 risk_alerts**：报告会在「估值报告红旗 / "
+        "\n> 以上来自较早的深度估值报告，不一定出现在近几日新闻里。「红旗」是治理 / 合规类重大事项，判断「有无"
+        "重大利空」与给分时要考虑，不要因为近期新闻没提到就写「无重大利空」。「财务提示」单独不构成重大利空，"
+        "也不据此调分，可以在分析里提及。**不要把它们写进 risk_alerts**：报告会在「估值报告红旗 / "
         "公司层面风险」一栏单独列出；risk_alerts 只写分析窗口内的新事件（新闻、公告、减持、处罚等），"
         "不得给这些旧条目标上近期日期。"
     )
+    note = (entry.get("kind_notes") or {}).get("tested")
+    if note and "tested" in kinds:
+        lines.append(f"> 财务质量类提示（现金流 / 存货 / 应收）：{note}。")
     return "\n".join(lines) + "\n"
 
 
@@ -195,7 +229,8 @@ def drop_copied_alerts(alerts: List[Any], entry: Dict[str, Any]) -> List[Any]:
 
 
 def apply_red_flags(result: Any, entry: Optional[Dict[str, Any]]) -> List[str]:
-    """把红旗挂到 dashboard 供报告渲染；模型打 ✅ 的「无重大利空」项改为 ⚠️ 并注明。"""
+    """把红旗挂到 dashboard 供报告渲染。有重大红旗时，模型打 ✅ 的「无重大利空」项改为 ⚠️ 并注明；
+    只有财务提示时不改模型的勾，清单末尾加一行「⚠️ 【估值报告】财务提示」。"""
     dashboard = getattr(result, "dashboard", None)
     if not entry or not isinstance(dashboard, dict):
         return []
@@ -213,15 +248,22 @@ def apply_red_flags(result: Any, entry: Optional[Dict[str, Any]]) -> List[str]:
         return changed  # 只有一般性的公司层面风险时不去改模型的勾
     battle = dashboard.get("battle_plan")
     checklist = battle.get("action_checklist") if isinstance(battle, dict) else None
-    if isinstance(checklist, list):
-        note = f"〔估值报告（{entry['date']}）列有 {len(entry['flags'])} 条质量红旗，见「估值报告红旗」〕"
-        new_list = []
-        for item in checklist:
-            if (isinstance(item, str) and "【模型】" in item and item.lstrip().startswith("✅")
-                    and _NO_RISK_CHECK.search(item) and note not in item):
-                item = item.replace("✅", "⚠️", 1).rstrip() + " " + note
-            new_list.append(item)
-        if new_list != checklist:
-            battle["action_checklist"] = new_list
-            changed.append("battle_plan.action_checklist")
+    if not isinstance(checklist, list):
+        return changed
+    kinds = flag_kinds(entry)
+    n_major = kinds.count("major")
+    # 模型自己写的【估值报告】项先去掉（这一项由程序写）
+    new_list = [x for x in checklist if not (isinstance(x, str) and REPORT_TAG in x)]
+    if n_major:
+        note = f"〔估值报告（{entry['date']}）列有 {n_major} 条重大红旗，见「估值报告红旗」〕"
+        new_list = [item.replace("✅", "⚠️", 1).rstrip() + " " + note
+                    if (isinstance(item, str) and "【模型】" in item and item.lstrip().startswith("✅")
+                        and _NO_RISK_CHECK.search(item) and note not in item) else item
+                    for item in new_list]
+    else:
+        new_list.append(f"⚠️ {REPORT_TAG}财务提示 {len(kinds)} 条（估值报告 {entry['date']}，非重大利空，"
+                        f"见「估值报告红旗」）")
+    if new_list != checklist:
+        battle["action_checklist"] = new_list
+        changed.append("battle_plan.action_checklist")
     return changed
