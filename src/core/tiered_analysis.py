@@ -107,20 +107,31 @@ class TieredAnalysisOutcome:
 def model_scope(config: Any, model: str) -> Iterator[None]:
     """临时切换主模型；空值表示沿用当前配置。
 
-    只改 litellm_model，保留 litellm_fallback_models：换档失败时仍走原有
-    降级链，不至于整轮分析失败。
+    换档失败时仍走降级链，不至于整轮分析失败。降级链里去掉与新主模型相同的项、
+    并把原主模型放到最前：初筛档（flash-lite）常与 GEMINI_MODEL_FALLBACK 相同，
+    不去重的话降级就是同一模型再试一次，该模型过载（503）时整轮失败
+    （2026-11-05：24 只失败 17 只）。
     """
     if not model:
         yield
         return
 
     original = getattr(config, "litellm_model", "")
+    original_fallbacks = getattr(config, "litellm_fallback_models", None)
+    fallbacks = [m for m in (original_fallbacks or []) if m and m != model]
+    if original and original != model and original not in fallbacks:
+        fallbacks.insert(0, original)
     config.litellm_model = model
-    logger.info("[tiered] 模型切换: %s -> %s", original or "(default)", model)
+    config.litellm_fallback_models = fallbacks
+    logger.info(
+        "[tiered] 模型切换: %s -> %s（降级: %s）",
+        original or "(default)", model, ", ".join(fallbacks) or "无",
+    )
     try:
         yield
     finally:
         config.litellm_model = original
+        config.litellm_fallback_models = original_fallbacks
 
 
 @contextmanager
