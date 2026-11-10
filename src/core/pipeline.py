@@ -1456,7 +1456,9 @@ class StockAnalysisPipeline:
             except Exception as exc:
                 logger.warning("[us_insider_feed] %s 查询失败：%s", code, exc)
         try:
-            facts["expected_range"] = compute_expected_range(bars_df)
+            # A 股用 HAR 宽度（atr-har 确认）；美股复现之前仍用 ATR20
+            facts["expected_range"] = compute_expected_range(
+                bars_df, method="har" if market == "cn" else "atr20")
         except Exception as exc:
             logger.warning("[expected_range] %s 计算失败：%s", code, exc)
         if not hasattr(self, "_price_facts"):

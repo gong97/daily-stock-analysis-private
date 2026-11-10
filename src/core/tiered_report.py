@@ -125,7 +125,7 @@ def _key_levels_lines(dashboard: Dict[str, Any], current_price: Optional[float])
         rows.append(f"- MA20：{_fmt_price(ma20)}")
     expected = _expected_range_text(dashboard)
     if expected != "—":
-        rows.append(f"- 次日波动区间（±1 ATR）：{expected}")
+        rows.append(f"- 次日波动区间：{expected}")
 
     if volume_ratio is not None:
         rows.append(f"- 量比：{volume_ratio}")
@@ -270,10 +270,33 @@ _PROGRAM_FLAG_LABELS = (
 ATR_NOTE = (
     "次日波动区间 = 最新收盘 ± 1 个 ATR。ATR（平均真实波幅）是近 20 个交易日每天真实波动幅度的平均值——真实波幅取当天最高减最低，若有跳空，则用前收盘到当天最高 / 最低中更大的那段——表示这只股票一天通常上下波动多少钱。它不预测价格会在哪里掉头：支撑位 / 压力位的八种算法检验下来都不比随机价位准，所以日报不再提示支撑位和压力位；挂条件单时，可以用这个区间判断离现价多远才算比平时大的波动。"
 )
+HAR_NOTE = (
+    "A 股的次日波动区间 = 最新收盘 ± 近 5 / 20 / 60 日 ATR 的平均。ATR（平均真实波幅）是每天真实波动幅度的平均值——真实波幅取当天最高减最低，若有跳空，则用前收盘到当天最高 / 最低中更大的那段。只用近 20 日的 ATR 会对最近很安静的股票给得太窄、对刚剧烈波动过的给得太宽；三个窗口平均之后，两类股票都校准（2011~2019 独立样本检验确认）。历史上约每 4 天有 1 天（24.5%）次日最高或最低会碰到区间边。它不预测价格会在哪里掉头（支撑位 / 压力位的八种算法都不比随机价位准，日报不再提示）；挂条件单时，用它判断离现价多远才算比平时大的波动。"
+)
+
+
+def _range_methods(dashboards) -> set:
+    out = set()
+    for d in dashboards:
+        rng = d.get("expected_range") if isinstance(d, dict) else None
+        if isinstance(rng, dict):
+            out.add(rng.get("method", "atr20"))
+    return out
+
+
+def range_notes(dashboards) -> List[str]:
+    """表下说明：按实际用到的口径给（A 股 HAR、美股 ATR20，可能同时出现）。"""
+    methods = _range_methods(dashboards)
+    notes = []
+    if "har" in methods:
+        notes.append(HAR_NOTE)
+    if "atr20" in methods or not methods:
+        notes.append(("美股" if "har" in methods else "") + ATR_NOTE)
+    return notes
 
 
 def _expected_range_text(dashboard: Dict[str, Any]) -> str:
-    """次日波动区间：最新收盘 ± 1 个 ATR（src/recent_runup.py）。"""
+    """次日波动区间：最新收盘 ± 1 个宽度（A 股 HAR、美股 ATR20，src/recent_runup.py）。"""
     rng = dashboard.get("expected_range")
     if not isinstance(rng, dict):
         return "—"
@@ -370,7 +393,7 @@ def render_decision_summary(
         lines.append(header)
         lines.append("")
 
-    lines.append("| 股票 | 动作 | 现价 | 次日波动区间（±1 ATR） | 关键价格 / 风险提示 | 紧迫度 |")
+    lines.append("| 股票 | 动作 | 现价 | 次日波动区间 | 关键价格 / 风险提示 | 紧迫度 |")
     lines.append("| --- | --- | --- | --- | --- | --- |")
     for row in rows:
         lines.append(
@@ -378,7 +401,8 @@ def render_decision_summary(
             f"{row['current_price']} | {row['expected_range']} | {row['key_price']} | {row['urgency']} |"
         )
     lines.append("")
-    lines.append(f"> ℹ️ {ATR_NOTE}")
+    for note in range_notes([_dashboard_of(r) for r in results]):
+        lines.append(f"> ℹ️ {note}")
 
     return "\n".join(lines)
 

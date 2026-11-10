@@ -18,6 +18,12 @@ token 下载（与 src/valuation_red_flags.py 共用 VALUATION_RED_FLAGS_TOKEN�
 ATR（平均真实波幅）= 近 20 个交易日每天「真实波幅」的平均值；真实波幅 = 当天最高 − 最低，若有跳空，则用
 前收盘到当天最高 / 最低中更大的那段。它表示这只股票一天通常上下波动多少钱。预期波动区间 = 最新收盘 ± 1 个 ATR。
 它不声称价格会在哪里掉头（八种支撑 / 压力算法都不比随机价位准），只告诉你多远之外才算比平时大的波动。
+
+A 股（2026-11-10 起）改用 HAR 宽度 = 近 5 / 20 / 60 日 ATR 的平均。出处：Macd-Qlib-Analyzer scripts/atr_calibration.py
+（台账 atr-har，第二次登记 92d5cde 后在 2011~2019 独立样本上确认）——预测次日真实波幅的误差（QLIKE）比 ATR20 小
+约 8%（t 15.3，34/34 季度为正），且不再系统性地对「最近安静」的股票偏窄、对「刚剧烈波动过」的偏宽（次日碰到
+区间边的比例两类股票之差 5.1 → 0 个百分点）。历史上次日最高或最低碰到 HAR 区间任一边的比例约 24.5%（约每 4 天
+1 天）。美股仍用 ATR20：US 仓库复现之前不改。
 """
 
 from __future__ import annotations
@@ -43,6 +49,7 @@ RUNUP_QUANTILE = 0.9
 MAX_AGE_DAYS = 14
 INDEX_SYMBOL = "sh000852"  # 中证 1000，与 compute_market_cutoff.py 的 RUNUP_INDEX 同一只
 ATR_WINDOW = 20
+HAR_WINDOWS = (5, 20, 60)
 TIMEOUT_SEC = 15
 
 _lock = threading.Lock()
@@ -178,17 +185,22 @@ def compute_recent_runup(bars: Any, cutoff: Optional[Dict[str, Any]] = None,
             "as_of": as_of.strftime("%Y-%m-%d")}
 
 
-def compute_expected_range(bars: Any) -> Optional[Dict[str, Any]]:
-    """最新收盘 ± 1 个 ATR(20)。"""
+def compute_expected_range(bars: Any, method: str = "atr20") -> Optional[Dict[str, Any]]:
+    """最新收盘 ± 1 个宽度。method="atr20"：ATR(20)；method="har"：ATR(5)、ATR(20)、ATR(60) 的平均
+    （A 股，见模块说明；日线不足 61 根时退回 ATR20，并在 method 里如实写 atr20）。"""
     df = _bars(bars)
     if df is None or len(df) < ATR_WINDOW + 1 or not {"high", "low"} <= set(df.columns):
         return None
     h, l, c = (df[k].astype(float) for k in ("high", "low", "close"))
     prev = c.shift(1)
     tr = pd.concat([h - l, (h - prev).abs(), (l - prev).abs()], axis=1).max(axis=1)
-    atr = float(tr.iloc[-ATR_WINDOW:].mean())
+    atr20 = float(tr.iloc[-ATR_WINDOW:].mean())
+    width, used = atr20, "atr20"
+    if method == "har" and len(df) >= max(HAR_WINDOWS) + 1:
+        width = float(sum(tr.iloc[-n:].mean() for n in HAR_WINDOWS) / len(HAR_WINDOWS))
+        used = "har"
     close = float(c.iloc[-1])
-    if not atr > 0 or not close > 0:
+    if not width > 0 or not close > 0:
         return None
-    return {"atr": atr, "atr_pct": atr / close, "close": close, "low": close - atr, "high": close + atr,
-            "as_of": df["date"].iloc[-1].strftime("%Y-%m-%d")}
+    return {"atr": width, "atr_pct": width / close, "close": close, "low": close - width, "high": close + width,
+            "method": used, "atr20": atr20, "as_of": df["date"].iloc[-1].strftime("%Y-%m-%d")}

@@ -1490,11 +1490,13 @@ class NotificationService(
                         # 支撑位 / 压力位不再显示（八种算法都不比随机价位准），改列 ±1 ATR 的次日波动区间
                         expected = dashboard.get('expected_range') if isinstance(dashboard, dict) else None
                         if isinstance(expected, dict) and expected.get('low') is not None:
+                            har = expected.get('method') == 'har'
                             report_lines.append(
-                                f"| {labels['expected_range_label']} | {expected['low']:.2f} ~ {expected['high']:.2f}"
-                                f"（ATR {expected['atr']:.2f}，±{expected['atr_pct'] * 100:.1f}%） |"
+                                f"| {labels['expected_range_har_label' if har else 'expected_range_label']} | "
+                                f"{expected['low']:.2f} ~ {expected['high']:.2f}"
+                                f"（{'HAR' if har else 'ATR'} {expected['atr']:.2f}，±{expected['atr_pct'] * 100:.1f}%） |"
                             )
-                            report_lines.extend(["", f"> ℹ️ {labels['atr_note']}"])
+                            report_lines.extend(["", f"> ℹ️ {labels['atr_note_har' if har else 'atr_note']}"])
                         report_lines.append("")
                     # 量能分析
                     if vol_data:

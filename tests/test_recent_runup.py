@@ -58,3 +58,23 @@ def test_expected_range_is_close_plus_minus_atr():
     assert out["atr"] == pytest.approx(1.0)
     assert (out["low"], out["high"]) == (pytest.approx(9.0), pytest.approx(11.0))
     assert out["atr_pct"] == pytest.approx(0.1)
+    assert out["method"] == "atr20"
+
+
+def test_expected_range_har_averages_5_20_60_day_atr():
+    # 前 41 天波幅 2，后 20 天波幅 1，最后 5 天波幅 0.5：ATR5 0.5、ATR20 (15*1+5*0.5)/20、ATR60 含 40 天的 2
+    widths = [2.0] * 41 + [1.0] * 15 + [0.5] * 5
+    closes = [10.0] * len(widths)
+    bars = _bars(closes, highs=[10 + w / 2 for w in widths], lows=[10 - w / 2 for w in widths])
+    out = rr.compute_expected_range(bars, method="har")
+    atr5, atr20, atr60 = 0.5, (15 * 1.0 + 5 * 0.5) / 20, (40 * 2.0 + 15 * 1.0 + 5 * 0.5) / 60
+    assert out["method"] == "har"
+    assert out["atr"] == pytest.approx((atr5 + atr20 + atr60) / 3)
+    assert out["atr20"] == pytest.approx(atr20)
+    assert out["high"] == pytest.approx(10 + out["atr"])
+
+
+def test_expected_range_har_falls_back_to_atr20_when_history_short():
+    bars = _bars([10.0] * 40, highs=[10.5] * 40, lows=[9.5] * 40)
+    out = rr.compute_expected_range(bars, method="har")
+    assert out["method"] == "atr20" and out["atr"] == pytest.approx(1.0)

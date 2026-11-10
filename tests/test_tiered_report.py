@@ -573,10 +573,22 @@ class ExpectedRangeTest(unittest.TestCase):
                                           "low": 268.36, "high": 295.36, "as_of": "2026-10-16"}},
         )
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
-        self.assertIn("| 次日波动区间（±1 ATR） |", summary)
+        self.assertIn("| 次日波动区间 |", summary)
         self.assertIn("¥268.36 ~ ¥295.36（±4.8%）", summary)
         self.assertIn("ATR（平均真实波幅）", summary)
         self.assertIn("不再提示支撑位和压力位", summary)
+        self.assertNotIn("5 / 20 / 60", summary)     # 只有 ATR20 口径时不出 HAR 说明
+
+    def test_har_range_gets_har_note(self):
+        result = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50,
+            dashboard={"expected_range": {"atr": 0.4, "atr_pct": 0.0135, "close": 29.69, "low": 29.29,
+                                          "high": 30.09, "method": "har", "atr20": 0.38, "as_of": "2026-11-10"}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
+        self.assertIn("近 5 / 20 / 60 日 ATR 的平均", summary)
+        self.assertIn("24.5%", summary)
+        self.assertNotIn("美股次日波动区间", summary)
 
     def test_runup_flag_is_listed_as_program_risk(self):
         result = _make_lite_result(
