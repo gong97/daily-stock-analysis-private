@@ -588,7 +588,23 @@ class ExpectedRangeTest(unittest.TestCase):
         summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[result]))
         self.assertIn("近 5 / 20 / 60 日 ATR 的平均", summary)
         self.assertIn("24.5%", summary)
-        self.assertNotIn("美股次日波动区间", summary)
+        self.assertIn("美股 24.7%", summary)
+        self.assertNotIn("港股等其他市场", summary)
+
+    def test_mixed_har_and_atr20_ranges_get_both_notes(self):
+        har = _make_lite_result(
+            code="AAPL", name="Apple", action="hold", score=50,
+            dashboard={"expected_range": {"atr": 4.0, "atr_pct": 0.015, "close": 270.0, "low": 266.0,
+                                          "high": 274.0, "method": "har", "atr20": 3.9, "as_of": "2026-11-10"}},
+        )
+        short = _make_lite_result(
+            code="600900.SH", name="长江电力", action="hold", score=50,
+            dashboard={"expected_range": {"atr": 0.4, "atr_pct": 0.0135, "close": 29.69, "low": 29.29,
+                                          "high": 30.09, "method": "atr20", "atr20": 0.4, "as_of": "2026-11-10"}},
+        )
+        summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[har, short]))
+        self.assertIn("近 5 / 20 / 60 日 ATR 的平均", summary)
+        self.assertIn("港股等其他市场，或日线不足 61 根时：次日波动区间 = 最新收盘 ± 1 个 ATR", summary)
 
     def test_runup_flag_is_listed_as_program_risk(self):
         result = _make_lite_result(
