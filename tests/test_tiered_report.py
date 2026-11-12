@@ -563,6 +563,40 @@ class ProgramFlagKeyPriceTest(unittest.TestCase):
         self.assertIn("| 长江电力 600900.SH | HOLD | — | — |", summary)
 
 
+class PendingBuybackTest(unittest.TestCase):
+    """2026-11-12 起名单含「待买回」：总览表名字后标出，表下说明动作怎么读。"""
+
+    def test_pending_buyback_marked(self):
+        import json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "notes.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"600258": "待买回（11-02 起卖出，2 次卖出，还剩 4,500 股没买回）"}, fh, ensure_ascii=False)
+            held = _make_lite_result(code="600900.SH", name="长江电力", action="hold", score=50)
+            pending = _make_lite_result(code="600258", name="首旅酒店", action="hold", score=50)
+            old = os.environ.get("STOCK_LIST_NOTES_FILE")
+            os.environ["STOCK_LIST_NOTES_FILE"] = path
+            try:
+                summary = render_decision_summary(TieredAnalysisOutcome(lite_results=[held, pending]))
+            finally:
+                if old is None:
+                    os.environ.pop("STOCK_LIST_NOTES_FILE", None)
+                else:
+                    os.environ["STOCK_LIST_NOTES_FILE"] = old
+        self.assertIn("| 首旅酒店 ·待买回 600258 |", summary)
+        self.assertIn("| 长江电力 600900.SH |", summary)
+        self.assertIn("「减仓 / 清仓」对它不适用", summary)
+        self.assertIn("首旅酒店：待买回（11-02 起卖出", summary)
+
+    def test_no_notes_file_no_marker(self):
+        os.environ.pop("STOCK_LIST_NOTES_FILE", None)
+        summary = render_decision_summary(TieredAnalysisOutcome(
+            lite_results=[_make_lite_result(code="600258", name="首旅酒店", action="hold", score=50)]))
+        self.assertNotIn("待买回", summary)
+
+
 class ExpectedRangeTest(unittest.TestCase):
     """次日波动区间（±1 ATR）：总览表一列 + 表下 ATR 说明；卡片关键位置不再列支撑 / 压力。"""
 

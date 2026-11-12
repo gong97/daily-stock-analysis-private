@@ -456,6 +456,9 @@ jobs:
           # 美股名单在 US_STOCK_LIST（逗号分隔；A/B 股写 BRK.B，不写 BRK-B——后者会被当成 A 股代码）。
           # 未设置时用美股日报的 10 只个股；绝不能回落到 A 股的 STOCK_LIST。
           STOCK_LIST_CONFIG: ${{ inputs.market == 'us' && (vars.US_STOCK_LIST || secrets.US_STOCK_LIST || 'AAPL,MSFT,AMZN,GOOGL,META,NVDA,TSLA,JPM,BRK.B,BF.B') || (vars.STOCK_LIST || secrets.STOCK_LIST) }}
+          # A 股名单 2026-11-12 起由 scripts/holdings_stock_list.py 从 Macd-Qlib-Analyzer 的持仓账本生成
+          # （仓位 >= 0.5% 或近 20 个交易日交易过的个股 + 待买回）；取不到才用上面的 STOCK_LIST 变量。设为 false 关掉。
+          HOLDINGS_AUTO_LIST: ${{ inputs.market != 'us' && (vars.HOLDINGS_AUTO_LIST || 'true') || 'false' }}
           # 美股空仓时名单只是关注列表，报告标题写「关注」；有持仓后把 US_STOCK_LIST_LABEL 设为「持仓」
           STOCK_LIST_LABEL: ${{ inputs.market == 'us' && (vars.US_STOCK_LIST_LABEL || '关注') || '' }}
           EMAIL_SUBJECT_PREFIX: ${{ inputs.market == 'us' && '【美股】' || '' }}
@@ -525,6 +528,16 @@ jobs:
             export STOCK_LIST="$STOCK_LIST_CONFIG"
           elif [ -z "${STOCK_LIST:-}" ]; then
             export STOCK_LIST="600519"
+          fi
+          # A 股：名单跟随持仓账本（见 HOLDINGS_AUTO_LIST）；失败时脚本已在日志写明原因，沿用上面的变量
+          if [ "${HOLDINGS_AUTO_LIST:-false}" = "true" ]; then
+            if AUTO_LIST=$(python scripts/holdings_stock_list.py --notes-out data/stock_list_notes.json); then
+              export STOCK_LIST="$AUTO_LIST"
+              export STOCK_LIST_NOTES_FILE="data/stock_list_notes.json"
+              echo "📋 名单来自持仓账本"
+            else
+              echo "⚠️ 持仓账本名单生成失败，沿用 STOCK_LIST 变量"
+            fi
           fi
 
           # 处理 LITELLM YAML 配置文件

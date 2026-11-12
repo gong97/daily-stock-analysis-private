@@ -7,12 +7,30 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional
 
 from src.core.tiered_analysis import ADD_ACTIONS, CUT_ACTIONS, TieredAnalysisOutcome, TieredCandidate
 from src.schemas.decision_action import display_action_fields_for_result, localize_action_label
 from src.utils.sniper_points import extract_sniper_points
+
+def _stock_list_notes() -> Dict[str, str]:
+    """scripts/holdings_stock_list.py 写的 {6 位代码: 说明}（目前只有「待买回」）；没有就空。"""
+    path = os.getenv("STOCK_LIST_NOTES_FILE", "").strip()
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+
+
+def _note_key(code: Any) -> str:
+    return str(code or "").split(".")[0]
+
 
 def _list_label() -> str:
     """STOCK_LIST 的称呼：默认「持仓」；美股空仓时那份名单只是关注列表，workflow 设 STOCK_LIST_LABEL=关注。"""
@@ -362,6 +380,7 @@ def render_decision_summary(
     if not results:
         return ""
 
+    notes = _stock_list_notes()
     rows = []
     for result in results:
         bucket = _summary_action_bucket(result)
@@ -370,7 +389,8 @@ def render_decision_summary(
         current_price = _summary_current_price(result, dashboard)
         rows.append(
             {
-                "name": getattr(result, "name", ""),
+                "name": getattr(result, "name", "")
+                + (" ·待买回" if _note_key(getattr(result, "code", "")) in notes else ""),
                 "code": getattr(result, "code", ""),
                 "bucket": bucket,
                 "action_label": _summary_action_label(result, bucket),
@@ -403,6 +423,11 @@ def render_decision_summary(
     lines.append("")
     for note in range_notes([_dashboard_of(r) for r in results]):
         lines.append(f"> ℹ️ {note}")
+    pending = [f"{r['name'].replace(' ·待买回', '')}：{notes[_note_key(r['code'])]}"
+               for r in rows if _note_key(r["code"]) in notes]
+    if pending:
+        lines.append("> 🔁 标「待买回」的已经卖出、还没买回（波段 T 对账里仍在进行中）：动作按「要不要买回」读，"
+                     "「减仓 / 清仓」对它不适用；买回限价可参考次日波动区间。" + "；".join(pending))
 
     return "\n".join(lines)
 
