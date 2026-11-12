@@ -94,6 +94,6 @@ def test_recent_runup_is_the_fourth_program_item() -> None:
 
     hit = {"flag": True, "top": True, "excess": 0.14, "stock_ret": 0.16, "index_ret": 0.02}
     items = build_program_checklist(None, None, "zh", recent_runup=hit)
-    assert items[3] == "⚠️ 【程序】近 5 日涨幅居前（不追高）：5 日 +16.0%，扣除中证 1000 后 +14.0%，全市场前 5%"
+    assert items[3] == "⚠️ 【程序】近 5 日涨幅居前（只用在买入一侧：不追、不加仓）：5 日 +16.0%，扣除中证 1000 后 +14.0%，全市场前 5%"
     miss = {**hit, "flag": False, "top": False}
     assert build_program_checklist(None, None, "zh", recent_runup=miss)[3].startswith("✅")

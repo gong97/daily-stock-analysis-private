@@ -38,7 +38,7 @@ _TEXT = {
         "insider_none": "近期无",
         "insider_failed": "未取到数据",
         "more": "等 {n} 笔",
-        "runup": "近 5 日涨幅居前（不追高）",
+        "runup": "近 5 日涨幅居前（只用在买入一侧：不追、不加仓）",
         "runup_detail": "5 日 {stock:+.1%}，扣除中证 1000 后 {excess:+.1%}，全市场{tier}",
         "runup_tier_top": "前 5%",
         "runup_tier": "前 5~10%",
